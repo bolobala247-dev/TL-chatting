@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
+import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
 import type { Profile } from "@/src/types";
 
@@ -114,7 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true });
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: "http://localhost:8081/(auth)/reset-password",
+        redirectTo: Linking.createURL("/(auth)/reset-password"),
       });
       if (error) throw error;
     } finally {
@@ -129,6 +130,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password: newPassword,
       });
       if (error) throw error;
+
+      await supabase.auth.signOut();
+      set({ session: null, user: null, profile: null });
     } finally {
       set({ loading: false });
     }

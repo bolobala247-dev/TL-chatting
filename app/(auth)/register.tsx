@@ -5,46 +5,76 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 
 export default function RegisterScreen() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [formError, setFormError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [success, setSuccess] = useState(false);
   const { signUp, loading } = useAuthStore();
 
   const handleRegister = async () => {
+    setFormError("");
+    setPasswordError("");
+    setConfirmPasswordError("");
+
     if (!username.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
+      setFormError("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp");
+      setConfirmPasswordError("Mật khẩu xác nhận không khớp");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự");
+      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự");
       return;
     }
 
     try {
       await signUp(email.trim(), password, username.trim());
-      Alert.alert(
-        "Đăng ký thành công",
-        "Vui lòng kiểm tra email để xác thực tài khoản"
-      );
-    } catch (error: any) {
-      Alert.alert("Đăng ký thất bại", error.message);
+      setSuccess(true);
+    } catch (err: unknown) {
+      console.error("[Register]", err);
+      const msg =
+        err instanceof Error ? err.message : "Đăng ký thất bại, vui lòng thử lại";
+      setFormError(msg);
     }
   };
+
+  if (success) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6">
+        <Text className="text-5xl">✉️</Text>
+        <Text className="mt-6 text-center text-xl font-bold text-gray-900">
+          Đăng ký thành công
+        </Text>
+        <Text className="mt-3 text-center text-base text-gray-500">
+          Vui lòng kiểm tra email{"\n"}
+          <Text className="font-medium text-gray-700">{email}</Text>
+          {"\n"}để xác thực tài khoản.
+        </Text>
+        <View className="mt-8 w-full">
+          <Button
+            title="Đăng nhập"
+            onPress={() => router.replace("/(auth)/login")}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -70,11 +100,16 @@ export default function RegisterScreen() {
               Tên người dùng
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                formError ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="username"
               placeholderTextColor="#9CA3AF"
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(text) => {
+                setUsername(text);
+                if (formError) setFormError("");
+              }}
               autoCapitalize="none"
               textContentType="username"
               autoComplete="username"
@@ -86,11 +121,16 @@ export default function RegisterScreen() {
               Email
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                formError ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="email@example.com"
               placeholderTextColor="#9CA3AF"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (formError) setFormError("");
+              }}
               autoCapitalize="none"
               keyboardType="email-address"
               textContentType="emailAddress"
@@ -103,15 +143,23 @@ export default function RegisterScreen() {
               Mật khẩu
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                passwordError ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="Ít nhất 6 ký tự"
               placeholderTextColor="#9CA3AF"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (passwordError) setPasswordError("");
+              }}
               secureTextEntry
               textContentType="newPassword"
               autoComplete="new-password"
             />
+            {passwordError ? (
+              <Text className="mt-1.5 text-sm text-red-600">{passwordError}</Text>
+            ) : null}
           </View>
 
           <View>
@@ -119,16 +167,30 @@ export default function RegisterScreen() {
               Xác nhận mật khẩu
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                confirmPasswordError ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="Nhập lại mật khẩu"
               placeholderTextColor="#9CA3AF"
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (confirmPasswordError) setConfirmPasswordError("");
+              }}
               secureTextEntry
               textContentType="newPassword"
               autoComplete="new-password"
             />
+            {confirmPasswordError ? (
+              <Text className="mt-1.5 text-sm text-red-600">
+                {confirmPasswordError}
+              </Text>
+            ) : null}
           </View>
+
+          {formError ? (
+            <Text className="text-sm text-red-600">{formError}</Text>
+          ) : null}
 
           <Button
             title="Đăng ký"

@@ -58,4 +58,30 @@ Destructive actions → `ConfirmDialog` (not `Alert.alert`):
 />
 ```
 
+## User feedback (no `Alert.alert`)
+
+`Alert.alert` is unreliable on Expo web — avoid it for validation, success, and error messages.
+
+| Case | Pattern |
+|------|---------|
+| Field validation | Inline `<Text className="text-sm text-red-600">` under the input; optional red border |
+| Form / API error | Inline message above submit button + `console.error("[ScreenName]", error)` |
+| Success with next step | Dedicated success view (see `forgot-password.tsx`, `reset-password.tsx`) |
+
+```tsx
+const [error, setError] = useState("");
+
+// validation
+if (!email.trim()) {
+  setError("Vui lòng nhập email");
+  return;
+}
+
+// API catch
+catch (error: unknown) {
+  console.error("[ForgotPassword]", error);
+  setError(error instanceof Error ? error.message : "Đã xảy ra lỗi");
+}
+```
+
 Use RN primitives only (`View`, `Text`, `Pressable`) — no HTML elements.

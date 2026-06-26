@@ -6,7 +6,6 @@ import {
   FlatList,
   Pressable,
   Modal,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -33,6 +32,8 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [groupNameError, setGroupNameError] = useState("");
+  const [formError, setFormError] = useState("");
 
   const isGroup = selectedUsers.length > 1;
 
@@ -68,12 +69,14 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   const handleCreate = async () => {
     if (!user || selectedUsers.length === 0) return;
 
+    setGroupNameError("");
+    setFormError("");
     setLoading(true);
     try {
       let room;
       if (isGroup) {
         if (!groupName.trim()) {
-          Alert.alert("Lỗi", "Vui lòng nhập tên nhóm");
+          setGroupNameError("Vui lòng nhập tên nhóm");
           setLoading(false);
           return;
         }
@@ -91,8 +94,13 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
 
       handleClose();
       router.push(`/chat/${room.id}` as any);
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+    } catch (err: unknown) {
+      console.error("[CreateRoomModal]", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể tạo cuộc trò chuyện, vui lòng thử lại";
+      setFormError(msg);
     } finally {
       setLoading(false);
     }
@@ -103,6 +111,8 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
     setSearchResults([]);
     setSelectedUsers([]);
     setGroupName("");
+    setGroupNameError("");
+    setFormError("");
     onClose();
   };
 
@@ -188,12 +198,20 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
         {isGroup && (
           <View className="border-b border-gray-100 px-4 py-3">
             <TextInput
-              className="h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900"
+              className={`h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900 ${
+                groupNameError ? "border border-red-500" : ""
+              }`}
               placeholder="Tên nhóm..."
               placeholderTextColor="#9CA3AF"
               value={groupName}
-              onChangeText={setGroupName}
+              onChangeText={(text) => {
+                setGroupName(text);
+                if (groupNameError) setGroupNameError("");
+              }}
             />
+            {groupNameError ? (
+              <Text className="mt-1.5 text-sm text-red-600">{groupNameError}</Text>
+            ) : null}
           </View>
         )}
 
@@ -217,6 +235,9 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
 
         {selectedUsers.length > 0 && (
           <View className="border-t border-gray-100 px-4 py-3">
+            {formError ? (
+              <Text className="mb-2 text-sm text-red-600">{formError}</Text>
+            ) : null}
             <Button
               title={isGroup ? "Tạo nhóm" : "Bắt đầu trò chuyện"}
               onPress={handleCreate}
