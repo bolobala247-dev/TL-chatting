@@ -8,6 +8,8 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useCooldown } from "@/src/hooks/useCooldown";
+import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 
@@ -21,6 +23,7 @@ export default function RegisterScreen() {
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [success, setSuccess] = useState(false);
+  const { cooldown, setCooldown } = useCooldown();
   const { signUp, loading } = useAuthStore();
 
   const handleRegister = async () => {
@@ -47,10 +50,14 @@ export default function RegisterScreen() {
       await signUp(email.trim(), password, username.trim());
       setSuccess(true);
     } catch (err: unknown) {
-      console.error("[Register]", err);
-      const msg =
-        err instanceof Error ? err.message : "Đăng ký thất bại, vui lòng thử lại";
-      setFormError(msg);
+      logAuthErrorDebug("Register", err);
+      const { message, cooldownSeconds } = formatAuthFormError(
+        err,
+        "Đăng ký thất bại, vui lòng thử lại",
+        "signup",
+      );
+      setFormError(message);
+      if (cooldownSeconds) setCooldown(cooldownSeconds);
     }
   };
 
@@ -193,9 +200,10 @@ export default function RegisterScreen() {
           ) : null}
 
           <Button
-            title="Đăng ký"
+            title={cooldown > 0 ? `Đăng ký lại sau (${cooldown}s)` : "Đăng ký"}
             onPress={handleRegister}
             loading={loading}
+            disabled={cooldown > 0}
           />
 
           <View className="mt-4 flex-row items-center justify-center gap-1">

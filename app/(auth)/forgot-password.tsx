@@ -8,6 +8,8 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useCooldown } from "@/src/hooks/useCooldown";
+import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 
@@ -17,6 +19,7 @@ export default function ForgotPasswordScreen() {
   const { resetPassword, loading } = useAuthStore();
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const { cooldown, setCooldown } = useCooldown();
 
   const handleReset = async () => {
     setError("");
@@ -28,13 +31,15 @@ export default function ForgotPasswordScreen() {
     try {
       await resetPassword(email.trim());
       setSent(true);
-    } catch (err: any) {
-      const msg = err.message || "";
-      if (msg.includes("once every") || err.status === 429) {
-        setError("Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi 1 phút rồi thử lại.");
-      } else {
-        setError(msg || "Đã xảy ra lỗi, vui lòng thử lại");
-      }
+    } catch (err: unknown) {
+      logAuthErrorDebug("ForgotPassword", err);
+      const { message, cooldownSeconds } = formatAuthFormError(
+        err,
+        "Đã xảy ra lỗi, vui lòng thử lại",
+        "password_reset",
+      );
+      setError(message);
+      if (cooldownSeconds) setCooldown(cooldownSeconds);
     }
   };
 
@@ -101,9 +106,10 @@ export default function ForgotPasswordScreen() {
           ) : null}
 
           <Button
-            title="Gửi link đặt lại"
+            title={cooldown > 0 ? `Gửi lại sau (${cooldown}s)` : "Gửi link đặt lại"}
             onPress={handleReset}
             loading={loading}
+            disabled={cooldown > 0}
           />
 
           <View className="mt-4 items-center">
