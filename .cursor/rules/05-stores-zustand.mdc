@@ -1,0 +1,51 @@
+---
+description: Zustand store patterns for TL-Chatting state management
+globs: src/stores/**
+alwaysApply: false
+---
+
+# Zustand Stores
+
+## Structure
+
+```typescript
+interface ChatState {
+  messages: Record<string, Message[]>;
+  loading: boolean;
+  fetchMessages: (roomId: string) => Promise<void>;
+}
+
+export const useChatStore = create<ChatState>((set, get) => ({
+  messages: {},
+  loading: false,
+
+  fetchMessages: async (roomId) => {
+    set({ loading: true });
+    try {
+      const data = await messageService.getMessages(roomId);
+      set((state) => ({ messages: { ...state.messages, [roomId]: data }, loading: false }));
+    } catch {
+      set({ loading: false });
+    }
+  },
+}));
+```
+
+## Conventions
+
+- Naming: `use[Domain]Store` — `useAuthStore`, `useChatStore`, `useRoomStore`
+- Interface defined above the store
+- Async ops: `set({ loading: true })` + `try/finally { set({ loading: false }) }`
+- Prefer calling **services** for Supabase queries (exception: existing `authStore` uses `supabase.auth`)
+
+## Message deduplication
+
+Before adding realtime messages, check for existing ID:
+
+```typescript
+if (roomMessages.some((m) => m.id === message.id)) return state;
+```
+
+## Optimistic message helpers
+
+Stores expose: `addOptimisticMessage`, `replaceOptimisticMessage`, `removeMessage` — hooks call these, not inline state mutation in screens.

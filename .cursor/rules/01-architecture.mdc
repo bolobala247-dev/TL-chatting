@@ -1,0 +1,36 @@
+---
+description: Layered architecture and data flow for TL-Chatting
+globs: app/**,src/**
+alwaysApply: false
+---
+
+# Architecture
+
+## One-way data flow
+
+```
+app/ (screens) → src/hooks/ → src/stores/ + src/services/ → src/lib/supabase.ts
+```
+
+```typescript
+// ❌ BAD — Supabase in a screen
+const { data } = await supabase.from("messages").select("*");
+
+// ✅ GOOD — hook orchestrates service + store
+const { messages, sendMessage } = useMessages(roomId);
+```
+
+## Layer rules
+
+| Layer | May call | Must NOT call |
+|-------|----------|---------------|
+| `app/`, `src/components/` | hooks, UI components | supabase, services directly |
+| `src/hooks/` | stores, services | supabase (except realtime in dedicated hooks) |
+| `src/stores/` | services | supabase directly (except existing authStore) |
+| `src/services/` | supabase | React hooks, components |
+
+## Scope discipline
+
+- Smallest correct diff — no unrelated refactors
+- Read surrounding code and match existing patterns
+- No premature abstractions or over-engineering

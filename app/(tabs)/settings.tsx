@@ -12,6 +12,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
+import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 
 export default function SettingsScreen() {
   const { profile, user, signOut, fetchProfile } = useAuthStore();
@@ -20,6 +21,7 @@ export default function SettingsScreen() {
   );
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -68,17 +70,20 @@ export default function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
-      { text: "Huỷ", style: "cancel" },
-      {
-        text: "Đăng xuất",
-        style: "destructive",
-        onPress: signOut,
-      },
-    ]);
+    setShowSignOutConfirm(true);
+  };
+
+  const confirmSignOut = async () => {
+    setShowSignOutConfirm(false);
+    try {
+      await signOut();
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.message || "Không thể đăng xuất");
+    }
   };
 
   return (
+    <>
     <ScrollView className="flex-1 bg-white">
       <View className="items-center px-4 pt-6">
         <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar}>
@@ -151,5 +156,17 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
     </ScrollView>
+
+    <ConfirmDialog
+      visible={showSignOutConfirm}
+      title="Đăng xuất"
+      message="Bạn có chắc muốn đăng xuất?"
+      confirmText="Đăng xuất"
+      cancelText="Huỷ"
+      destructive
+      onConfirm={confirmSignOut}
+      onCancel={() => setShowSignOutConfirm(false)}
+    />
+    </>
   );
 }

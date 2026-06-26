@@ -1,0 +1,54 @@
+---
+description: Supabase service layer — queries, mutations, error handling
+globs: src/services/**,src/lib/**
+alwaysApply: false
+---
+
+# Services & Supabase Client
+
+## Service pattern
+
+Plain objects with async methods — not classes:
+
+```typescript
+export const messageService = {
+  async getMessages(roomId: string, cursor?: string): Promise<Message[]> {
+    let query = supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: false })
+      .limit(MESSAGES_PER_PAGE);
+
+    if (cursor) query = query.lt("created_at", cursor);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  async sendMessage(message: InsertTables<"messages">): Promise<Message> {
+    const { data, error } = await supabase.from("messages").insert(message).select().single();
+    if (error) throw error;
+    return data;
+  },
+};
+```
+
+## Rules
+
+- All `supabase.from()` calls live in `src/services/` only
+- `if (error) throw error` — let hooks/stores handle UI feedback
+- Lists: `return data ?? []` · Single: `return data`
+- Use typed client: `createClient<Database>` in `src/lib/supabase.ts`
+- Constants (page sizes, etc.) in `src/lib/constants.ts`
+
+## Auth storage
+
+`src/lib/supabase.ts` uses `expo-secure-store` on native, default storage on web. Never add `service_role` key here.
+
+## Types in services
+
+```typescript
+import type { Message, InsertTables } from "@/src/types";
+```

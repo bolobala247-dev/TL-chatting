@@ -1,0 +1,37 @@
+# TL-Chatting Core
+
+## Stack
+
+Expo SDK 56 · React Native 0.85 · TypeScript strict · Expo Router · Zustand v5 · NativeWind v4 · Supabase
+
+Always consult https://docs.expo.dev/versions/v56.0.0/ — do NOT use outdated Expo APIs.
+
+## Imports
+
+```typescript
+// ✅ GOOD
+import type { Message } from "@/src/types";
+import { messageService } from "@/src/services/messageService";
+
+// ❌ BAD — relative deep paths, missing type keyword
+import { Message } from "../../../src/types";
+```
+
+Order: React/RN → expo packages → `@/` imports → relative.
+
+## UI Language
+
+User-facing text is **Vietnamese** (buttons, errors, dialogs, placeholders).
+
+## Dev Commands
+
+```bash
+npx expo start           # Dev server
+npx expo start --clear   # Clear Metro cache
+```
+
+Do not commit `.env.local` or debug logs.
+
+## Cross-reference
+
+Full rules: `AGENTS.md`. Modular rules in `.agent/rules/` by domain.

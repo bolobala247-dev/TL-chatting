@@ -1,0 +1,57 @@
+---
+description: Custom hooks, realtime subscriptions, optimistic updates
+globs: src/hooks/**
+alwaysApply: false
+---
+
+# Hooks & Realtime
+
+## Hook role
+
+Hooks bridge UI ↔ stores ↔ services. Name: `use[Feature]` (e.g. `useMessages`, `useAuth`).
+
+## Zustand selectors
+
+```typescript
+// ✅ GOOD — stable selector, no full-store destructure
+const addMessage = useChatStore((s) => s.addMessage);
+const messages = useChatStore((s) => s.messages[roomId] ?? EMPTY_MESSAGES);
+
+// ❌ BAD
+const store = useChatStore();
+```
+
+Use stable empty constants (`const EMPTY_MESSAGES: Message[] = []`) to avoid re-renders.
+
+## Realtime subscriptions
+
+Only in `src/hooks/`. Always cleanup:
+
+```typescript
+useEffect(() => {
+  const channel = supabase
+    .channel(`room:${roomId}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` },
+      (payload) => addMessage(payload.new as Message))
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, [roomId, addMessage]);
+```
+
+Channel names: `room:${roomId}`, `global:messages`, `typing:${roomId}`.
+
+## Optimistic updates (messages)
+
+```typescript
+const tempId = `temp-${Date.now()}`;
+addOptimisticMessage(optimistic);
+try {
+  const sent = await messageService.sendMessage({ ... });
+  replaceOptimisticMessage(tempId, sent);
+} catch {
+  removeMessage(tempId, roomId);
+}
+```
+
+Use `useCallback` for handlers passed to list items.

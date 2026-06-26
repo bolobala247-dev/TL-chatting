@@ -5,7 +5,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
@@ -17,18 +16,25 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const { resetPassword, loading } = useAuthStore();
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
   const handleReset = async () => {
+    setError("");
     if (!email.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập email");
+      setError("Vui lòng nhập email");
       return;
     }
 
     try {
       await resetPassword(email.trim());
       setSent(true);
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+    } catch (err: any) {
+      const msg = err.message || "";
+      if (msg.includes("once every") || err.status === 429) {
+        setError("Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi 1 phút rồi thử lại.");
+      } else {
+        setError(msg || "Đã xảy ra lỗi, vui lòng thử lại");
+      }
     }
   };
 
@@ -89,6 +95,10 @@ export default function ForgotPasswordScreen() {
               autoFocus
             />
           </View>
+
+          {error ? (
+            <Text className="text-sm text-red-600">{error}</Text>
+          ) : null}
 
           <Button
             title="Gửi link đặt lại"

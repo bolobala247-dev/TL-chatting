@@ -1,0 +1,40 @@
+# Database & Migrations
+
+## Migration files
+
+Location: `supabase/migrations/0000N_description.sql` — sequential numbering.
+
+Each migration must include:
+1. Table/column changes
+2. **RLS policies** on new tables
+3. Indexes for query patterns
+4. Realtime publication if live updates needed:
+   ```sql
+   ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+   ```
+
+## Never edit by hand
+
+`src/types/database.ts` mirrors Supabase schema — regenerate after migration:
+
+```bash
+npx supabase gen types typescript --project-id <your-project-id> > src/types/database.ts
+```
+
+Then update `src/types/index.ts` aliases if new tables were added:
+
+```typescript
+export type Profile = Tables<"profiles">;
+export type Message = Tables<"messages">;
+```
+
+## Domain types
+
+Composite types (`RoomWithLastMessage`, `MessageWithSender`) live in `src/types/index.ts` — not in `database.ts`.
+
+## After schema change checklist
+
+1. Migration SQL committed
+2. Types regenerated
+3. Service methods added/updated
+4. RLS tested with anon key (client perspective)
