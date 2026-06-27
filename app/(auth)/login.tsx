@@ -5,7 +5,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from "react-native";
 import { Link } from "expo-router";
@@ -15,18 +14,23 @@ import { Button } from "@/src/components/ui/Button";
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const { signIn, loading } = useAuthStore();
 
   const handleLogin = async () => {
+    setError("");
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập email và mật khẩu");
+      setError("Vui lòng nhập email và mật khẩu");
       return;
     }
 
     try {
       await signIn(email.trim(), password);
-    } catch (error: any) {
-      Alert.alert("Đăng nhập thất bại", error.message);
+    } catch (err: unknown) {
+      console.error("[Login]", err);
+      const msg =
+        err instanceof Error ? err.message : "Đăng nhập thất bại, vui lòng thử lại";
+      setError(msg);
     }
   };
 
@@ -54,11 +58,16 @@ export default function LoginScreen() {
               Email
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                error ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="email@example.com"
               placeholderTextColor="#9CA3AF"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (error) setError("");
+              }}
               autoCapitalize="none"
               keyboardType="email-address"
               textContentType="emailAddress"
@@ -71,11 +80,16 @@ export default function LoginScreen() {
               Mật khẩu
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                error ? "border-red-500" : "border-gray-300"
+              }`}
               placeholder="Nhập mật khẩu"
               placeholderTextColor="#9CA3AF"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (error) setError("");
+              }}
               secureTextEntry
               textContentType="password"
               autoComplete="password"
@@ -89,6 +103,10 @@ export default function LoginScreen() {
               </Text>
             </Link>
           </View>
+
+          {error ? (
+            <Text className="text-sm text-red-600">{error}</Text>
+          ) : null}
 
           <Button
             title="Đăng nhập"

@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  Alert,
   ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -22,18 +21,27 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [avatarError, setAvatarError] = useState("");
+  const [signOutError, setSignOutError] = useState("");
 
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
+    setProfileSuccess("");
+    setProfileError("");
     try {
       await profileService.updateProfile(user.id, {
         display_name: displayName.trim() || null,
       });
       await fetchProfile();
-      Alert.alert("Thành công", "Đã cập nhật hồ sơ");
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+      setProfileSuccess("Đã cập nhật hồ sơ");
+    } catch (err: unknown) {
+      console.error("[Settings] save profile", err);
+      const msg =
+        err instanceof Error ? err.message : "Không thể cập nhật hồ sơ";
+      setProfileError(msg);
     } finally {
       setSaving(false);
     }
@@ -41,11 +49,12 @@ export default function SettingsScreen() {
 
   const handlePickAvatar = async () => {
     if (!user) return;
+    setAvatarError("");
 
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Lỗi", "Cần quyền truy cập thư viện ảnh");
+      setAvatarError("Cần quyền truy cập thư viện ảnh");
       return;
     }
 
@@ -62,14 +71,18 @@ export default function SettingsScreen() {
     try {
       await profileService.uploadAvatar(user.id, result.assets[0].uri);
       await fetchProfile();
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message);
+    } catch (err: unknown) {
+      console.error("[Settings] upload avatar", err);
+      const msg =
+        err instanceof Error ? err.message : "Không thể tải ảnh đại diện";
+      setAvatarError(msg);
     } finally {
       setUploadingAvatar(false);
     }
   };
 
   const handleSignOut = () => {
+    setSignOutError("");
     setShowSignOutConfirm(true);
   };
 
@@ -77,8 +90,13 @@ export default function SettingsScreen() {
     setShowSignOutConfirm(false);
     try {
       await signOut();
-    } catch (error: any) {
-      Alert.alert("Lỗi", error.message || "Không thể đăng xuất");
+    } catch (err: unknown) {
+      console.error("[Settings] sign out", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể đăng xuất, vui lòng thử lại";
+      setSignOutError(msg);
     }
   };
 
@@ -102,6 +120,12 @@ export default function SettingsScreen() {
         <Text className="mt-3 text-sm text-gray-500">
           @{profile?.username || "unknown"}
         </Text>
+
+        {avatarError ? (
+          <Text className="mt-2 text-center text-sm text-red-600">
+            {avatarError}
+          </Text>
+        ) : null}
       </View>
 
       <View className="mt-6 px-4">
@@ -115,13 +139,26 @@ export default function SettingsScreen() {
               Tên hiển thị
             </Text>
             <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
+              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
+                profileError ? "border-red-500" : "border-gray-300"
+              }`}
               value={displayName}
-              onChangeText={setDisplayName}
+              onChangeText={(text) => {
+                setDisplayName(text);
+                if (profileError) setProfileError("");
+                if (profileSuccess) setProfileSuccess("");
+              }}
               placeholder="Nhập tên hiển thị"
               placeholderTextColor="#9CA3AF"
             />
           </View>
+
+          {profileSuccess ? (
+            <Text className="text-sm text-green-600">{profileSuccess}</Text>
+          ) : null}
+          {profileError ? (
+            <Text className="text-sm text-red-600">{profileError}</Text>
+          ) : null}
 
           <Button
             title="Lưu thay đổi"
@@ -145,6 +182,12 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </View>
+
+        {signOutError ? (
+          <Text className="mt-4 text-center text-sm text-red-600">
+            {signOutError}
+          </Text>
+        ) : null}
 
         <Pressable
           className="mt-4 h-12 items-center justify-center rounded-xl bg-red-50 active:bg-red-100"

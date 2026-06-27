@@ -20,10 +20,11 @@ function AuthGate() {
     if (!initialized) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const onResetPassword = segments[1] === "reset-password";
 
     if (!session && !inAuthGroup) {
       router.replace("/(auth)/login");
-    } else if (session && inAuthGroup) {
+    } else if (session && inAuthGroup && !onResetPassword) {
       router.replace("/(tabs)");
     }
   }, [session, initialized, segments]);

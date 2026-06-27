@@ -105,6 +105,7 @@ TL-chatting/
 | `service_role` key on client | `EXPO_PUBLIC_SUPABASE_ANON_KEY` only |
 | HTML elements (`div`, `span`) | RN primitives (`View`, `Text`, `Pressable`) |
 | Arrow function component exports | `export default function ScreenName()` |
+| `Alert.alert` for user feedback (validation, success, errors) | Inline `Text` under inputs; success screen; `console.error` for unexpected API errors |
 | `Alert.alert` for destructive confirms | `ConfirmDialog` component |
 | Destructure entire Zustand store | Select individual fields: `useStore((s) => s.field)` |
 
@@ -152,6 +153,7 @@ Details and examples in modular rule files above.
 - **Navigation:** Expo Router file-based; `(auth)` / `(tabs)` groups; `AuthGate` in root `_layout.tsx`
 - **Realtime:** Channels `room:${roomId}`, `global:messages`, `typing:${roomId}`
 - **Icons:** `expo-symbols` `SymbolView` with `{ ios, android, web }` names
+- **User feedback:** Do not use `Alert.alert` for validation/success/errors — it is unreliable on web. Show inline errors under fields, dedicated success UI, or `console.error` for debugging
 
 ---
 

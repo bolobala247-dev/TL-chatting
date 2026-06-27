@@ -5,7 +5,6 @@ import {
   TextInput,
   FlatList,
   Pressable,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -21,10 +20,12 @@ export default function ContactsScreen() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
+  const [chatError, setChatError] = useState("");
 
   const handleSearch = useCallback(
     async (text: string) => {
       setQuery(text);
+      if (chatError) setChatError("");
       if (!text.trim() || !user) {
         setResults([]);
         return;
@@ -45,11 +46,17 @@ export default function ContactsScreen() {
   const handleStartChat = useCallback(
     async (profile: Profile) => {
       if (!user) return;
+      setChatError("");
       try {
         const room = await roomService.createDirectRoom(user.id, profile.id);
         router.push(`/chat/${room.id}` as any);
-      } catch (error: any) {
-        Alert.alert("Lỗi", error.message);
+      } catch (err: unknown) {
+        console.error("[Contacts] start chat", err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Không thể bắt đầu trò chuyện, vui lòng thử lại";
+        setChatError(msg);
       }
     },
     [user, router]
@@ -104,6 +111,10 @@ export default function ContactsScreen() {
             autoCapitalize="none"
           />
         </View>
+
+        {chatError ? (
+          <Text className="mt-2 text-sm text-red-600">{chatError}</Text>
+        ) : null}
       </View>
 
       <FlatList
