@@ -19,3 +19,5 @@ export const USER_STATUS = {
   OFFLINE: "offline",
   AWAY: "away",
 } as const;
+
+export const EAS_PROJECT_ID = "5ff3ce97-1320-44a7-b7f5-167bbfd02b6f";

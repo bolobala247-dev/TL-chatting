@@ -1,9 +1,10 @@
-import { useEffect } from "react";
-import { Platform } from "react-native";
+import { useEffect, useRef } from "react";
+import { AppState, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
+import { EAS_PROJECT_ID } from "@/src/lib/constants";
 import { pushTokenService } from "@/src/services/pushTokenService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
@@ -28,8 +29,17 @@ Notifications.setNotificationHandler({
   },
 });
 
+function resolveProjectId(): string | null {
+  return (
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId ??
+    EAS_PROJECT_ID
+  );
+}
+
 async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
+    console.warn("[useNotifications] Push chỉ hoạt động trên thiết bị thật");
     return null;
   }
 
@@ -51,15 +61,13 @@ async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== "granted") {
+    console.warn("[useNotifications] Người dùng chưa cấp quyền thông báo");
     return null;
   }
 
-  const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
-
+  const projectId = resolveProjectId();
   if (!projectId) {
-    console.error("[useNotifications] Thiếu EAS projectId trong app config");
+    console.error("[useNotifications] Thiếu EAS projectId");
     return null;
   }
 
@@ -73,6 +81,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 export function useNotifications(enabled: boolean) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const syncingRef = useRef(false);
 
   useEffect(() => {
     if (!enabled || !user || Platform.OS !== "android") {
@@ -81,7 +90,10 @@ export function useNotifications(enabled: boolean) {
 
     let cancelled = false;
 
-    async function setupPushToken() {
+    async function syncPushToken() {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+
       try {
         const token = await registerForPushNotifications();
         if (cancelled || !token) return;
@@ -92,23 +104,29 @@ export function useNotifications(enabled: boolean) {
           "android",
           Device.modelName ?? undefined
         );
+        console.log("[useNotifications] Đã lưu push token");
       } catch (error) {
         console.error("[useNotifications]", error);
+      } finally {
+        syncingRef.current = false;
       }
     }
 
-    setupPushToken();
+    syncPushToken();
+
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        syncPushToken();
+      }
+    });
 
     return () => {
       cancelled = true;
+      appStateSub.remove();
     };
   }, [enabled, user?.id]);
 
   useEffect(() => {
-    const receivedSub = Notifications.addNotificationReceivedListener(() => {
-      // Foreground display is handled by setNotificationHandler.
-    });
-
     const responseSub =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const roomId = response.notification.request.content.data?.roomId as
@@ -121,7 +139,6 @@ export function useNotifications(enabled: boolean) {
       });
 
     return () => {
-      receivedSub.remove();
       responseSub.remove();
     };
   }, [router]);
