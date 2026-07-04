@@ -61,15 +61,36 @@ async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
   }
 }
 
+function normalizePayload(body: unknown): WebhookPayload | null {
+  if (!body || typeof body !== "object") return null;
+
+  const value = body as Record<string, unknown>;
+
+  if (value.type && value.table && value.record) {
+    return value as WebhookPayload;
+  }
+
+  if (value.record && typeof value.record === "object") {
+    return {
+      type: "INSERT",
+      table: "messages",
+      record: value.record as MessageRecord,
+    };
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
   try {
-    const payload = (await req.json()) as WebhookPayload;
+    const body = await req.json();
+    const payload = normalizePayload(body);
 
-    if (payload.type !== "INSERT" || payload.table !== "messages") {
+    if (!payload || payload.type !== "INSERT" || payload.table !== "messages") {
       return new Response(JSON.stringify({ skipped: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

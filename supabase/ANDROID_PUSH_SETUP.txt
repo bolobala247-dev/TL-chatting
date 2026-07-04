@@ -6,10 +6,15 @@
 # hoặc chạy SQL trong Supabase Dashboard → SQL Editor
 #
 # === 2. Deploy Edge Function ===
-#   supabase link --project-ref <project-id>
+#   supabase link --project-ref xoxnjqgumfhzwturtfhz
 #   supabase functions deploy send-push-on-message --no-verify-jwt
 #
-# === 3. Database Webhook (Supabase Dashboard) ===
+# === 3. Bật trigger tự gửi push (migration 00004) ===
+#   supabase db push
+# hoặc chạy SQL trong supabase/migrations/00004_message_push_trigger.sql
+# (Edge Function phải deploy trước trigger)
+#
+# === 3b. Database Webhook (thay thế trigger nếu muốn) ===
 # Database → Webhooks → Create a new hook
 #   - Name: send-push-on-message
 #   - Table: public.messages

@@ -18,18 +18,26 @@ export const pushTokenService = {
     platform: InsertTables<"push_tokens">["platform"],
     deviceId?: string
   ): Promise<void> {
-    const { error } = await supabase.from("push_tokens").upsert(
-      {
-        user_id: userId,
-        token,
-        platform,
-        device_id: deviceId ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,token" }
-    );
+    const row = {
+      user_id: userId,
+      token,
+      platform,
+      device_id: deviceId ?? null,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (error) throw error;
+    const { error: upsertError } = await supabase
+      .from("push_tokens")
+      .upsert(row, { onConflict: "user_id,token" });
+
+    if (upsertError) {
+      const { error: insertError } = await supabase
+        .from("push_tokens")
+        .insert(row);
+
+      if (insertError) throw insertError;
+    }
+
     currentToken = token;
   },
 
