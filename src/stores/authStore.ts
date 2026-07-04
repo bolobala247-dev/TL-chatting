@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
+import { pushTokenService } from "@/src/services/pushTokenService";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -106,6 +107,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    try {
+      await pushTokenService.removeCurrentToken();
+    } catch (error) {
+      console.error("[AuthStore.signOut] remove push token", error);
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     set({ session: null, user: null, profile: null });

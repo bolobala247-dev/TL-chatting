@@ -13,6 +13,7 @@ export type Profile = Tables<"profiles">;
 export type Room = Tables<"rooms">;
 export type RoomParticipant = Tables<"room_participants">;
 export type Message = Tables<"messages">;
+export type PushToken = Tables<"push_tokens">;
 
 export interface RoomWithLastMessage {
   room_id: string;

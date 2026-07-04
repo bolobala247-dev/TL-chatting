@@ -1,0 +1,49 @@
+# Android Build + Push Notifications — hướng dẫn triển khai
+#
+# === 1. Migration (đã có file supabase/migrations/00003_push_tokens.sql) ===
+# Nếu chưa apply trên Supabase project của bạn:
+#   supabase db push
+# hoặc chạy SQL trong Supabase Dashboard → SQL Editor
+#
+# === 2. Deploy Edge Function ===
+#   supabase link --project-ref <project-id>
+#   supabase functions deploy send-push-on-message --no-verify-jwt
+#
+# === 3. Database Webhook (Supabase Dashboard) ===
+# Database → Webhooks → Create a new hook
+#   - Name: send-push-on-message
+#   - Table: public.messages
+#   - Events: INSERT
+#   - Type: Supabase Edge Functions
+#   - Function: send-push-on-message
+#   - HTTP method: POST
+#
+# Lặp lại cho cả dev (xoxnjqgumfhzwturtfhz) và prod (elevsuvbbittizjxrfll)
+# nếu bạn dùng 2 project Supabase khác nhau.
+#
+# === 4. FCM credentials (bắt buộc cho push trên Android) ===
+# 1. Tạo Firebase project tại https://console.firebase.google.com
+# 2. Thêm Android app với package: com.haruthao.tlchatting
+# 3. Project Settings → Cloud Messaging → FCM V1 service account JSON
+# 4. Upload lên EAS:
+#      eas credentials --platform android
+#    Chọn profile preview hoặc production, upload FCM V1 key
+#
+# === 5. Build APK test nội bộ ===
+#   npm run env:dev          # hoặc env:prod
+#   npm run build:android:preview
+# Tải APK từ https://expo.dev → cài lên máy Android (bật cài app không xác định)
+#
+# === 6. Build AAB cho Google Play ===
+#   npm run build:android:prod
+#   eas submit --platform android --profile production
+# Cần file google-play-service-account.json (đã gitignore) và app trên Play Console
+#
+# === 7. Kiểm thử push (2 máy Android) ===
+# - Cài APK preview, đăng nhập 2 tài khoản khác nhau
+# - Máy B đóng app hoàn toàn
+# - Máy A gửi tin nhắn → Máy B nhận notification
+# - Tap notification → mở đúng phòng chat
+# - Khi B đang mở phòng chat với A → không hiện banner (client suppress)
+#
+# Lưu ý: Push KHÔNG hoạt động trên Expo Go. Cần bản build EAS (preview/production).
