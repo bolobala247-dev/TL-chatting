@@ -4,6 +4,7 @@ import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "@/src/hooks/useAuth";
+import { useNotifications } from "@/src/hooks/useNotifications";
 import { LoadingSpinner } from "@/src/components/ui/LoadingSpinner";
 import "../global.css";
 
@@ -15,6 +16,8 @@ function AuthGate() {
   const { session, initialized } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useNotifications(!!session);
 
   useEffect(() => {
     if (!initialized) return;
