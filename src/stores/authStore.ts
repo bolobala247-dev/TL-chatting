@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
 import { pushTokenService } from "@/src/services/pushTokenService";
+import { registerPushNotificationsForUser } from "@/src/services/notificationService";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -47,12 +48,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (session?.user) {
         await get().fetchProfile();
+        void registerPushNotificationsForUser(session.user.id);
       }
 
-      supabase.auth.onAuthStateChange(async (_event, session) => {
+      supabase.auth.onAuthStateChange(async (event, session) => {
         set({ session, user: session?.user ?? null });
         if (session?.user) {
           await get().fetchProfile();
+          if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+            void registerPushNotificationsForUser(session.user.id);
+          }
         } else {
           set({ profile: null });
         }
@@ -101,6 +106,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       });
       if (error) throw error;
+
+      const user = get().user;
+      if (user) {
+        void registerPushNotificationsForUser(user.id);
+      }
     } finally {
       set({ loading: false });
     }
