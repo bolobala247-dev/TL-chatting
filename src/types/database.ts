@@ -14,8 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      message_reactions: {
+        Row: {
+          created_at: string | null
+          emoji: string
+          id: string
+          message_id: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji: string
+          id?: string
+          message_id: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          message_id?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
+          attachments: Json | null
           content: string | null
           created_at: string | null
           deleted_at: string | null
@@ -24,6 +74,7 @@ export type Database = {
           id: string
           is_edited: boolean | null
           media_url: string | null
+          metadata: Json | null
           pinned_at: string | null
           pinned_by: string | null
           reply_to: string | null
@@ -33,6 +84,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          attachments?: Json | null
           content?: string | null
           created_at?: string | null
           deleted_at?: string | null
@@ -41,6 +93,7 @@ export type Database = {
           id?: string
           is_edited?: boolean | null
           media_url?: string | null
+          metadata?: Json | null
           pinned_at?: string | null
           pinned_by?: string | null
           reply_to?: string | null
@@ -50,6 +103,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attachments?: Json | null
           content?: string | null
           created_at?: string | null
           deleted_at?: string | null
@@ -58,6 +112,7 @@ export type Database = {
           id?: string
           is_edited?: boolean | null
           media_url?: string | null
+          metadata?: Json | null
           pinned_at?: string | null
           pinned_by?: string | null
           reply_to?: string | null
@@ -98,6 +153,55 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poll_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string
+          option_index: number
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id: string
+          option_index: number
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          option_index?: number
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_votes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -361,6 +465,7 @@ export type Database = {
           last_message_at: string
           last_message_content: string
           last_message_sender: string
+          last_message_type: string
           room_avatar: string
           room_id: string
           room_name: string
@@ -374,6 +479,7 @@ export type Database = {
       set_message_pin: {
         Args: { p_message_id: string; p_pinned: boolean }
         Returns: {
+          attachments: Json | null
           content: string | null
           created_at: string | null
           deleted_at: string | null
@@ -382,6 +488,7 @@ export type Database = {
           id: string
           is_edited: boolean | null
           media_url: string | null
+          metadata: Json | null
           pinned_at: string | null
           pinned_by: string | null
           reply_to: string | null

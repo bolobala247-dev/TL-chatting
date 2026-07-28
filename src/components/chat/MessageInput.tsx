@@ -1,10 +1,13 @@
-import { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import { useRef } from "react";
 import { View, TextInput, Pressable, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/src/components/ui/Icon";
 import { useThemeColors } from "@/src/theme";
 
 interface MessageInputProps {
+  /** Controlled text — the screen owns it so drafts can persist. */
+  value: string;
+  onChangeText: (value: string) => void;
   onSend: (content: string) => void;
   onAttach?: () => void;
   /** Long-press on the send button — used to schedule the drafted message. */
@@ -13,28 +16,24 @@ interface MessageInputProps {
   onTypingStop?: () => void;
 }
 
-export interface MessageInputHandle {
-  /** Restore composer text (e.g. after undoing a send). */
-  setText: (value: string) => void;
-}
-
-export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(
-  function MessageInput(
-    { onSend, onAttach, onLongPressSend, onTypingStart, onTypingStop },
-    ref
-  ) {
+export function MessageInput({
+  value,
+  onChangeText,
+  onSend,
+  onAttach,
+  onLongPressSend,
+  onTypingStart,
+  onTypingStop,
+}: MessageInputProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
-  const [text, setText] = useState("");
   const typingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  useImperativeHandle(ref, () => ({ setText }), []);
+  const handleChangeText = (next: string) => {
+    onChangeText(next);
 
-  const handleChangeText = (value: string) => {
-    setText(value);
-
-    if (value.length > 0 && !typingRef.current) {
+    if (next.length > 0 && !typingRef.current) {
       typingRef.current = true;
       onTypingStart?.();
     }
@@ -46,25 +45,25 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(
     }, 2000);
   };
 
-  const handleSend = () => {
-    if (!text.trim()) return;
-    onSend(text.trim());
-    setText("");
+  const endTyping = () => {
     typingRef.current = false;
     onTypingStop?.();
     clearTimeout(typingTimeoutRef.current);
+  };
+
+  const handleSend = () => {
+    if (!value.trim()) return;
+    onSend(value.trim());
+    endTyping();
   };
 
   const handleLongPressSend = () => {
-    if (!text.trim() || !onLongPressSend) return;
-    onLongPressSend(text.trim());
-    setText("");
-    typingRef.current = false;
-    onTypingStop?.();
-    clearTimeout(typingTimeoutRef.current);
+    if (!value.trim() || !onLongPressSend) return;
+    onLongPressSend(value.trim());
+    endTyping();
   };
 
-  const hasText = text.trim().length > 0;
+  const hasText = value.trim().length > 0;
 
   return (
     <View className="flex-row items-end gap-2 border-t border-divider bg-surface px-3 py-2">
@@ -89,7 +88,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(
           className="max-h-24 font-sans text-body leading-5 text-fg"
           placeholder={t("input.placeholder")}
           placeholderTextColor={colors.placeholder}
-          value={text}
+          value={value}
           onChangeText={handleChangeText}
           multiline
           textAlignVertical="center"
@@ -119,5 +118,4 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(
       </Pressable>
     </View>
   );
-  }
-);
+}

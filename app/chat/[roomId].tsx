@@ -14,20 +14,26 @@ import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useMessages } from "@/src/hooks/useMessages";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
-import { roomService } from "@/src/services/roomService";
+import { useRoomParticipants } from "@/src/hooks/useRoomParticipants";
 import { messageService } from "@/src/services/messageService";
 import { savedMessageService } from "@/src/services/savedMessageService";
 import { scheduledMessageService } from "@/src/services/scheduledMessageService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
+import { useDraftStore } from "@/src/stores/draftStore";
+import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES } from "@/src/lib/constants";
+import { getAttachments } from "@/src/lib/messageMeta";
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
 import { MessageList } from "@/src/components/chat/MessageList";
-import {
-  MessageInput,
-  type MessageInputHandle,
-} from "@/src/components/chat/MessageInput";
+import { MessageInput } from "@/src/components/chat/MessageInput";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
+import { ReactionsSheet } from "@/src/components/chat/ReactionBar";
+import { ReadReceiptsSheet } from "@/src/components/chat/ReadReceiptsSheet";
+import { AttachmentSheet } from "@/src/components/chat/AttachmentSheet";
+import { ImageViewerModal } from "@/src/components/chat/ImageViewerModal";
+import { PollComposer } from "@/src/components/chat/PollComposer";
+import { PollVotersSheet } from "@/src/components/chat/PollBubble";
 import { ReplyPreview } from "@/src/components/chat/ReplyPreview";
 import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
 import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
@@ -40,7 +46,7 @@ import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Message, ScheduledMessage } from "@/src/types";
+import type { Message, MessageWithMeta, MessageAttachment, ScheduledMessage } from "@/src/types";
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
@@ -54,20 +60,46 @@ export default function ChatScreen() {
     loading,
     hasMore,
     sendMessage,
+    sendAlbum,
+    sendPoll,
+    toggleReaction,
+    votePoll,
     loadMore,
     undoableMessage,
     undoSend,
   } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
 
-  const inputRef = useRef<MessageInputHandle>(null);
+  // Single participants fetch: header + read receipts share it
+  const { participants, otherProfile } = useRoomParticipants(roomId!);
+  const roomName = otherProfile
+    ? otherProfile.display_name || otherProfile.username
+    : "";
+  const roomAvatar = otherProfile?.avatar_url ?? null;
+  const participantCount = participants.length;
+  const isGroup = participantCount > 2;
 
-  const [roomName, setRoomName] = useState("");
-  const [roomAvatar, setRoomAvatar] = useState<string | null>(null);
-  const [participantCount, setParticipantCount] = useState(0);
+  // Composer text lives here so drafts can persist per room
+  const [inputText, setInputText] = useState("");
+  const inputTextRef = useRef("");
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const updateInputText = useCallback((text: string) => {
+    inputTextRef.current = text;
+    setInputText(text);
+  }, []);
+
+  const [selectedMessage, setSelectedMessage] = useState<MessageWithMeta | null>(null);
   const [showActions, setShowActions] = useState(false);
+  const [reactionsTarget, setReactionsTarget] = useState<MessageWithMeta | null>(null);
+  const [receiptsTarget, setReceiptsTarget] = useState<MessageWithMeta | null>(null);
+  const [votersTarget, setVotersTarget] = useState<MessageWithMeta | null>(null);
+  const [showAttachSheet, setShowAttachSheet] = useState(false);
+  const [showPollComposer, setShowPollComposer] = useState(false);
+  const [albumView, setAlbumView] = useState<{
+    images: MessageAttachment[];
+    index: number;
+  } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [chatError, setChatError] = useState("");
 
@@ -94,22 +126,32 @@ export default function ChatScreen() {
     [insets.bottom]
   );
 
+  // Seed the composer from the saved draft; flush it back on leave
   useEffect(() => {
-    if (!roomId || !user) return;
+    if (!roomId) return;
 
-    roomService.getRoomParticipants(roomId).then((participants) => {
-      setParticipantCount(participants.length);
+    const draft = useDraftStore.getState().drafts[roomId]?.text ?? "";
+    inputTextRef.current = draft;
+    setInputText(draft);
 
-      const otherParticipant = participants.find(
-        (p) => p.user_id !== user.id
-      );
-      if (otherParticipant?.profiles) {
-        const { profiles: otherProfile } = otherParticipant;
-        setRoomName(otherProfile.display_name || otherProfile.username);
-        setRoomAvatar(otherProfile.avatar_url);
-      }
-    });
-  }, [roomId, user]);
+    return () => {
+      clearTimeout(draftTimerRef.current);
+      useDraftStore.getState().setDraft(roomId, inputTextRef.current);
+    };
+  }, [roomId]);
+
+  const handleChangeText = useCallback(
+    (text: string) => {
+      inputTextRef.current = text;
+      setInputText(text);
+
+      clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = setTimeout(() => {
+        if (roomId) useDraftStore.getState().setDraft(roomId, text);
+      }, DRAFT_SAVE_DEBOUNCE_MS);
+    },
+    [roomId]
+  );
 
   // Feature data: pinned list, saved bookmarks, pending scheduled sends
   useEffect(() => {
@@ -159,10 +201,30 @@ export default function ChatScreen() {
     });
   }, [messages]);
 
-  const handleLongPress = useCallback((message: Message) => {
+  const handleLongPress = useCallback((message: MessageWithMeta) => {
     setSelectedMessage(message);
     setShowActions(true);
   }, []);
+
+  const handleShowReactions = useCallback((message: MessageWithMeta) => {
+    setReactionsTarget(message);
+  }, []);
+
+  const handleViewReceipts = useCallback((message: MessageWithMeta) => {
+    setReceiptsTarget(message);
+  }, []);
+
+  const handleViewVoters = useCallback((message: MessageWithMeta) => {
+    setVotersTarget(message);
+  }, []);
+
+  const handleOpenAlbum = useCallback(
+    (message: MessageWithMeta, index: number) => {
+      const images = getAttachments(message);
+      if (images.length > 0) setAlbumView({ images, index });
+    },
+    []
+  );
 
   const handleReply = useCallback((message: Message) => {
     setReplyTo(message);
@@ -267,15 +329,19 @@ export default function ChatScreen() {
   const handleUndo = useCallback(async () => {
     try {
       const recalled = await undoSend();
-      if (recalled) inputRef.current?.setText(recalled);
+      if (recalled) updateInputText(recalled);
     } catch {
       setChatError(t("undo.failed"));
     }
-  }, [undoSend, t]);
+  }, [undoSend, updateInputText, t]);
 
-  const handleLongPressSend = useCallback((content: string) => {
-    setScheduleDraft(content);
-  }, []);
+  const handleLongPressSend = useCallback(
+    (content: string) => {
+      setScheduleDraft(content);
+      updateInputText("");
+    },
+    [updateInputText]
+  );
 
   const handleSchedulePick = useCallback(
     async (date: Date) => {
@@ -300,18 +366,18 @@ export default function ChatScreen() {
         setReplyTo(null);
       } catch (err: unknown) {
         console.error("[ChatScreen] schedule message", err);
-        inputRef.current?.setText(draft);
+        updateInputText(draft);
         setChatError(t("schedule.failed"));
       }
     },
-    [user, roomId, scheduleDraft, replyTo, t]
+    [user, roomId, scheduleDraft, replyTo, updateInputText, t]
   );
 
   const handleScheduleClose = useCallback(() => {
     // Dismissed without picking — hand the draft back to the composer
-    if (scheduleDraft) inputRef.current?.setText(scheduleDraft);
+    if (scheduleDraft) updateInputText(scheduleDraft);
     setScheduleDraft(null);
-  }, [scheduleDraft]);
+  }, [scheduleDraft, updateInputText]);
 
   const handleCancelScheduled = useCallback(
     async (item: ScheduledMessage) => {
@@ -329,6 +395,11 @@ export default function ChatScreen() {
   const handleSend = useCallback(
     async (content: string) => {
       if (chatError) setChatError("");
+
+      // Composer + persisted draft clear as soon as the send is issued
+      updateInputText("");
+      clearTimeout(draftTimerRef.current);
+      if (roomId) useDraftStore.getState().clearDraft(roomId);
 
       if (replyTo) {
         if (!user) return;
@@ -351,12 +422,17 @@ export default function ChatScreen() {
         sendMessage(content);
       }
     },
-    [replyTo, sendMessage, roomId, user, chatError]
+    [replyTo, sendMessage, roomId, user, chatError, updateInputText]
   );
 
-  const handleAttach = useCallback(async () => {
-    if (!user || !roomId) return;
+  // "+" opens the attachment sheet; the picker/composer follow from there
+  const handleAttach = useCallback(() => {
     if (chatError) setChatError("");
+    setShowAttachSheet(true);
+  }, [chatError]);
+
+  const handlePickPhotos = useCallback(async () => {
+    if (!user || !roomId) return;
 
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -367,26 +443,32 @@ export default function ChatScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_ALBUM_IMAGES,
       quality: 0.8,
     });
 
-    if (result.canceled) return;
+    if (result.canceled || result.assets.length === 0) return;
 
     try {
-      await messageService.sendImageMessage(
-        roomId,
-        user.id,
-        result.assets[0].uri
-      );
+      await sendAlbum(result.assets.map((asset) => asset.uri));
     } catch (err: unknown) {
-      console.error("[ChatScreen] send image", err);
-      const msg =
-        err instanceof Error
-          ? t("message.sendImageFailedDetail", { message: err.message })
-          : t("message.sendImageFailed");
-      setChatError(msg);
+      console.error("[ChatScreen] send album", err);
+      setChatError(t("album.sendFailed"));
     }
-  }, [roomId, user, chatError]);
+  }, [roomId, user, sendAlbum, t]);
+
+  const handleSendPoll = useCallback(
+    async (question: string, options: string[]) => {
+      try {
+        await sendPoll(question, options);
+      } catch (err: unknown) {
+        console.error("[ChatScreen] send poll", err);
+        setChatError(t("poll.sendFailed"));
+      }
+    },
+    [sendPoll, t]
+  );
 
   if (!roomId) {
     return <Spinner fullScreen />;
@@ -417,8 +499,15 @@ export default function ChatScreen() {
           messages={messages}
           loading={loading}
           hasMore={hasMore}
+          participants={participants}
+          showPollVoters={isGroup}
           onLoadMore={loadMore}
           onMessageLongPress={handleLongPress}
+          onToggleReaction={toggleReaction}
+          onShowReactions={handleShowReactions}
+          onOpenAlbum={handleOpenAlbum}
+          onVote={votePoll}
+          onViewVoters={handleViewVoters}
         />
       </View>
 
@@ -454,7 +543,8 @@ export default function ChatScreen() {
           />
         )}
         <MessageInput
-          ref={inputRef}
+          value={inputText}
+          onChangeText={handleChangeText}
           onSend={handleSend}
           onAttach={handleAttach}
           onLongPressSend={handleLongPressSend}
@@ -473,6 +563,46 @@ export default function ChatScreen() {
         onSave={handleSave}
         onEdit={handleEdit}
         onDelete={handleRecall}
+        onReact={toggleReaction}
+        onViewReceipts={handleViewReceipts}
+      />
+
+      <ReactionsSheet
+        message={reactionsTarget}
+        visible={!!reactionsTarget}
+        onClose={() => setReactionsTarget(null)}
+      />
+
+      <ReadReceiptsSheet
+        message={receiptsTarget}
+        visible={!!receiptsTarget}
+        onClose={() => setReceiptsTarget(null)}
+      />
+
+      <PollVotersSheet
+        message={votersTarget}
+        visible={!!votersTarget}
+        onClose={() => setVotersTarget(null)}
+      />
+
+      <AttachmentSheet
+        visible={showAttachSheet}
+        onClose={() => setShowAttachSheet(false)}
+        onPickPhotos={handlePickPhotos}
+        onCreatePoll={() => setShowPollComposer(true)}
+      />
+
+      <PollComposer
+        visible={showPollComposer}
+        onClose={() => setShowPollComposer(false)}
+        onSubmit={handleSendPoll}
+      />
+
+      <ImageViewerModal
+        attachments={albumView?.images ?? []}
+        initialIndex={albumView?.index ?? 0}
+        visible={!!albumView}
+        onClose={() => setAlbumView(null)}
       />
 
       <ConfirmDialog

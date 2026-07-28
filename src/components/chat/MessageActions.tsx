@@ -1,22 +1,27 @@
 import { View, Text, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
-import type { Message } from "@/src/types";
+import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
+import { QUICK_REACTIONS } from "@/src/lib/constants";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { Sheet } from "@/src/components/ui/Sheet";
 
 interface MessageActionsProps {
-  message: Message | null;
+  message: MessageWithMeta | null;
   visible: boolean;
   /** Whether the current user already bookmarked this message. */
   isSaved: boolean;
   onClose: () => void;
-  onReply: (message: Message) => void;
-  onPin: (message: Message, pinned: boolean) => void;
-  onSave: (message: Message, save: boolean) => void;
-  onEdit: (message: Message) => void;
+  onReply: (message: MessageWithMeta) => void;
+  onPin: (message: MessageWithMeta, pinned: boolean) => void;
+  onSave: (message: MessageWithMeta, save: boolean) => void;
+  onEdit: (message: MessageWithMeta) => void;
   /** Recall — "delete for everyone" (soft delete). */
-  onDelete: (message: Message) => void;
+  onDelete: (message: MessageWithMeta) => void;
+  /** Toggle a quick reaction on the message. */
+  onReact: (message: MessageWithMeta, emoji: string) => void;
+  /** Open the "seen by" list for an own message. */
+  onViewReceipts: (message: MessageWithMeta) => void;
 }
 
 interface ActionItem {
@@ -36,6 +41,8 @@ export function MessageActions({
   onSave,
   onEdit,
   onDelete,
+  onReact,
+  onViewReceipts,
 }: MessageActionsProps) {
   const { t } = useTranslation(["common", "chat"]);
   const userId = useAuthStore((s) => s.user?.id);
@@ -92,6 +99,14 @@ export function MessageActions({
 
   if (isMine) {
     actions.push({
+      label: t("chat:receipts.viewSeen"),
+      icon: { ios: "eye", android: "visibility", web: "visibility" },
+      onPress: () => {
+        onViewReceipts(message);
+        onClose();
+      },
+    });
+    actions.push({
       label: t("chat:actions.recall"),
       icon: { ios: "trash", android: "delete", web: "delete" },
       destructive: true,
@@ -111,6 +126,31 @@ export function MessageActions({
           </Text>
         </View>
       )}
+
+      {/* Quick reactions — tap toggles and closes */}
+      <View className="flex-row items-center justify-between border-b border-divider px-4 py-3">
+        {QUICK_REACTIONS.map((emoji) => {
+          const reacted = (message.message_reactions ?? []).some(
+            (r) => r.user_id === userId && r.emoji === emoji
+          );
+          return (
+            <Pressable
+              key={emoji}
+              className={`h-10 w-10 items-center justify-center rounded-full ${
+                reacted ? "bg-ink/10" : "active:bg-pressed"
+              }`}
+              onPress={() => {
+                onReact(message, emoji);
+                onClose();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={emoji}
+            >
+              <Text className="text-[22px]">{emoji}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {actions.map((action, index) => (
         <Pressable

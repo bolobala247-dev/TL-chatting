@@ -44,6 +44,8 @@
     "imagePlaceholder": "[Hình ảnh]",
     "videoPlaceholder": "[Video]",
     "filePlaceholder": "[Tệp]",
+    "albumPlaceholder": "[Album]",
+    "pollPlaceholder": "[Bình chọn]",
     "edited": "(đã sửa)",
     "deleted": "Tin nhắn đã bị thu hồi",
     "emptyTitle": "Chưa có tin nhắn nào",
@@ -114,6 +116,44 @@
     "one": "{{name}} đang nhập",
     "two": "{{name1}} và {{name2}} đang nhập",
     "many": "{{count}} người đang nhập"
+  },
+  "draft": {
+    "prefix": "Nháp"
+  },
+  "reactions": {
+    "title": "Cảm xúc"
+  },
+  "receipts": {
+    "sent": "Đã gửi",
+    "seenByAll": "Đã xem",
+    "title": "Đã xem",
+    "viewSeen": "Xem ai đã xem",
+    "seenBy_other": "{{count}} người đã xem",
+    "nobody": "Chưa ai xem tin nhắn này"
+  },
+  "attach": {
+    "title": "Đính kèm",
+    "photos": "Ảnh",
+    "poll": "Bình chọn"
+  },
+  "poll": {
+    "create": "Tạo bình chọn",
+    "questionLabel": "Câu hỏi",
+    "questionPlaceholder": "Đặt câu hỏi...",
+    "optionPlaceholder": "Lựa chọn {{index}}",
+    "addOption": "Thêm lựa chọn",
+    "removeOption": "Xoá lựa chọn",
+    "send": "Gửi bình chọn",
+    "votes_other": "{{count}} phiếu",
+    "viewVotes": "Xem phiếu bầu",
+    "votersTitle": "Phiếu bầu",
+    "noVotes": "Chưa có phiếu bầu",
+    "questionRequired": "Vui lòng nhập câu hỏi",
+    "minOptions": "Cần ít nhất 2 lựa chọn",
+    "sendFailed": "Không thể gửi bình chọn"
+  },
+  "album": {
+    "sendFailed": "Không thể gửi ảnh"
   },
   "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"
 }

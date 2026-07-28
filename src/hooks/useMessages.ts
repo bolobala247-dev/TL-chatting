@@ -3,12 +3,14 @@ import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import { messageService } from "@/src/services/messageService";
+import { reactionService } from "@/src/services/reactionService";
+import { pollService } from "@/src/services/pollService";
 import { roomService } from "@/src/services/roomService";
 import { UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
-import type { Message } from "@/src/types";
+import type { Message, MessageWithMeta } from "@/src/types";
 
-const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_MESSAGES: MessageWithMeta[] = [];
 
 export function useMessages(roomId: string) {
   const user = useAuthStore((s) => s.user);
@@ -23,6 +25,8 @@ export function useMessages(roomId: string) {
     (s) => s.replaceOptimisticMessage
   );
   const removeMessage = useChatStore((s) => s.removeMessage);
+  const applyReactionChange = useChatStore((s) => s.applyReactionChange);
+  const applyVoteChange = useChatStore((s) => s.applyVoteChange);
   const clearUnread = useRoomStore((s) => s.clearUnread);
 
   // Undo-send grace window: last confirmed message stays recallable for a few seconds
@@ -78,6 +82,8 @@ export function useMessages(roomId: string) {
         deleted_at: null,
         deleted_by: null,
         has_link: null,
+        attachments: null,
+        metadata: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -125,6 +131,162 @@ export function useMessages(roomId: string) {
     }
   }, [undoableMessage, roomId]);
 
+  // Album: optimistic bubble with the local URIs while uploads run
+  const sendAlbum = useCallback(
+    async (imageUris: string[], caption?: string) => {
+      if (!user || imageUris.length === 0) return;
+
+      const tempId = `temp-${Date.now()}`;
+      const optimistic: MessageWithMeta = {
+        id: tempId,
+        room_id: roomId,
+        sender_id: user.id,
+        content: caption?.trim() || null,
+        type: "image",
+        media_url: imageUris[0],
+        reply_to: null,
+        is_edited: false,
+        pinned_at: null,
+        pinned_by: null,
+        deleted_at: null,
+        deleted_by: null,
+        has_link: null,
+        attachments: imageUris.map((url) => ({ url })) as any,
+        metadata: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      addOptimisticMessage(optimistic);
+
+      try {
+        const sent = await messageService.sendAlbumMessage(
+          roomId,
+          user.id,
+          imageUris,
+          caption
+        );
+        replaceOptimisticMessage(tempId, sent);
+      } catch (err) {
+        removeMessage(tempId, roomId);
+        throw err;
+      }
+    },
+    [roomId, user]
+  );
+
+  const sendPoll = useCallback(
+    async (question: string, options: string[]) => {
+      if (!user || !question.trim() || options.length < 2) return;
+
+      const tempId = `temp-${Date.now()}`;
+      const optimistic: MessageWithMeta = {
+        id: tempId,
+        room_id: roomId,
+        sender_id: user.id,
+        content: question.trim(),
+        type: "poll",
+        media_url: null,
+        reply_to: null,
+        is_edited: false,
+        pinned_at: null,
+        pinned_by: null,
+        deleted_at: null,
+        deleted_by: null,
+        has_link: null,
+        attachments: null,
+        metadata: { question: question.trim(), options } as any,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        poll_votes: [],
+      };
+
+      addOptimisticMessage(optimistic);
+
+      try {
+        const sent = await messageService.sendPollMessage(
+          roomId,
+          user.id,
+          question,
+          options
+        );
+        replaceOptimisticMessage(tempId, sent);
+      } catch (err) {
+        removeMessage(tempId, roomId);
+        throw err;
+      }
+    },
+    [roomId, user]
+  );
+
+  // Optimistic toggle with revert; realtime echo dedups in the store
+  const toggleReaction = useCallback(
+    async (message: MessageWithMeta, emoji: string) => {
+      if (!user) return;
+
+      const patch = { user_id: user.id, emoji };
+      const hasReacted = (message.message_reactions ?? []).some(
+        (r) => r.user_id === user.id && r.emoji === emoji
+      );
+
+      applyReactionChange(
+        roomId,
+        message.id,
+        patch,
+        hasReacted ? "remove" : "add"
+      );
+
+      try {
+        if (hasReacted) {
+          await reactionService.removeReaction(message.id, user.id, emoji);
+        } else {
+          await reactionService.addReaction(message.id, roomId, user.id, emoji);
+        }
+      } catch (err) {
+        // Revert the optimistic patch
+        applyReactionChange(
+          roomId,
+          message.id,
+          patch,
+          hasReacted ? "add" : "remove"
+        );
+        console.error("[useMessages] toggleReaction", err);
+      }
+    },
+    [roomId, user]
+  );
+
+  // Tap current choice = unvote, tap another = change vote (single choice)
+  const votePoll = useCallback(
+    async (message: MessageWithMeta, optionIndex: number) => {
+      if (!user) return;
+
+      const previous =
+        (message.poll_votes ?? []).find((v) => v.user_id === user.id) ?? null;
+      const isUnvote = previous?.option_index === optionIndex;
+      const patch = { user_id: user.id, option_index: optionIndex };
+
+      applyVoteChange(roomId, message.id, patch, isUnvote ? "remove" : "add");
+
+      try {
+        if (isUnvote) {
+          await pollService.unvote(message.id, user.id);
+        } else {
+          await pollService.vote(message.id, roomId, user.id, optionIndex);
+        }
+      } catch (err) {
+        // Restore the previous vote state
+        if (previous) {
+          applyVoteChange(roomId, message.id, previous, "add");
+        } else {
+          applyVoteChange(roomId, message.id, patch, "remove");
+        }
+        console.error("[useMessages] votePoll", err);
+      }
+    },
+    [roomId, user]
+  );
+
   const loadMore = useCallback(() => {
     if (loading || !hasMore || messages.length === 0) return;
     const oldest = messages[messages.length - 1];
@@ -136,6 +298,10 @@ export function useMessages(roomId: string) {
     loading,
     hasMore,
     sendMessage,
+    sendAlbum,
+    sendPoll,
+    toggleReaction,
+    votePoll,
     loadMore,
     undoableMessage,
     undoSend,

@@ -46,6 +46,8 @@
     "imagePlaceholder": "[Photo]",
     "videoPlaceholder": "[Video]",
     "filePlaceholder": "[File]",
+    "albumPlaceholder": "[Album]",
+    "pollPlaceholder": "[Poll]",
     "edited": "(edited)",
     "deleted": "This message was deleted",
     "emptyTitle": "No messages yet",
@@ -118,6 +120,46 @@
     "one": "{{name}} is typing",
     "two": "{{name1}} and {{name2}} are typing",
     "many": "{{count}} people are typing"
+  },
+  "draft": {
+    "prefix": "Draft"
+  },
+  "reactions": {
+    "title": "Reactions"
+  },
+  "receipts": {
+    "sent": "Sent",
+    "seenByAll": "Seen",
+    "title": "Seen by",
+    "viewSeen": "See who's seen",
+    "seenBy_one": "Seen by {{count}}",
+    "seenBy_other": "Seen by {{count}}",
+    "nobody": "No one has seen this yet"
+  },
+  "attach": {
+    "title": "Attach",
+    "photos": "Photos",
+    "poll": "Poll"
+  },
+  "poll": {
+    "create": "Create poll",
+    "questionLabel": "Question",
+    "questionPlaceholder": "Ask a question...",
+    "optionPlaceholder": "Option {{index}}",
+    "addOption": "Add option",
+    "removeOption": "Remove option",
+    "send": "Send poll",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "viewVotes": "View votes",
+    "votersTitle": "Votes",
+    "noVotes": "No votes yet",
+    "questionRequired": "Please enter a question",
+    "minOptions": "Add at least 2 options",
+    "sendFailed": "Couldn't send the poll"
+  },
+  "album": {
+    "sendFailed": "Couldn't send the photos"
   },
   "startChatFailed": "Couldn't start the conversation, please try again"
 }

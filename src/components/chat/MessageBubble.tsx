@@ -1,14 +1,28 @@
+import { memo } from "react";
 import { View, Text, Pressable, Linking } from "react-native";
-import { Image } from "expo-image";
 import { useTranslation } from "react-i18next";
-import type { Message } from "@/src/types";
+import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
+import { hasSeen } from "@/src/lib/receipts";
+import { getAttachments } from "@/src/lib/messageMeta";
 import { Icon } from "@/src/components/ui/Icon";
+import { ReactionBar } from "./ReactionBar";
+import { AlbumGrid } from "./AlbumGrid";
+import { PollBubble } from "./PollBubble";
 
 interface MessageBubbleProps {
-  message: Message;
-  onLongPress?: (message: Message) => void;
+  message: MessageWithMeta;
+  /** Room participants (watermarks) — drives the own-message receipt ticks. */
+  participants?: RoomParticipantWithProfile[];
+  /** Group rooms expose the poll voters list. */
+  showPollVoters?: boolean;
+  onLongPress?: (message: MessageWithMeta) => void;
+  onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
+  onShowReactions?: (message: MessageWithMeta) => void;
+  onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
+  onVote?: (message: MessageWithMeta, optionIndex: number) => void;
+  onViewVoters?: (message: MessageWithMeta) => void;
 }
 
 function formatTime(dateStr: string, locale: string): string {
@@ -36,11 +50,35 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   );
 }
 
-export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
+// Memoized: message object identity changes on any patch, so memo keeps
+// FlashList re-renders cheap while reactions/votes/receipts update live
+export const MessageBubble = memo(function MessageBubble({
+  message,
+  participants,
+  showPollVoters,
+  onLongPress,
+  onToggleReaction,
+  onShowReactions,
+  onOpenAlbum,
+  onVote,
+  onViewVoters,
+}: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
   const isMine = message.sender_id === userId;
   const isDeleted = !!message.deleted_at;
+  const isPoll = message.type === "poll";
+  const albumImages =
+    !isDeleted && message.type === "image" ? getAttachments(message) : [];
+
+  // Receipt ticks: one check = sent, two = seen by every other participant
+  const showReceipt =
+    isMine && !isDeleted && !message.id.startsWith("temp-");
+  const others = showReceipt
+    ? (participants ?? []).filter((p) => p.user_id !== message.sender_id)
+    : [];
+  const seenByAll =
+    others.length > 0 && others.every((p) => hasSeen(p, message.created_at));
 
   if (message.type === "system") {
     return (
@@ -77,15 +115,22 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
           </Text>
         ) : (
           <>
-            {message.type === "image" && message.media_url && (
-              <View className="mb-1 overflow-hidden rounded-xl">
-                <Image
-                  source={{ uri: message.media_url }}
-                  style={{ width: 220, height: 180 }}
-                  contentFit="cover"
-                  transition={200}
-                />
-              </View>
+            {message.type === "image" && albumImages.length > 0 && (
+              <AlbumGrid
+                attachments={albumImages}
+                onPressImage={(index) => onOpenAlbum?.(message, index)}
+              />
+            )}
+
+            {isPoll && (
+              <PollBubble
+                message={message}
+                isMine={isMine}
+                currentUserId={userId}
+                showViewVotes={showPollVoters}
+                onVote={(m, index) => onVote?.(m, index)}
+                onViewVoters={(m) => onViewVoters?.(m)}
+              />
             )}
 
             {(message.type === "video" || message.type === "file") &&
@@ -119,7 +164,7 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
                 </Pressable>
               )}
 
-            {message.content && (
+            {message.content && !isPoll && (
               <Text
                 className={`font-sans text-body leading-5 ${
                   isMine ? "text-ink-inverse" : "text-fg"
@@ -157,8 +202,41 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
               size={11}
             />
           )}
+          {showReceipt && (
+            <View
+              className="flex-row items-center"
+              accessibilityLabel={t(
+                seenByAll ? "receipts.seenByAll" : "receipts.sent"
+              )}
+            >
+              <Icon
+                name={{ ios: "checkmark", android: "check", web: "check" }}
+                tone="inverse"
+                size={11}
+              />
+              {seenByAll && (
+                <View style={{ marginLeft: -7 }}>
+                  <Icon
+                    name={{ ios: "checkmark", android: "check", web: "check" }}
+                    tone="inverse"
+                    size={11}
+                  />
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </View>
+
+      {!isDeleted && (message.message_reactions?.length ?? 0) > 0 && (
+        <ReactionBar
+          reactions={message.message_reactions!}
+          isMine={isMine}
+          currentUserId={userId}
+          onToggle={(emoji) => onToggleReaction?.(message, emoji)}
+          onOpenDetails={() => onShowReactions?.(message)}
+        />
+      )}
     </Pressable>
   );
-}
+});

@@ -5,7 +5,12 @@ import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Message, RoomParticipant } from "@/src/types";
+import type {
+  Message,
+  MessageReaction,
+  PollVote,
+  RoomParticipant,
+} from "@/src/types";
 
 const RESUBSCRIBE_DELAY_MS = 3000;
 
@@ -95,6 +100,123 @@ export function useRealtimeMessages(roomId: string) {
               .removeMessage((payload.old as any).id, roomId);
           }
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "message_reactions",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            const reaction = payload.new as MessageReaction;
+            useChatStore
+              .getState()
+              .applyReactionChange(
+                roomId,
+                reaction.message_id,
+                { user_id: reaction.user_id, emoji: reaction.emoji },
+                "add"
+              );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "message_reactions",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            // REPLICA IDENTITY FULL: old row carries all columns
+            const reaction = payload.old as MessageReaction;
+            useChatStore
+              .getState()
+              .applyReactionChange(
+                roomId,
+                reaction.message_id,
+                { user_id: reaction.user_id, emoji: reaction.emoji },
+                "remove"
+              );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "poll_votes",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            const vote = payload.new as PollVote;
+            useChatStore
+              .getState()
+              .applyVoteChange(
+                roomId,
+                vote.message_id,
+                { user_id: vote.user_id, option_index: vote.option_index },
+                "add"
+              );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "poll_votes",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            // Vote change (upsert): 'add' replaces the user's previous vote
+            const vote = payload.new as PollVote;
+            useChatStore
+              .getState()
+              .applyVoteChange(
+                roomId,
+                vote.message_id,
+                { user_id: vote.user_id, option_index: vote.option_index },
+                "add"
+              );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "poll_votes",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            const vote = payload.old as PollVote;
+            useChatStore
+              .getState()
+              .applyVoteChange(
+                roomId,
+                vote.message_id,
+                { user_id: vote.user_id, option_index: vote.option_index },
+                "remove"
+              );
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "room_participants",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            // last_read_at watermark moved → live read receipts
+            useChatStore
+              .getState()
+              .applyParticipantUpdate(payload.new as RoomParticipant);
+          }
+        )
         .subscribe((status) => {
           if (disposed) return;
 
@@ -160,7 +282,8 @@ export function useRealtimeRooms() {
               message.room_id,
               message.content,
               senderName,
-              message.created_at ?? new Date().toISOString()
+              message.created_at ?? new Date().toISOString(),
+              message.type
             );
         });
     };

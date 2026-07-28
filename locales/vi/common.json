@@ -7,6 +7,7 @@
   },
   "actions": {
     "cancel": "Huỷ",
+    "close": "Đóng",
     "save": "Lưu",
     "confirm": "Xác nhận",
     "delete": "Xoá",
