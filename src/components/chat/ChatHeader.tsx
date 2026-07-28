@@ -9,6 +9,8 @@ interface ChatHeaderProps {
   avatarUrl?: string | null;
   isOnline?: boolean;
   participantCount?: number;
+  /** Opens the shared media / files / links screen. */
+  onPressMedia?: () => void;
 }
 
 export function ChatHeader({
@@ -16,6 +18,7 @@ export function ChatHeader({
   avatarUrl,
   isOnline,
   participantCount,
+  onPressMedia,
 }: ChatHeaderProps) {
   const { t } = useTranslation("chat");
   const router = useRouter();
@@ -50,6 +53,26 @@ export function ChatHeader({
               : t("header.offline")}
         </Text>
       </View>
+
+      {onPressMedia && (
+        <Pressable
+          onPress={onPressMedia}
+          className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={t("header.media")}
+        >
+          <Icon
+            name={{
+              ios: "photo.on.rectangle",
+              android: "photo_library",
+              web: "photo_library",
+            }}
+            tone="primary"
+            size={20}
+          />
+        </Pressable>
+      )}
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/src/i18n";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Badge } from "@/src/components/ui/Badge";
+import { useDraftStore } from "@/src/stores/draftStore";
 import type { RoomWithLastMessage } from "@/src/types";
 
 interface RoomListItemProps {
@@ -32,7 +33,26 @@ function formatRelativeTime(dateStr: string | null): string {
 
 export function RoomListItem({ room, onPress }: RoomListItemProps) {
   const { t } = useTranslation("chat");
+  const draft = useDraftStore((s) => s.drafts[room.room_id]?.text);
   const hasUnread = room.unread_count > 0;
+
+  // Media/poll messages have no (or non-representative) text content:
+  // fall back to a bracketed placeholder by type
+  const typePlaceholder =
+    room.last_message_type === "poll"
+      ? t("message.pollPlaceholder")
+      : room.last_message_type === "image"
+        ? t("message.imagePlaceholder")
+        : room.last_message_type === "video"
+          ? t("message.videoPlaceholder")
+          : room.last_message_type === "file"
+            ? t("message.filePlaceholder")
+            : null;
+
+  const preview =
+    room.last_message_type === "poll"
+      ? typePlaceholder
+      : room.last_message_content || typePlaceholder;
 
   return (
     <Pressable
@@ -60,14 +80,23 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
         </View>
 
         <View className="mt-0.5 flex-row items-center justify-between">
-          <Text
-            className={`flex-1 text-caption ${hasUnread ? "font-sans-medium text-fg-secondary" : "font-sans text-fg-tertiary"}`}
-            numberOfLines={1}
-          >
-            {room.last_message_sender
-              ? `${room.last_message_sender}: ${room.last_message_content || ""}`
-              : room.last_message_content || t("rooms.noMessages")}
-          </Text>
+          {draft ? (
+            <Text
+              className="flex-1 font-sans text-caption italic text-fg-tertiary"
+              numberOfLines={1}
+            >
+              {t("draft.prefix")}: {draft}
+            </Text>
+          ) : (
+            <Text
+              className={`flex-1 text-caption ${hasUnread ? "font-sans-medium text-fg-secondary" : "font-sans text-fg-tertiary"}`}
+              numberOfLines={1}
+            >
+              {room.last_message_sender
+                ? `${room.last_message_sender}: ${preview || ""}`
+                : preview || t("rooms.noMessages")}
+            </Text>
+          )}
 
           {hasUnread && (
             <Badge

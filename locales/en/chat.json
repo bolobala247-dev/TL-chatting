@@ -27,16 +27,29 @@
     "offline": "Offline",
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
-    "back": "Back"
+    "back": "Back",
+    "media": "Media & links"
   },
   "input": {
     "placeholder": "Type a message...",
     "attach": "Attach",
     "send": "Send"
   },
+  "actions": {
+    "pin": "Pin message",
+    "unpin": "Unpin",
+    "save": "Save message",
+    "unsave": "Unsave",
+    "recall": "Delete for everyone"
+  },
   "message": {
     "imagePlaceholder": "[Photo]",
+    "videoPlaceholder": "[Video]",
+    "filePlaceholder": "[File]",
+    "albumPlaceholder": "[Album]",
+    "pollPlaceholder": "[Poll]",
     "edited": "(edited)",
+    "deleted": "This message was deleted",
     "emptyTitle": "No messages yet",
     "emptyCta": "Start the conversation!",
     "editTitle": "Edit message",
@@ -45,15 +58,108 @@
     "deleteTitle": "Delete message",
     "deleteConfirm": "Are you sure you want to delete this message?",
     "deleteFailed": "Couldn't delete the message",
+    "recallTitle": "Delete for everyone?",
+    "recallConfirm": "This message will be deleted for everyone in the conversation.",
+    "recallAction": "Delete",
+    "recallFailed": "Couldn't delete the message",
+    "pinFailed": "Couldn't pin the message",
+    "saveFailed": "Couldn't save the message",
     "sendFailed": "Couldn't send the message",
     "sendImageFailed": "Couldn't send the photo",
     "sendImageFailedDetail": "Couldn't send the photo: {{message}}",
     "replyingTo": "Replying to message"
   },
+  "pinned": {
+    "title": "Pinned messages",
+    "count_one": "{{count}} pinned message",
+    "count_other": "{{count}} pinned messages",
+    "unpin": "Unpin"
+  },
+  "undo": {
+    "sent": "Sent",
+    "action": "Undo",
+    "failed": "Couldn't undo the message"
+  },
+  "schedule": {
+    "title": "Schedule send",
+    "hint": "The message will be sent within a minute of the chosen time.",
+    "in30m": "In 30 minutes",
+    "in1h": "In 1 hour",
+    "in3h": "In 3 hours",
+    "tonight": "Tonight at 8:00 PM",
+    "tomorrowMorning": "Tomorrow at 8:00 AM",
+    "pending_one": "{{count}} scheduled message",
+    "pending_other": "{{count}} scheduled messages",
+    "listTitle": "Scheduled messages",
+    "sendAt": "Sends at {{time}}",
+    "cancel": "Cancel send",
+    "empty": "No scheduled messages",
+    "failed": "Couldn't schedule the message",
+    "cancelFailed": "Couldn't cancel the scheduled message"
+  },
+  "media": {
+    "title": "Media & links",
+    "tabs": {
+      "media": "Photos & videos",
+      "files": "Files",
+      "links": "Links"
+    },
+    "emptyMedia": "No photos or videos yet",
+    "emptyFiles": "No files yet",
+    "emptyLinks": "No links yet",
+    "loadFailed": "Couldn't load the content"
+  },
+  "saved": {
+    "title": "Saved messages",
+    "empty": "No saved messages",
+    "emptyHint": "Long-press a message and choose Save message to find it here",
+    "unsave": "Unsave",
+    "loadFailed": "Couldn't load saved messages"
+  },
   "typing": {
     "one": "{{name}} is typing",
     "two": "{{name1}} and {{name2}} are typing",
     "many": "{{count}} people are typing"
+  },
+  "draft": {
+    "prefix": "Draft"
+  },
+  "reactions": {
+    "title": "Reactions"
+  },
+  "receipts": {
+    "sent": "Sent",
+    "seenByAll": "Seen",
+    "title": "Seen by",
+    "viewSeen": "See who's seen",
+    "seenBy_one": "Seen by {{count}}",
+    "seenBy_other": "Seen by {{count}}",
+    "nobody": "No one has seen this yet"
+  },
+  "attach": {
+    "title": "Attach",
+    "photos": "Photos",
+    "poll": "Poll"
+  },
+  "poll": {
+    "create": "Create poll",
+    "questionLabel": "Question",
+    "questionPlaceholder": "Ask a question...",
+    "optionPlaceholder": "Option {{index}}",
+    "addOption": "Add option",
+    "removeOption": "Remove option",
+    "send": "Send poll",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "viewVotes": "View votes",
+    "votersTitle": "Votes",
+    "noVotes": "No votes yet",
+    "questionRequired": "Please enter a question",
+    "minOptions": "Add at least 2 options",
+    "sendFailed": "Couldn't send the poll"
+  },
+  "album": {
+    "sendFailed": "Couldn't send the photos"
   },
   "startChatFailed": "Couldn't start the conversation, please try again"
 }

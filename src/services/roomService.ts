@@ -1,5 +1,9 @@
 import { supabase } from "@/src/lib/supabase";
-import type { Room, RoomWithLastMessage, RoomParticipant, Profile } from "@/src/types";
+import type {
+  Room,
+  RoomWithLastMessage,
+  RoomParticipantWithProfile,
+} from "@/src/types";
 
 export const roomService = {
   async getUserRooms(userId: string): Promise<RoomWithLastMessage[]> {
@@ -106,7 +110,7 @@ export const roomService = {
 
   async getRoomParticipants(
     roomId: string
-  ): Promise<Array<RoomParticipant & { profiles: Profile | null }>> {
+  ): Promise<RoomParticipantWithProfile[]> {
     const { data, error } = await supabase
       .from("room_participants")
       .select("*, profiles(*)")

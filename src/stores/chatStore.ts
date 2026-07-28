@@ -1,20 +1,47 @@
 import { create } from "zustand";
-import type { Message } from "@/src/types";
+import type {
+  Message,
+  MessageWithMeta,
+  RoomParticipant,
+  RoomParticipantWithProfile,
+} from "@/src/types";
 import { messageService } from "@/src/services/messageService";
 
+type ReactionPatch = { user_id: string; emoji: string };
+type VotePatch = { user_id: string; option_index: number };
+
 interface ChatState {
-  messages: Record<string, Message[]>;
+  messages: Record<string, MessageWithMeta[]>;
   loading: boolean;
   hasMore: Record<string, boolean>;
   activeRoomId: string | null;
+  // Participants cached per room: header + read-receipt watermarks
+  participantsByRoom: Record<string, RoomParticipantWithProfile[]>;
 
   setActiveRoom: (roomId: string | null) => void;
   fetchMessages: (roomId: string, cursor?: string) => Promise<void>;
   addMessage: (message: Message) => void;
   updateMessage: (message: Message) => void;
   removeMessage: (messageId: string, roomId: string) => void;
-  addOptimisticMessage: (message: Message) => void;
+  addOptimisticMessage: (message: MessageWithMeta) => void;
   replaceOptimisticMessage: (tempId: string, message: Message) => void;
+  applyReactionChange: (
+    roomId: string,
+    messageId: string,
+    reaction: ReactionPatch,
+    kind: "add" | "remove"
+  ) => void;
+  applyVoteChange: (
+    roomId: string,
+    messageId: string,
+    vote: VotePatch,
+    kind: "add" | "remove"
+  ) => void;
+  setRoomParticipants: (
+    roomId: string,
+    participants: RoomParticipantWithProfile[]
+  ) => void;
+  applyParticipantUpdate: (participant: RoomParticipant) => void;
   reset: () => void;
 }
 
@@ -23,6 +50,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loading: false,
   hasMore: {},
   activeRoomId: null,
+  participantsByRoom: {},
 
   setActiveRoom: (roomId) => set({ activeRoomId: roomId }),
 
@@ -78,7 +106,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messages: {
           ...state.messages,
           [message.room_id]: roomMessages.map((m) =>
-            m.id === message.id ? message : m
+            m.id === message.id
+              ? // Realtime UPDATE payloads carry no embeds: keep local meta
+                {
+                  ...message,
+                  message_reactions: m.message_reactions,
+                  poll_votes: m.poll_votes,
+                }
+              : m
           ),
         },
       };
@@ -133,6 +168,91 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  applyReactionChange: (roomId, messageId, reaction, kind) => {
+    set((state) => {
+      const roomMessages = state.messages[roomId] ?? [];
+      if (!roomMessages.some((m) => m.id === messageId)) return state;
+
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: roomMessages.map((m) => {
+            if (m.id !== messageId) return m;
+            const current = m.message_reactions ?? [];
+            // Dedup by user+emoji so optimistic + realtime echo don't double
+            const without = current.filter(
+              (r) =>
+                !(r.user_id === reaction.user_id && r.emoji === reaction.emoji)
+            );
+            return {
+              ...m,
+              message_reactions:
+                kind === "add" ? [...without, reaction] : without,
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  applyVoteChange: (roomId, messageId, vote, kind) => {
+    set((state) => {
+      const roomMessages = state.messages[roomId] ?? [];
+      if (!roomMessages.some((m) => m.id === messageId)) return state;
+
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: roomMessages.map((m) => {
+            if (m.id !== messageId) return m;
+            // Single choice: any change replaces the user's previous vote
+            const without = (m.poll_votes ?? []).filter(
+              (v) => v.user_id !== vote.user_id
+            );
+            return {
+              ...m,
+              poll_votes: kind === "add" ? [...without, vote] : without,
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  setRoomParticipants: (roomId, participants) => {
+    set((state) => ({
+      participantsByRoom: {
+        ...state.participantsByRoom,
+        [roomId]: participants,
+      },
+    }));
+  },
+
+  // Realtime watermark update (last_read_at) → live read receipts
+  applyParticipantUpdate: (participant) => {
+    set((state) => {
+      const roomParticipants = state.participantsByRoom[participant.room_id];
+      if (!roomParticipants) return state;
+
+      return {
+        participantsByRoom: {
+          ...state.participantsByRoom,
+          [participant.room_id]: roomParticipants.map((p) =>
+            p.user_id === participant.user_id
+              ? { ...p, ...participant, profiles: p.profiles }
+              : p
+          ),
+        },
+      };
+    });
+  },
+
   reset: () =>
-    set({ messages: {}, loading: false, hasMore: {}, activeRoomId: null }),
+    set({
+      messages: {},
+      loading: false,
+      hasMore: {},
+      activeRoomId: null,
+      participantsByRoom: {},
+    }),
 }));

@@ -12,7 +12,8 @@ interface RoomState {
     roomId: string,
     content: string | null,
     senderName: string | null,
-    timestamp: string
+    timestamp: string,
+    type: string | null
   ) => void;
   incrementUnread: (roomId: string) => void;
   clearUnread: (roomId: string) => void;
@@ -34,7 +35,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  updateRoomLastMessage: (roomId, content, senderName, timestamp) => {
+  updateRoomLastMessage: (roomId, content, senderName, timestamp, type) => {
     set((state) => ({
       rooms: state.rooms
         .map((room) =>
@@ -44,6 +45,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
                 last_message_content: content,
                 last_message_sender: senderName,
                 last_message_at: timestamp,
+                last_message_type: type,
               }
             : room
         )

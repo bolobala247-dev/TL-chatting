@@ -1,4 +1,8 @@
 {
+  "archive": {
+    "sectionTitle": "Archive",
+    "savedMessages": "Saved messages"
+  },
   "notifications": {
     "sectionTitle": "Notifications",
     "statusUnsupported": "This device doesn't support Android push notifications",

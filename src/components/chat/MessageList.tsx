@@ -4,22 +4,38 @@ import { useTranslation } from "react-i18next";
 import { FlashList } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
 import { useThemeColors } from "@/src/theme";
-import type { Message } from "@/src/types";
+import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
 
 interface MessageListProps {
-  messages: Message[];
+  messages: MessageWithMeta[];
   loading: boolean;
   hasMore: boolean;
+  /** Watermarks for receipt ticks; identity changes on realtime updates. */
+  participants?: RoomParticipantWithProfile[];
+  /** Group rooms expose the poll voters list. */
+  showPollVoters?: boolean;
   onLoadMore: () => void;
-  onMessageLongPress?: (message: Message) => void;
+  onMessageLongPress?: (message: MessageWithMeta) => void;
+  onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
+  onShowReactions?: (message: MessageWithMeta) => void;
+  onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
+  onVote?: (message: MessageWithMeta, optionIndex: number) => void;
+  onViewVoters?: (message: MessageWithMeta) => void;
 }
 
 export function MessageList({
   messages,
   loading,
   hasMore,
+  participants,
+  showPollVoters,
   onLoadMore,
   onMessageLongPress,
+  onToggleReaction,
+  onShowReactions,
+  onOpenAlbum,
+  onVote,
+  onViewVoters,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
@@ -32,10 +48,29 @@ export function MessageList({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Message }) => (
-      <MessageBubble message={item} onLongPress={onMessageLongPress} />
+    ({ item }: { item: MessageWithMeta }) => (
+      <MessageBubble
+        message={item}
+        participants={participants}
+        showPollVoters={showPollVoters}
+        onLongPress={onMessageLongPress}
+        onToggleReaction={onToggleReaction}
+        onShowReactions={onShowReactions}
+        onOpenAlbum={onOpenAlbum}
+        onVote={onVote}
+        onViewVoters={onViewVoters}
+      />
     ),
-    [onMessageLongPress]
+    [
+      participants,
+      showPollVoters,
+      onMessageLongPress,
+      onToggleReaction,
+      onShowReactions,
+      onOpenAlbum,
+      onVote,
+      onViewVoters,
+    ]
   );
 
   const renderHeader = useCallback(() => {
@@ -47,7 +82,7 @@ export function MessageList({
     );
   }, [loading, messages.length, colors.fgTertiary]);
 
-  const keyExtractor = useCallback((item: Message) => item.id, []);
+  const keyExtractor = useCallback((item: MessageWithMeta) => item.id, []);
 
   // FlashList does not support flex styles in contentContainerStyle,
   // so the loading/empty states render outside the list.
@@ -76,6 +111,7 @@ export function MessageList({
       data={orderedMessages}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
+      extraData={participants}
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,

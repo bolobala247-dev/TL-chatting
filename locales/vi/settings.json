@@ -1,4 +1,8 @@
 {
+  "archive": {
+    "sectionTitle": "Kho lưu trữ",
+    "savedMessages": "Tin nhắn đã lưu"
+  },
   "notifications": {
     "sectionTitle": "Thông báo",
     "statusUnsupported": "Thiết bị này không hỗ trợ push Android",

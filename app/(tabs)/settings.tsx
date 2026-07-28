@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import {
@@ -44,6 +45,7 @@ const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
 
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation(["settings", "profile", "common", "errors"]);
+  const router = useRouter();
   const { profile, user, signOut, fetchProfile } = useAuthStore();
   const { preference, colors, setPreference } = useTheme();
   const [displayName, setDisplayName] = useState(
@@ -261,6 +263,36 @@ export default function SettingsScreen() {
             variant="primary"
           />
         </View>
+      </View>
+
+      <View className="mt-8 px-4">
+        <SectionHeader title={t("archive.sectionTitle")} className="mb-4" />
+
+        <ListGroup>
+          <Pressable
+            className="flex-row items-center gap-3 px-4 py-3.5 active:bg-pressed"
+            onPress={() => router.push("/saved-messages")}
+            accessibilityRole="button"
+          >
+            <Icon
+              name={{ ios: "bookmark", android: "bookmark", web: "bookmark" }}
+              tone="secondary"
+              size="md"
+            />
+            <Text className="flex-1 font-sans text-body text-fg">
+              {t("archive.savedMessages")}
+            </Text>
+            <Icon
+              name={{
+                ios: "chevron.right",
+                android: "chevron_right",
+                web: "chevron_right",
+              }}
+              tone="tertiary"
+              size="sm"
+            />
+          </Pressable>
+        </ListGroup>
       </View>
 
       <View className="mt-8 px-4">
