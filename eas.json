@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EAS_USE_CACHE": "1",
         "EXPO_PUBLIC_SUPABASE_URL": "https://xoxnjqgumfhzwturtfhz.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhveG5qcWd1bWZoend0dXJ0Zmh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzUxNTksImV4cCI6MjA5Nzk1MTE1OX0.Z0YMQ_nD7XMHK6xHxuNJO_ET0qvdSp7NmBDrtqRrr6o"
       }
@@ -18,6 +19,8 @@
         "buildType": "apk"
       },
       "env": {
+        "EAS_USE_CACHE": "1",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a",
         "EXPO_PUBLIC_SUPABASE_URL": "https://xoxnjqgumfhzwturtfhz.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhveG5qcWd1bWZoend0dXJ0Zmh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzUxNTksImV4cCI6MjA5Nzk1MTE1OX0.Z0YMQ_nD7XMHK6xHxuNJO_ET0qvdSp7NmBDrtqRrr6o"
       }
@@ -29,6 +32,8 @@
         "buildType": "apk"
       },
       "env": {
+        "EAS_USE_CACHE": "1",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a",
         "EXPO_PUBLIC_SUPABASE_URL": "https://elevsuvbbittizjxrfll.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsZXZzdXZiYml0dGl6anhyZmxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjE3NDEsImV4cCI6MjA5ODEzNzc0MX0.AN61yGiBcQOOPKnwHMCAasMqkcLREARNdPQFiQAiqMY"
       }

@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "TL Chatting",
+    "name": "Talo",
     "slug": "tl-chatting",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tlchatting",
+    "scheme": "talo",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -41,13 +41,14 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#2563EB",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#000000",
           "defaultChannel": "messages"
         }
       ],
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      "./plugins/withGradleBuildOptimizations"
     ],
     "experiments": {
       "typedRoutes": true

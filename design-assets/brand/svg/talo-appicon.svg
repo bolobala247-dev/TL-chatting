@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Talo app icon — full-bleed 1024 tile (iOS/store masters; OS applies corner mask) -->
+  <rect width="1024" height="1024" fill="#000000"/>
+  <g fill="#FFFFFF" transform="translate(192 192) scale(1.25)">
+    <rect x="48" y="64" width="132" height="88" rx="44"/>
+    <rect x="332" y="64" width="132" height="88" rx="44"/>
+    <rect x="212" y="64" width="88" height="384" rx="44"/>
+  </g>
+</svg>

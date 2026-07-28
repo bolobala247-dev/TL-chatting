@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Talo Android adaptive icon — foreground layer (white symbol, transparent bg, safe-zone centered) -->
+  <g fill="#FFFFFF" transform="translate(256 256)">
+    <rect x="48" y="64" width="132" height="88" rx="44"/>
+    <rect x="332" y="64" width="132" height="88" rx="44"/>
+    <rect x="212" y="64" width="88" height="384" rx="44"/>
+  </g>
+</svg>

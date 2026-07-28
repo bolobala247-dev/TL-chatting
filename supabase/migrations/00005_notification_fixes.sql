@@ -1,5 +1,5 @@
 -- ============================================
--- TL-Chatting: Notification fixes (audit P2, P3, P8, P10)
+-- Talo: Notification fixes (audit P2, P3, P8, P10)
 -- ============================================
 -- 1. Push trigger: read Edge Function URL + shared secret from Vault
 --    (no hardcoded project URL, authenticated call, never blocks insert)
