@@ -3,11 +3,11 @@ import {
   View,
   Text,
   Pressable,
-  ScrollView,
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
+import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import {
   LANGUAGE_LABELS,
   SUPPORTED_LANGUAGES,
@@ -188,7 +188,12 @@ export default function SettingsScreen() {
 
   return (
     <>
-    <ScrollView className="flex-1 bg-background">
+    <KeyboardAwareScrollView
+      className="flex-1 bg-background"
+      bottomOffset={24}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <View className="items-center px-4 pt-6">
         <Pressable
           onPress={handlePickAvatar}
@@ -241,6 +246,8 @@ export default function SettingsScreen() {
             }}
             placeholder={t("profile:displayName.placeholder")}
             error={profileError || undefined}
+            returnKeyType="done"
+            onSubmitEditing={handleSaveProfile}
           />
 
           {profileSuccess ? (
@@ -362,7 +369,7 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
-    </ScrollView>
+    </KeyboardAwareScrollView>
 
     <ConfirmDialog
       visible={showSignOutConfirm}

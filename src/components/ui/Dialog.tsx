@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Modal, View, Text, Pressable } from "react-native";
+import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useThemeColors, elevationOverlay } from "@/src/theme";
 
 interface DialogProps {
@@ -22,30 +23,35 @@ export function Dialog({ visible, onClose, title, children, footer }: DialogProp
       visible={visible}
       transparent
       animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <Pressable
-        className="flex-1 items-center justify-center px-8"
-        style={{ backgroundColor: colors.scrim }}
-        onPress={onClose}
-        accessibilityLabel="Đóng hộp thoại"
-      >
+      {/* Keeps the card above the keyboard when it hosts a TextInput */}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <Pressable
-          className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6"
-          style={elevationOverlay}
-          onPress={(e) => e.stopPropagation()}
+          className="flex-1 items-center justify-center px-8"
+          style={{ backgroundColor: colors.scrim }}
+          onPress={onClose}
+          accessibilityLabel="Đóng hộp thoại"
         >
-          {title ? (
-            <Text className="font-sans-semibold text-title text-fg">
-              {title}
-            </Text>
-          ) : null}
-          {children ? <View className="mt-2">{children}</View> : null}
-          {footer ? (
-            <View className="mt-6 flex-row justify-end gap-3">{footer}</View>
-          ) : null}
+          <Pressable
+            className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6"
+            style={elevationOverlay}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {title ? (
+              <Text className="font-sans-semibold text-title text-fg">
+                {title}
+              </Text>
+            ) : null}
+            {children ? <View className="mt-2">{children}</View> : null}
+            {footer ? (
+              <View className="mt-6 flex-row justify-end gap-3">{footer}</View>
+            ) : null}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

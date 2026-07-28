@@ -1,15 +1,9 @@
 import { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, Text, FlatList, Pressable, Modal } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { roomService } from "@/src/services/roomService";
@@ -29,6 +23,7 @@ interface CreateRoomModalProps {
 export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   const { t } = useTranslation(["chat", "common"]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -151,13 +146,25 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={handleClose}
+    >
       <KeyboardAvoidingView
         className="flex-1 bg-background"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
+        style={{ paddingTop: insets.top }}
       >
         <View className="flex-row items-center justify-between border-b border-divider px-4 pb-3 pt-4">
-          <Pressable onPress={handleClose} accessibilityRole="button">
+          <Pressable
+            onPress={handleClose}
+            className="-mx-2 px-2 py-2"
+            hitSlop={4}
+            accessibilityRole="button"
+          >
             <Text className="font-sans text-body text-fg-secondary">{t("common:actions.cancel")}</Text>
           </Pressable>
           <Text className="font-sans-semibold text-title text-fg">
@@ -218,6 +225,8 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
           renderItem={renderUserItem}
           keyExtractor={(item) => item.id}
           className="flex-1"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListEmptyComponent={
             <View className="items-center py-10">
               <Text className="font-sans text-caption text-fg-tertiary">
@@ -232,7 +241,10 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
         />
 
         {selectedUsers.length > 0 && (
-          <View className="border-t border-divider px-4 py-3">
+          <View
+            className="border-t border-divider px-4 py-3"
+            style={{ paddingBottom: insets.bottom + 12 }}
+          >
             {formError ? (
               <FormMessage className="mb-2">{formError}</FormMessage>
             ) : null}

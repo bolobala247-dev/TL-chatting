@@ -116,6 +116,9 @@ export default function ContactsScreen() {
         data={results}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
+        // Single tap opens a chat even while the keyboard is up
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListEmptyComponent={
           <View className="items-center pt-20">
             <Icon

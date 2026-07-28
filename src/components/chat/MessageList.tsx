@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FlashList } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
@@ -84,6 +84,9 @@ export function MessageList({
       onStartReachedThreshold={0.2}
       ListHeaderComponent={renderHeader}
       contentContainerStyle={{ paddingVertical: 8 }}
+      // iOS: drag the keyboard down interactively; Android: dismiss on scroll
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      keyboardShouldPersistTaps="handled"
     />
   );
 }

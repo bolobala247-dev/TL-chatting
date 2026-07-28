@@ -1,14 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, TextInput } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  useReanimatedKeyboardAnimation,
+} from "react-native-keyboard-controller";
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
+import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useMessages } from "@/src/hooks/useMessages";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { roomService } from "@/src/services/roomService";
@@ -52,6 +55,16 @@ export default function ChatScreen() {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editError, setEditError] = useState("");
+
+  // Collapse the bottom safe-area padding in sync with the keyboard so the
+  // composer sits flush above it (no double gap, no jump) — runs on UI thread
+  const { progress } = useReanimatedKeyboardAnimation();
+  const composerInsetStyle = useAnimatedStyle(
+    () => ({
+      paddingBottom: interpolate(progress.value, [0, 1], [insets.bottom, 0]),
+    }),
+    [insets.bottom]
+  );
 
   useEffect(() => {
     if (!roomId || !user) return;
@@ -198,7 +211,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
     >
       <View style={{ paddingTop: insets.top }}>
         <ChatHeader
@@ -218,7 +231,7 @@ export default function ChatScreen() {
         />
       </View>
 
-      <View style={{ paddingBottom: insets.bottom }}>
+      <Animated.View style={composerInsetStyle}>
         <TypingIndicator typingUsers={typingUsers} />
         {chatError ? (
           <View className="border-t border-divider bg-danger-bg px-4 py-2">
@@ -237,7 +250,7 @@ export default function ChatScreen() {
           onTypingStart={startTyping}
           onTypingStop={stopTyping}
         />
-      </View>
+      </Animated.View>
 
       <MessageActions
         message={selectedMessage}

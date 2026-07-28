@@ -1,13 +1,9 @@
 import { useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { View, Text } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import { useCooldown } from "@/src/hooks/useCooldown";
 import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -19,6 +15,7 @@ import { StatusScreen } from "@/src/components/ui/StatusScreen";
 export default function ForgotPasswordScreen() {
   const { t } = useTranslation(["auth", "common", "errors"]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const { resetPassword, loading } = useAuthStore();
   const [sent, setSent] = useState(false);
@@ -69,14 +66,18 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      contentContainerClassName="flex-grow justify-center px-6"
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+      }}
+      bottomOffset={24}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerClassName="flex-1 justify-center px-6"
-        keyboardShouldPersistTaps="handled"
-      >
         <View className="mb-10">
           <Text className="font-sans-bold text-headline text-fg">
             {t("forgot.title")}
@@ -97,6 +98,8 @@ export default function ForgotPasswordScreen() {
             textContentType="emailAddress"
             autoComplete="email"
             autoFocus
+            returnKeyType="send"
+            onSubmitEditing={handleReset}
           />
 
           {error ? <FormMessage>{error}</FormMessage> : null}
@@ -114,13 +117,12 @@ export default function ForgotPasswordScreen() {
 
           <View className="mt-4 items-center">
             <Link href="/(auth)/login" asChild>
-              <Text className="font-sans-semibold text-caption text-ink">
+              <Text className="py-1 font-sans-semibold text-caption text-ink">
                 {t("forgot.backToLogin")}
               </Text>
             </Link>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }

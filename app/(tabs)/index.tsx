@@ -65,7 +65,10 @@ export default function ChatsScreen() {
           />
         }
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={rooms.length === 0 ? { flex: 1 } : undefined}
+        // Bottom padding keeps the FAB from covering the last room row
+        contentContainerStyle={
+          rooms.length === 0 ? { flex: 1 } : { paddingBottom: 96 }
+        }
       />
 
       <Pressable
