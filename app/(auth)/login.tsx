@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Link } from "expo-router";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import CountryFlag from "react-native-country-flag";
@@ -18,7 +19,9 @@ import {
   type AppLanguage,
 } from "@/src/i18n";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useTheme } from "@/src/theme";
 import { Button } from "@/src/components/ui/Button";
+import { Icon } from "@/src/components/ui/Icon";
 import { PasswordInput } from "@/src/components/ui/PasswordInput";
 import { TextField } from "@/src/components/ui/TextField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
@@ -29,6 +32,12 @@ const LANGUAGE_FLAG_ISO: Record<AppLanguage, string> = {
   vi: "vn",
 };
 
+// Logo đổi theo theme: symbol đen trên nền sáng, trắng trên nền tối
+const LOGO_BY_SCHEME = {
+  light: require("@/design-assets/brand/png/talo-symbol-black.png"),
+  dark: require("@/design-assets/brand/png/talo-symbol-white.png"),
+} as const;
+
 export default function LoginScreen() {
   const { t, i18n } = useTranslation(["auth", "common"]);
   const insets = useSafeAreaInsets();
@@ -36,6 +45,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { signIn, loading } = useAuthStore();
+  const { scheme, setPreference } = useTheme();
+  const isDark = scheme === "dark";
 
   const currentLanguage: AppLanguage = isSupportedLanguage(i18n.language)
     ? i18n.language
@@ -53,6 +64,15 @@ export default function LoginScreen() {
       await signIn(identifier.trim(), password);
     } catch (err: unknown) {
       console.error("[Login]", err);
+      // Supabase trả về lỗi tiếng Anh — map sang thông báo tiếng Việt
+      const code = (err as { code?: string } | null)?.code;
+      if (
+        code === "invalid_credentials" ||
+        (err instanceof Error && err.message === "Invalid login credentials")
+      ) {
+        setError(t("errors.invalidCredentials"));
+        return;
+      }
       const msg =
         err instanceof Error ? err.message : t("errors.loginFailed");
       setError(msg);
@@ -64,28 +84,57 @@ export default function LoginScreen() {
       className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Language toggle — reachable before signing in */}
-      <Pressable
-        className="absolute right-6 z-10 flex-row items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 active:bg-pressed"
+      {/* Theme + language toggles — reachable before signing in */}
+      <View
+        className="absolute right-6 z-10 flex-row items-center gap-2"
         style={{ top: insets.top + 12 }}
-        onPress={() => void setAppLanguage(nextLanguage)}
       >
-        <CountryFlag
-          isoCode={LANGUAGE_FLAG_ISO[currentLanguage]}
-          size={14}
-          style={{ borderRadius: 3 }}
-        />
-        <Text className="font-sans-semibold text-label text-fg-secondary">
-          {LANGUAGE_LABELS[currentLanguage]}
-        </Text>
-      </Pressable>
+        <Pressable
+          className="h-8 w-8 items-center justify-center rounded-full bg-surface-secondary active:bg-pressed"
+          onPress={() => setPreference(isDark ? "light" : "dark")}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            isDark ? "common:theme.switchToLight" : "common:theme.switchToDark"
+          )}
+        >
+          <Icon
+            name={
+              isDark
+                ? { ios: "sun.max", android: "light_mode", web: "light_mode" }
+                : { ios: "moon", android: "dark_mode", web: "dark_mode" }
+            }
+            tone="secondary"
+            size="sm"
+          />
+        </Pressable>
+
+        <Pressable
+          className="flex-row items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 active:bg-pressed"
+          onPress={() => void setAppLanguage(nextLanguage)}
+        >
+          <CountryFlag
+            isoCode={LANGUAGE_FLAG_ISO[currentLanguage]}
+            size={14}
+            style={{ borderRadius: 3 }}
+          />
+          <Text className="font-sans-semibold text-label text-fg-secondary">
+            {LANGUAGE_LABELS[currentLanguage]}
+          </Text>
+        </Pressable>
+      </View>
 
       <ScrollView
         contentContainerClassName="flex-1 justify-center px-6"
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10 items-center">
-          <Text className="font-sans-bold text-display text-ink">
+          <Image
+            source={LOGO_BY_SCHEME[scheme]}
+            style={{ width: 72, height: 72 }}
+            contentFit="contain"
+            accessibilityLabel={t("common:appName")}
+          />
+          <Text className="mt-4 font-sans-bold text-display text-ink">
             {t("common:appName")}
           </Text>
           <Text className="mt-2 font-sans text-body text-fg-tertiary">

@@ -17,6 +17,10 @@
     "show": "Hiển thị mật khẩu",
     "hide": "Ẩn mật khẩu"
   },
+  "theme": {
+    "switchToDark": "Chuyển sang giao diện tối",
+    "switchToLight": "Chuyển sang giao diện sáng"
+  },
   "time": {
     "justNow": "Vừa xong",
     "minutes_other": "{{count}} phút",

@@ -17,6 +17,10 @@
     "show": "Show password",
     "hide": "Hide password"
   },
+  "theme": {
+    "switchToDark": "Switch to dark theme",
+    "switchToLight": "Switch to light theme"
+  },
   "time": {
     "justNow": "Just now",
     "minutes_one": "{{count}} min",
