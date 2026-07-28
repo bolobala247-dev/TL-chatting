@@ -9,6 +9,7 @@ export {
   lightColors,
   darkColors,
   motion,
+  elevationOverlay,
   iconSize,
   avatarSize,
   type ThemeColors,

@@ -103,6 +103,18 @@ export const motion = {
   durationSlow: 300,
 } as const;
 
+/**
+ * elevation-overlay (DESIGN_SYSTEM.md §7) — the only shadow in the app.
+ * Applied to dialogs/sheets/menus; combined with a hairline border in dark.
+ */
+export const elevationOverlay = {
+  shadowColor: "#000000",
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.08,
+  shadowRadius: 24,
+  elevation: 4,
+} as const;
+
 /** Icon size tokens (DESIGN_SYSTEM.md §10). */
 export const iconSize = {
   sm: 16,

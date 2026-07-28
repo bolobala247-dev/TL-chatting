@@ -4,51 +4,73 @@ import {
   ActivityIndicator,
   type PressableProps,
 } from "react-native";
+import { useThemeColors } from "@/src/theme";
 
 interface ButtonProps extends PressableProps {
   title: string;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "md" | "lg";
   loading?: boolean;
 }
 
+// Monochrome hierarchy (DESIGN_SYSTEM.md §16): primary = ink fill,
+// secondary = quiet surface, ghost = text only, danger = tinted destructive
 const variantStyles = {
   primary: {
-    container: "bg-primary-600 active:bg-primary-700",
-    text: "text-white font-semibold",
+    container: "bg-ink active:opacity-90",
+    text: "text-ink-inverse",
   },
   secondary: {
-    container: "bg-gray-100 active:bg-gray-200 border border-gray-300",
-    text: "text-gray-800 font-semibold",
+    container: "bg-surface-secondary border border-border active:bg-pressed",
+    text: "text-fg",
   },
   ghost: {
-    container: "active:bg-gray-100",
-    text: "text-primary-600 font-semibold",
+    container: "active:bg-pressed",
+    text: "text-ink",
   },
+  danger: {
+    container: "bg-danger-bg active:opacity-90",
+    text: "text-danger",
+  },
+};
+
+const sizeStyles = {
+  md: "h-11",
+  lg: "h-12",
 };
 
 export function Button({
   title,
   variant = "primary",
+  size = "lg",
   loading = false,
   disabled,
   ...props
 }: ButtonProps) {
+  const colors = useThemeColors();
   const styles = variantStyles[variant];
   const isDisabled = disabled || loading;
+  const spinnerColor =
+    variant === "primary"
+      ? colors.inkInverse
+      : variant === "danger"
+        ? colors.danger
+        : colors.fgSecondary;
 
   return (
     <Pressable
-      className={`h-12 items-center justify-center rounded-xl px-6 ${styles.container} ${isDisabled ? "opacity-50" : ""}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      className={`items-center justify-center rounded-xl px-6 ${sizeStyles[size]} ${styles.container} ${isDisabled ? "opacity-50" : ""}`}
       disabled={isDisabled}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator
-          color={variant === "primary" ? "#FFFFFF" : "#3B82F6"}
-          size="small"
-        />
+        <ActivityIndicator color={spinnerColor} size="small" />
       ) : (
-        <Text className={`text-base ${styles.text}`}>{title}</Text>
+        <Text className={`font-sans-semibold text-body ${styles.text}`}>
+          {title}
+        </Text>
       )}
     </Pressable>
   );
