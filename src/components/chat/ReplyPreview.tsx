@@ -21,7 +21,12 @@ export function ReplyPreview({ message, onDismiss }: ReplyPreviewProps) {
           {message.content || t("message.imagePlaceholder")}
         </Text>
       </View>
-      <Pressable onPress={onDismiss} className="p-1 active:opacity-50">
+      <Pressable
+        onPress={onDismiss}
+        className="h-9 w-9 items-center justify-center rounded-full active:opacity-50"
+        hitSlop={8}
+        accessibilityRole="button"
+      >
         <Icon
           name={{ ios: "xmark", android: "close", web: "close" }}
           tone="tertiary"

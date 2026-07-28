@@ -1,13 +1,9 @@
-import { useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { useRef, useState } from "react";
+import { View, Text, type TextInput } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import { useCooldown } from "@/src/hooks/useCooldown";
 import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { profileService } from "@/src/services/profileService";
@@ -23,10 +19,14 @@ const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,30}$/;
 export default function RegisterScreen() {
   const { t } = useTranslation(["auth", "common"]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
   const [formError, setFormError] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -109,14 +109,18 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      contentContainerClassName="flex-grow justify-center px-6"
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+      }}
+      bottomOffset={24}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerClassName="flex-1 justify-center px-6"
-        keyboardShouldPersistTaps="handled"
-      >
         <View className="mb-10 items-center">
           <Text className="font-sans-bold text-display text-ink">
             {t("register.title")}
@@ -140,9 +144,13 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             textContentType="username"
             autoComplete="username"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => emailRef.current?.focus()}
           />
 
           <TextField
+            ref={emailRef}
             label={t("fields.email.label")}
             error={!!formError}
             placeholder={t("fields.email.placeholder")}
@@ -155,9 +163,13 @@ export default function RegisterScreen() {
             keyboardType="email-address"
             textContentType="emailAddress"
             autoComplete="email"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
           />
 
           <PasswordInput
+            ref={passwordRef}
             label={t("fields.password.label")}
             error={passwordError}
             placeholder={t("fields.passwordHint")}
@@ -168,9 +180,13 @@ export default function RegisterScreen() {
             }}
             textContentType="newPassword"
             autoComplete="new-password"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => confirmPasswordRef.current?.focus()}
           />
 
           <PasswordInput
+            ref={confirmPasswordRef}
             label={t("fields.confirmPassword.label")}
             error={confirmPasswordError}
             placeholder={t("fields.confirmPassword.placeholder")}
@@ -181,6 +197,8 @@ export default function RegisterScreen() {
             }}
             textContentType="newPassword"
             autoComplete="new-password"
+            returnKeyType="done"
+            onSubmitEditing={handleRegister}
           />
 
           {formError ? <FormMessage>{formError}</FormMessage> : null}
@@ -207,7 +225,6 @@ export default function RegisterScreen() {
             </Link>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }

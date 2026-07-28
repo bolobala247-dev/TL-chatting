@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, type TextInput } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
+import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import i18n from "@/src/i18n";
 import { useAuthStore } from "@/src/stores/authStore";
 import { supabase } from "@/src/lib/supabase";
@@ -35,8 +31,10 @@ function getResetPasswordErrorMessage(error: unknown): string {
 export default function ResetPasswordScreen() {
   const { t } = useTranslation(["auth", "common"]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const confirmPasswordRef = useRef<TextInput>(null);
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [formError, setFormError] = useState("");
@@ -139,14 +137,18 @@ export default function ResetPasswordScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      contentContainerClassName="flex-grow justify-center px-6"
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+      }}
+      bottomOffset={24}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerClassName="flex-1 justify-center px-6"
-        keyboardShouldPersistTaps="handled"
-      >
         <View className="mb-10">
           <Text className="font-sans-bold text-headline text-fg">
             {t("reset.title")}
@@ -169,9 +171,13 @@ export default function ResetPasswordScreen() {
             editable={hasRecoverySession}
             textContentType="newPassword"
             autoComplete="new-password"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => confirmPasswordRef.current?.focus()}
           />
 
           <PasswordInput
+            ref={confirmPasswordRef}
             label={t("fields.confirmPassword.label")}
             error={confirmPasswordError}
             placeholder={t("fields.confirmNewPassword.placeholder")}
@@ -183,6 +189,8 @@ export default function ResetPasswordScreen() {
             editable={hasRecoverySession}
             textContentType="newPassword"
             autoComplete="new-password"
+            returnKeyType="done"
+            onSubmitEditing={handleUpdate}
           />
 
           {formError ? <FormMessage>{formError}</FormMessage> : null}
@@ -195,13 +203,12 @@ export default function ResetPasswordScreen() {
             />
           ) : (
             <Link href="/(auth)/forgot-password" asChild>
-              <Text className="text-center font-sans-semibold text-caption text-ink">
+              <Text className="py-1 text-center font-sans-semibold text-caption text-ink">
                 {t("reset.requestNewLink")}
               </Text>
             </Link>
           )}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }

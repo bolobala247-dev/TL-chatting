@@ -9,12 +9,14 @@ import {
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initI18n } from "@/src/i18n";
 import { ThemeProvider, useTheme, useThemeBootstrap } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import { useRealtimeRooms } from "@/src/hooks/useRealtime";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
+import { VercelInsights } from "@/src/components/VercelInsights";
 import "../global.css";
 
 export { ErrorBoundary } from "expo-router";
@@ -93,8 +95,11 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <ThemedApp />
-    </ThemeProvider>
+    <KeyboardProvider>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
+      <VercelInsights />
+    </KeyboardProvider>
   );
 }

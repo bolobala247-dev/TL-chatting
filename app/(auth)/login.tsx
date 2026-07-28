@@ -1,17 +1,11 @@
-import { useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { useRef, useState } from "react";
+import { View, Text, Pressable, type TextInput } from "react-native";
 import { Link } from "expo-router";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import CountryFlag from "react-native-country-flag";
+import { KeyboardAwareScrollView } from "@/src/lib/keyboard";
 import {
   LANGUAGE_LABELS,
   isSupportedLanguage,
@@ -44,6 +38,7 @@ export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const passwordRef = useRef<TextInput>(null);
   const { signIn, loading } = useAuthStore();
   const { scheme, setPreference } = useTheme();
   const isDark = scheme === "dark";
@@ -80,18 +75,16 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <View className="flex-1 bg-background">
       {/* Theme + language toggles — reachable before signing in */}
       <View
         className="absolute right-6 z-10 flex-row items-center gap-2"
         style={{ top: insets.top + 12 }}
       >
         <Pressable
-          className="h-8 w-8 items-center justify-center rounded-full bg-surface-secondary active:bg-pressed"
+          className="h-9 w-9 items-center justify-center rounded-full bg-surface-secondary active:bg-pressed"
           onPress={() => setPreference(isDark ? "light" : "dark")}
+          hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={t(
             isDark ? "common:theme.switchToLight" : "common:theme.switchToDark"
@@ -109,8 +102,10 @@ export default function LoginScreen() {
         </Pressable>
 
         <Pressable
-          className="flex-row items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 active:bg-pressed"
+          className="flex-row items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-2 active:bg-pressed"
           onPress={() => void setAppLanguage(nextLanguage)}
+          hitSlop={6}
+          accessibilityRole="button"
         >
           <CountryFlag
             isoCode={LANGUAGE_FLAG_ISO[currentLanguage]}
@@ -123,9 +118,17 @@ export default function LoginScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerClassName="flex-1 justify-center px-6"
+      <KeyboardAwareScrollView
+        className="flex-1"
+        contentContainerClassName="flex-grow justify-center px-6"
+        contentContainerStyle={{
+          paddingTop: insets.top + 56,
+          paddingBottom: insets.bottom + 24,
+        }}
+        bottomOffset={24}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
       >
         <View className="mb-10 items-center">
           <Image
@@ -156,9 +159,13 @@ export default function LoginScreen() {
             keyboardType="email-address"
             textContentType="username"
             autoComplete="username"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
           />
 
           <PasswordInput
+            ref={passwordRef}
             label={t("fields.password.label")}
             error={!!error}
             placeholder={t("fields.password.placeholder")}
@@ -169,11 +176,13 @@ export default function LoginScreen() {
             }}
             textContentType="password"
             autoComplete="password"
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
 
           <View className="items-end">
             <Link href="/(auth)/forgot-password" asChild>
-              <Text className="font-sans-medium text-caption text-ink">
+              <Text className="py-1 font-sans-medium text-caption text-ink">
                 {t("login.forgotPassword")}
               </Text>
             </Link>
@@ -198,7 +207,7 @@ export default function LoginScreen() {
             </Link>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </View>
   );
 }

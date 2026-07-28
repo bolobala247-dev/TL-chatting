@@ -24,7 +24,8 @@ export function ChatHeader({
     <View className="flex-row items-center gap-3 border-b border-divider bg-surface px-4 pb-3 pt-2">
       <Pressable
         onPress={() => router.back()}
-        className="mr-1 active:opacity-50"
+        className="-ml-2 h-11 w-11 items-center justify-center rounded-full active:opacity-50"
+        hitSlop={4}
         accessibilityRole="button"
         accessibilityLabel={t("header.back")}
       >

@@ -55,6 +55,7 @@ export function MessageInput({
         <Pressable
           className="mb-1.5 h-9 w-9 items-center justify-center rounded-full active:bg-pressed"
           onPress={onAttach}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t("input.attach")}
         >
@@ -76,7 +77,7 @@ export function MessageInput({
           multiline
           textAlignVertical="center"
           returnKeyType="default"
-          blurOnSubmit={false}
+          submitBehavior="newline"
           onSubmitEditing={Platform.OS === "web" ? handleSend : undefined}
         />
       </View>
@@ -87,6 +88,7 @@ export function MessageInput({
         }`}
         onPress={handleSend}
         disabled={!hasText}
+        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t("input.send")}
       >
