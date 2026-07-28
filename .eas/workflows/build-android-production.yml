@@ -1,0 +1,15 @@
+# Tự động build Android production khi push lên nhánh main
+# Yêu cầu: kết nối GitHub repo trong Expo Dashboard (expo.dev → project → GitHub)
+name: Build Android (production)
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  build_android:
+    name: Build Android app bundle
+    type: build
+    params:
+      platform: android
+      profile: production
