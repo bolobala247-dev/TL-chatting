@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { SymbolView } from "expo-symbols";
 import { useTranslation } from "react-i18next";
 import {
   LANGUAGE_LABELS,
@@ -24,6 +23,12 @@ import {
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
+import { Icon } from "@/src/components/ui/Icon";
+import { TextField } from "@/src/components/ui/TextField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
+import { SectionHeader } from "@/src/components/ui/SectionHeader";
+import { Card, ListGroup } from "@/src/components/ui/Card";
+import { useTheme, type ThemePreference } from "@/src/theme";
 
 // Static keys so the notification status stays translated after a language switch
 const NOTIFICATION_STATUS_KEYS = {
@@ -35,9 +40,12 @@ const NOTIFICATION_STATUS_KEYS = {
 
 type NotificationStatusKey = keyof typeof NOTIFICATION_STATUS_KEYS;
 
+const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
+
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation(["settings", "profile", "common", "errors"]);
   const { profile, user, signOut, fetchProfile } = useAuthStore();
+  const { preference, colors, setPreference } = useTheme();
   const [displayName, setDisplayName] = useState(
     profile?.display_name || ""
   );
@@ -180,62 +188,63 @@ export default function SettingsScreen() {
 
   return (
     <>
-    <ScrollView className="flex-1 bg-white">
+    <ScrollView className="flex-1 bg-background">
       <View className="items-center px-4 pt-6">
-        <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar}>
+        <Pressable
+          onPress={handlePickAvatar}
+          disabled={uploadingAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={t("profile:sectionTitle")}
+        >
           <Avatar
             uri={profile?.avatar_url}
             name={profile?.display_name || profile?.username}
             size={90}
           />
-          <View className="absolute -bottom-1 -right-1 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-primary-600">
-            <Text className="text-xs text-white">
-              {uploadingAvatar ? "..." : "📷"}
-            </Text>
+          <View className="absolute -bottom-1 -right-1 h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-ink">
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color={colors.inkInverse} />
+            ) : (
+              <Icon
+                name={{
+                  ios: "camera.fill",
+                  android: "photo_camera",
+                  web: "photo_camera",
+                }}
+                tone="inverse"
+                size="sm"
+              />
+            )}
           </View>
         </Pressable>
 
-        <Text className="mt-3 text-sm text-gray-500">
+        <Text className="mt-3 font-sans text-caption text-fg-tertiary">
           @{profile?.username || "unknown"}
         </Text>
 
         {avatarError ? (
-          <Text className="mt-2 text-center text-sm text-red-600">
-            {avatarError}
-          </Text>
+          <FormMessage className="mt-2 text-center">{avatarError}</FormMessage>
         ) : null}
       </View>
 
       <View className="mt-6 px-4">
-        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          {t("profile:sectionTitle")}
-        </Text>
+        <SectionHeader title={t("profile:sectionTitle")} className="mb-4" />
 
         <View className="gap-4">
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("profile:displayName.label")}
-            </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                profileError ? "border-red-500" : "border-gray-300"
-              }`}
-              value={displayName}
-              onChangeText={(text) => {
-                setDisplayName(text);
-                if (profileError) setProfileError("");
-                if (profileSuccess) setProfileSuccess("");
-              }}
-              placeholder={t("profile:displayName.placeholder")}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
+          <TextField
+            label={t("profile:displayName.label")}
+            value={displayName}
+            onChangeText={(text) => {
+              setDisplayName(text);
+              if (profileError) setProfileError("");
+              if (profileSuccess) setProfileSuccess("");
+            }}
+            placeholder={t("profile:displayName.placeholder")}
+            error={profileError || undefined}
+          />
 
           {profileSuccess ? (
-            <Text className="text-sm text-green-600">{profileSuccess}</Text>
-          ) : null}
-          {profileError ? (
-            <Text className="text-sm text-red-600">{profileError}</Text>
+            <FormMessage tone="success">{profileSuccess}</FormMessage>
           ) : null}
 
           <Button
@@ -248,48 +257,74 @@ export default function SettingsScreen() {
       </View>
 
       <View className="mt-8 px-4">
-        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          {t("language.sectionTitle")}
-        </Text>
+        <SectionHeader title={t("appearance.sectionTitle")} className="mb-4" />
 
-        <View className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-          {SUPPORTED_LANGUAGES.map((language, index) => (
+        <ListGroup>
+          {THEME_OPTIONS.map((option) => (
             <Pressable
-              key={language}
-              className={`flex-row items-center justify-between px-4 py-3.5 active:bg-gray-100 ${
-                index > 0 ? "border-t border-gray-200" : ""
-              }`}
-              onPress={() => handleSelectLanguage(language)}
+              key={option}
+              className="flex-row items-center justify-between px-4 py-3.5 active:bg-pressed"
+              onPress={() => setPreference(option)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: preference === option }}
             >
-              <Text className="text-[15px] text-gray-900">
-                {LANGUAGE_LABELS[language]}
+              <Text className="font-sans text-body text-fg">
+                {t(`appearance.${option}`)}
               </Text>
-              {i18n.language === language ? (
-                <SymbolView
+              {preference === option ? (
+                <Icon
                   name={{ ios: "checkmark", android: "check", web: "check" }}
-                  tintColor="#2563EB"
-                  size={18}
+                  tone="ink"
+                  size="sm"
                 />
               ) : null}
             </Pressable>
           ))}
-        </View>
+        </ListGroup>
       </View>
 
       <View className="mt-8 px-4">
-        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          {t("notifications.sectionTitle")}
-        </Text>
+        <SectionHeader title={t("language.sectionTitle")} className="mb-4" />
 
-        <View className="gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <Text className="text-sm text-gray-600">
+        <ListGroup>
+          {SUPPORTED_LANGUAGES.map((language) => (
+            <Pressable
+              key={language}
+              className="flex-row items-center justify-between px-4 py-3.5 active:bg-pressed"
+              onPress={() => handleSelectLanguage(language)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: i18n.language === language }}
+            >
+              <Text className="font-sans text-body text-fg">
+                {LANGUAGE_LABELS[language]}
+              </Text>
+              {i18n.language === language ? (
+                <Icon
+                  name={{ ios: "checkmark", android: "check", web: "check" }}
+                  tone="ink"
+                  size="sm"
+                />
+              ) : null}
+            </Pressable>
+          ))}
+        </ListGroup>
+      </View>
+
+      <View className="mt-8 px-4">
+        <SectionHeader
+          title={t("notifications.sectionTitle")}
+          className="mb-4"
+        />
+
+        <Card className="gap-3 p-4">
+          <Text className="font-sans text-caption text-fg-secondary">
             {notificationStatus
               ? t(NOTIFICATION_STATUS_KEYS[notificationStatus])
               : ""}
           </Text>
 
           {notificationError ? (
-            <Text className="text-sm text-red-600">{notificationError}</Text>
+            <FormMessage>{notificationError}</FormMessage>
           ) : null}
 
           <Button
@@ -298,37 +333,34 @@ export default function SettingsScreen() {
             loading={registeringNotifications}
             variant="secondary"
           />
-        </View>
+        </Card>
       </View>
 
       <View className="mt-8 px-4 pb-10">
-        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          {t("account.sectionTitle")}
-        </Text>
+        <SectionHeader title={t("account.sectionTitle")} className="mb-4" />
 
-        <View className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <Card className="p-4">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-gray-600">{t("account.email")}</Text>
-            <Text className="text-sm font-medium text-gray-900">
+            <Text className="font-sans text-caption text-fg-secondary">{t("account.email")}</Text>
+            <Text className="font-sans-medium text-caption text-fg">
               {user?.email || "N/A"}
             </Text>
           </View>
-        </View>
+        </Card>
 
         {signOutError ? (
-          <Text className="mt-4 text-center text-sm text-red-600">
+          <FormMessage className="mt-4 text-center">
             {signOutError}
-          </Text>
+          </FormMessage>
         ) : null}
 
-        <Pressable
-          className="mt-4 h-12 items-center justify-center rounded-xl bg-red-50 active:bg-red-100"
-          onPress={handleSignOut}
-        >
-          <Text className="text-base font-semibold text-red-600">
-            {t("account.signOut")}
-          </Text>
-        </Pressable>
+        <View className="mt-4">
+          <Button
+            title={t("account.signOut")}
+            variant="danger"
+            onPress={handleSignOut}
+          />
+        </View>
       </View>
     </ScrollView>
 

@@ -10,6 +10,12 @@
   "language": {
     "sectionTitle": "Language"
   },
+  "appearance": {
+    "sectionTitle": "Appearance",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "account": {
     "sectionTitle": "Account",
     "email": "Email",

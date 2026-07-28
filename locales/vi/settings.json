@@ -10,6 +10,12 @@
   "language": {
     "sectionTitle": "Ngôn ngữ"
   },
+  "appearance": {
+    "sectionTitle": "Giao diện",
+    "light": "Sáng",
+    "dark": "Tối",
+    "system": "Hệ thống"
+  },
   "account": {
     "sectionTitle": "Tài khoản",
     "email": "Email",
