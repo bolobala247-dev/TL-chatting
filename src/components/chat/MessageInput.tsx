@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { View, TextInput, Pressable, Platform } from "react-native";
-import { SymbolView } from "expo-symbols";
 import { useTranslation } from "react-i18next";
+import { Icon } from "@/src/components/ui/Icon";
+import { useThemeColors } from "@/src/theme";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
@@ -17,6 +18,7 @@ export function MessageInput({
   onTypingStop,
 }: MessageInputProps) {
   const { t } = useTranslation("chat");
+  const colors = useThemeColors();
   const [text, setText] = useState("");
   const typingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -48,25 +50,27 @@ export function MessageInput({
   const hasText = text.trim().length > 0;
 
   return (
-    <View className="flex-row items-end gap-2 border-t border-gray-100 bg-white px-3 py-2">
+    <View className="flex-row items-end gap-2 border-t border-divider bg-surface px-3 py-2">
       {onAttach && (
         <Pressable
-          className="mb-1.5 h-9 w-9 items-center justify-center rounded-full active:bg-gray-100"
+          className="mb-1.5 h-9 w-9 items-center justify-center rounded-full active:bg-pressed"
           onPress={onAttach}
+          accessibilityRole="button"
+          accessibilityLabel={t("input.attach")}
         >
-          <SymbolView
+          <Icon
             name={{ ios: "plus.circle.fill", android: "add_circle", web: "add_circle" }}
-            tintColor="#9CA3AF"
-            size={24}
+            tone="tertiary"
+            size="lg"
           />
         </Pressable>
       )}
 
-      <View className="min-h-[36px] flex-1 justify-center rounded-2xl bg-gray-100 px-4 py-2">
+      <View className="min-h-[36px] flex-1 justify-center rounded-2xl bg-surface-secondary px-4 py-2">
         <TextInput
-          className="max-h-24 text-[15px] leading-5 text-gray-900"
+          className="max-h-24 font-sans text-body leading-5 text-fg"
           placeholder={t("input.placeholder")}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.placeholder}
           value={text}
           onChangeText={handleChangeText}
           multiline
@@ -79,14 +83,16 @@ export function MessageInput({
 
       <Pressable
         className={`mb-1.5 h-9 w-9 items-center justify-center rounded-full ${
-          hasText ? "bg-primary-600 active:bg-primary-700" : ""
+          hasText ? "bg-ink active:opacity-90" : ""
         }`}
         onPress={handleSend}
         disabled={!hasText}
+        accessibilityRole="button"
+        accessibilityLabel={t("input.send")}
       >
-        <SymbolView
+        <Icon
           name={{ ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" }}
-          tintColor={hasText ? "#FFFFFF" : "#D1D5DB"}
+          color={hasText ? colors.inkInverse : colors.disabled}
           size={18}
         />
       </Pressable>

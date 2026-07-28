@@ -1,8 +1,9 @@
-import { View, Text, Pressable, Modal } from "react-native";
-import { SymbolView } from "expo-symbols";
+import { View, Text, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { Message } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
+import { Icon, type IconName } from "@/src/components/ui/Icon";
+import { Sheet } from "@/src/components/ui/Sheet";
 
 interface MessageActionsProps {
   message: Message | null;
@@ -15,8 +16,7 @@ interface MessageActionsProps {
 
 interface ActionItem {
   label: string;
-  icon: any;
-  color: string;
+  icon: IconName;
   onPress: () => void;
   destructive?: boolean;
 }
@@ -39,7 +39,6 @@ export function MessageActions({
     {
       label: t("actions.reply"),
       icon: { ios: "arrowshape.turn.up.left", android: "reply", web: "reply" },
-      color: "#374151",
       onPress: () => {
         onReply(message);
         onClose();
@@ -51,7 +50,6 @@ export function MessageActions({
     actions.push({
       label: t("actions.edit"),
       icon: { ios: "pencil", android: "edit", web: "edit" },
-      color: "#374151",
       onPress: () => {
         onEdit(message);
         onClose();
@@ -63,7 +61,6 @@ export function MessageActions({
     actions.push({
       label: t("actions.delete"),
       icon: { ios: "trash", android: "delete", web: "delete" },
-      color: "#DC2626",
       destructive: true,
       onPress: () => {
         onDelete(message);
@@ -73,45 +70,38 @@ export function MessageActions({
   }
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable
-        className="flex-1 justify-end bg-black/40"
-        onPress={onClose}
-      >
-        <View className="mx-3 mb-8 overflow-hidden rounded-2xl bg-white">
-          {message.content && (
-            <View className="border-b border-gray-100 px-4 py-3">
-              <Text className="text-sm text-gray-500" numberOfLines={2}>
-                {message.content}
-              </Text>
-            </View>
-          )}
-
-          {actions.map((action, index) => (
-            <Pressable
-              key={index}
-              className="flex-row items-center gap-3 px-4 py-3.5 active:bg-gray-50"
-              onPress={action.onPress}
-            >
-              <SymbolView
-                name={action.icon}
-                tintColor={action.color}
-                size={20}
-              />
-              <Text
-                className={`text-base ${action.destructive ? "font-medium text-red-600" : "text-gray-900"}`}
-              >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
+    <Sheet visible={visible} onClose={onClose}>
+      {message.content && (
+        <View className="border-b border-divider px-4 py-3">
+          <Text className="font-sans text-caption text-fg-tertiary" numberOfLines={2}>
+            {message.content}
+          </Text>
         </View>
-      </Pressable>
-    </Modal>
+      )}
+
+      {actions.map((action, index) => (
+        <Pressable
+          key={index}
+          className="flex-row items-center gap-3 px-4 py-3.5 active:bg-pressed"
+          onPress={action.onPress}
+          accessibilityRole="button"
+        >
+          <Icon
+            name={action.icon}
+            tone={action.destructive ? "danger" : "secondary"}
+            size="md"
+          />
+          <Text
+            className={`text-body ${
+              action.destructive
+                ? "font-sans-medium text-danger"
+                : "font-sans text-fg"
+            }`}
+          >
+            {action.label}
+          </Text>
+        </Pressable>
+      ))}
+    </Sheet>
   );
 }

@@ -1,12 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   View,
-  Text,
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  Pressable,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,8 +21,11 @@ import { MessageInput } from "@/src/components/chat/MessageInput";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
 import { ReplyPreview } from "@/src/components/chat/ReplyPreview";
-import { LoadingSpinner } from "@/src/components/ui/LoadingSpinner";
+import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
+import { Dialog } from "@/src/components/ui/Dialog";
+import { Button } from "@/src/components/ui/Button";
+import { FormMessage } from "@/src/components/ui/FormMessage";
 import type { Message, Profile } from "@/src/types";
 
 export default function ChatScreen() {
@@ -192,12 +192,12 @@ export default function ChatScreen() {
   }, [roomId, user, chatError]);
 
   if (!roomId) {
-    return <LoadingSpinner fullScreen />;
+    return <Spinner fullScreen />;
   }
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={{ paddingTop: insets.top }}>
@@ -221,8 +221,8 @@ export default function ChatScreen() {
       <View style={{ paddingBottom: insets.bottom }}>
         <TypingIndicator typingUsers={typingUsers} />
         {chatError ? (
-          <View className="border-t border-red-100 bg-red-50 px-4 py-2">
-            <Text className="text-sm text-red-600">{chatError}</Text>
+          <View className="border-t border-divider bg-danger-bg px-4 py-2">
+            <FormMessage>{chatError}</FormMessage>
           </View>
         ) : null}
         {replyTo && (
@@ -259,59 +259,46 @@ export default function ChatScreen() {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      <Modal
+      <Dialog
         visible={!!editingMessage}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditingMessage(null)}
-      >
-        <Pressable
-          className="flex-1 items-center justify-center bg-black/50 px-6"
-          onPress={() => setEditingMessage(null)}
-        >
-          <Pressable
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text className="text-lg font-bold text-gray-900">
-              {t("message.editTitle")}
-            </Text>
-            <TextInput
-              className={`mt-4 min-h-[88px] rounded-xl border bg-gray-50 px-4 py-3 text-base text-gray-900 ${
-                editError ? "border-red-500" : "border-gray-300"
-              }`}
-              value={editContent}
-              onChangeText={(text) => {
-                setEditContent(text);
-                if (editError) setEditError("");
-              }}
-              multiline
-              autoFocus
-            />
-            {editError ? (
-              <Text className="mt-2 text-sm text-red-600">{editError}</Text>
-            ) : null}
-            <View className="mt-6 flex-row justify-end gap-3">
-              <Pressable
-                className="rounded-xl bg-gray-100 px-5 py-3 active:bg-gray-200"
+        onClose={() => setEditingMessage(null)}
+        title={t("message.editTitle")}
+        footer={
+          <>
+            <View className="flex-1">
+              <Button
+                title={t("common:actions.cancel")}
+                variant="secondary"
+                size="md"
                 onPress={() => setEditingMessage(null)}
-              >
-                <Text className="text-sm font-semibold text-gray-700">
-                  {t("common:actions.cancel")}
-                </Text>
-              </Pressable>
-              <Pressable
-                className="rounded-xl bg-primary-600 px-5 py-3 active:bg-primary-700"
-                onPress={confirmEdit}
-              >
-                <Text className="text-sm font-semibold text-white">
-                  {t("common:actions.save")}
-                </Text>
-              </Pressable>
+              />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+            <View className="flex-1">
+              <Button
+                title={t("common:actions.save")}
+                size="md"
+                onPress={confirmEdit}
+              />
+            </View>
+          </>
+        }
+      >
+        <TextInput
+          className={`mt-2 min-h-[88px] rounded-xl border bg-surface-secondary px-4 py-3 font-sans text-body text-fg ${
+            editError ? "border-danger" : "border-border"
+          }`}
+          value={editContent}
+          onChangeText={(text) => {
+            setEditContent(text);
+            if (editError) setEditError("");
+          }}
+          multiline
+          autoFocus
+        />
+        {editError ? (
+          <FormMessage className="mt-2">{editError}</FormMessage>
+        ) : null}
+      </Dialog>
     </KeyboardAvoidingView>
   );
 }

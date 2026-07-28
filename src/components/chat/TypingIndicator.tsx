@@ -48,7 +48,7 @@ function TypingDots() {
       {[dot1, dot2, dot3].map((dot, i) => (
         <Animated.View
           key={i}
-          className="h-1.5 w-1.5 rounded-full bg-gray-400"
+          className="h-1.5 w-1.5 rounded-full bg-fg-tertiary"
           style={{
             opacity: dot.interpolate({
               inputRange: [0, 1],
@@ -79,7 +79,7 @@ export function TypingIndicator({ typingUsers }: TypingIndicatorProps) {
   return (
     <View className="flex-row items-center gap-2 px-4 py-1.5">
       <TypingDots />
-      <Text className="text-xs text-gray-400">{text}</Text>
+      <Text className="font-sans text-label text-fg-tertiary">{text}</Text>
     </View>
   );
 }

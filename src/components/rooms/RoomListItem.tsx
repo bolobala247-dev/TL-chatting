@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import i18n from "@/src/i18n";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { Badge } from "@/src/components/ui/Badge";
 import type { RoomWithLastMessage } from "@/src/types";
 
 interface RoomListItemProps {
@@ -35,8 +36,9 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
 
   return (
     <Pressable
-      className="flex-row items-center gap-3 px-4 py-3 active:bg-gray-50"
+      className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
       onPress={() => onPress(room.room_id)}
+      accessibilityRole="button"
     >
       <Avatar
         uri={room.room_avatar}
@@ -47,19 +49,19 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
       <View className="flex-1">
         <View className="flex-row items-center justify-between">
           <Text
-            className={`flex-1 text-[15px] ${hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-800"}`}
+            className={`flex-1 text-body text-fg ${hasUnread ? "font-sans-semibold" : "font-sans-medium"}`}
             numberOfLines={1}
           >
             {room.room_name || t("defaultRoomName")}
           </Text>
-          <Text className="ml-2 text-xs text-gray-400">
+          <Text className="ml-2 font-sans text-label text-fg-tertiary">
             {formatRelativeTime(room.last_message_at)}
           </Text>
         </View>
 
         <View className="mt-0.5 flex-row items-center justify-between">
           <Text
-            className={`flex-1 text-sm ${hasUnread ? "font-medium text-gray-700" : "text-gray-500"}`}
+            className={`flex-1 text-caption ${hasUnread ? "font-sans-medium text-fg-secondary" : "font-sans text-fg-tertiary"}`}
             numberOfLines={1}
           >
             {room.last_message_sender
@@ -68,11 +70,10 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
           </Text>
 
           {hasUnread && (
-            <View className="ml-2 min-w-[20px] items-center justify-center rounded-full bg-primary-600 px-1.5 py-0.5">
-              <Text className="text-[11px] font-bold text-white">
-                {room.unread_count > 99 ? "99+" : room.unread_count}
-              </Text>
-            </View>
+            <Badge
+              label={room.unread_count > 99 ? "99+" : String(room.unread_count)}
+              className="ml-2"
+            />
           )}
         </View>
       </View>

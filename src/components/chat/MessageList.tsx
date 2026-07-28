@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { View, Text, FlatList, ActivityIndicator } from "react-native";
 import { useTranslation } from "react-i18next";
 import { MessageBubble } from "./MessageBubble";
+import { useThemeColors } from "@/src/theme";
 import type { Message } from "@/src/types";
 
 interface MessageListProps {
@@ -20,6 +21,7 @@ export function MessageList({
   onMessageLongPress,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
+  const colors = useThemeColors();
   const renderItem = useCallback(
     ({ item }: { item: Message }) => (
       <MessageBubble message={item} onLongPress={onMessageLongPress} />
@@ -31,10 +33,10 @@ export function MessageList({
     if (!loading || messages.length === 0) return null;
     return (
       <View className="items-center py-4">
-        <ActivityIndicator size="small" color="#3B82F6" />
+        <ActivityIndicator size="small" color={colors.fgTertiary} />
       </View>
     );
-  }, [loading, messages.length]);
+  }, [loading, messages.length, colors.fgTertiary]);
 
   const renderEmpty = useCallback(() => {
     if (loading) {
@@ -43,7 +45,7 @@ export function MessageList({
           className="flex-1 items-center justify-center"
           style={{ transform: [{ scaleY: -1 }] }}
         >
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color={colors.fgTertiary} />
         </View>
       );
     }
@@ -52,15 +54,15 @@ export function MessageList({
         className="flex-1 items-center justify-center"
         style={{ transform: [{ scaleY: -1 }] }}
       >
-        <Text className="text-base text-gray-400">
+        <Text className="font-sans-semibold text-title text-fg">
           {t("message.emptyTitle")}
         </Text>
-        <Text className="mt-1 text-sm text-gray-300">
+        <Text className="mt-1 font-sans text-caption text-fg-tertiary">
           {t("message.emptyCta")}
         </Text>
       </View>
     );
-  }, [loading, t]);
+  }, [loading, t, colors.fgTertiary]);
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
 

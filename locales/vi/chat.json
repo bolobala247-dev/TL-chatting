@@ -24,10 +24,13 @@
   "header": {
     "online": "Đang hoạt động",
     "offline": "Không hoạt động",
-    "members_other": "{{count}} thành viên"
+    "members_other": "{{count}} thành viên",
+    "back": "Quay lại"
   },
   "input": {
-    "placeholder": "Nhập tin nhắn..."
+    "placeholder": "Nhập tin nhắn...",
+    "attach": "Đính kèm",
+    "send": "Gửi"
   },
   "message": {
     "imagePlaceholder": "[Hình ảnh]",
