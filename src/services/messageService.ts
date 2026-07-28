@@ -162,12 +162,13 @@ export const messageService = {
     imageUri: string
   ): Promise<Message> {
     const fileName = `${roomId}/${Date.now()}.jpg`;
+    // RN không hỗ trợ tạo Blob từ ArrayBuffer — upload ArrayBuffer trực tiếp
     const response = await fetch(imageUri);
-    const blob = await response.blob();
+    const arrayBuffer = await response.arrayBuffer();
 
     const { error: uploadError } = await supabase.storage
       .from("chat-media")
-      .upload(fileName, blob, {
+      .upload(fileName, arrayBuffer, {
         contentType: "image/jpeg",
       });
 
@@ -198,11 +199,11 @@ export const messageService = {
       imageUris.map(async (uri, i) => {
         const fileName = `${roomId}/${ts}-${i}.jpg`;
         const response = await fetch(uri);
-        const blob = await response.blob();
+        const arrayBuffer = await response.arrayBuffer();
 
         const { error: uploadError } = await supabase.storage
           .from("chat-media")
-          .upload(fileName, blob, { contentType: "image/jpeg" });
+          .upload(fileName, arrayBuffer, { contentType: "image/jpeg" });
 
         if (uploadError) throw uploadError;
 
