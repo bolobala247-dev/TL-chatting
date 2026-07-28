@@ -16,6 +16,12 @@
 --   supabase secrets set PUSH_FUNCTION_SECRET=<random-long-secret>
 
 -- ============================================
+-- 0. REQUIRED EXTENSION (new projects don't have pg_net enabled)
+-- ============================================
+
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- ============================================
 -- 1. PUSH TRIGGER (replaces 00004 version)
 -- ============================================
 
