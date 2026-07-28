@@ -1,7 +1,9 @@
 import { Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       screenOptions={{
@@ -24,7 +26,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Tin nhắn",
+          title: t("tabs.messages"),
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: "bubble.left.and.bubble.right", android: "chat", web: "chat" }}
@@ -37,7 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="contacts"
         options={{
-          title: "Danh bạ",
+          title: t("tabs.contacts"),
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: "person.2", android: "group", web: "group" }}
@@ -50,7 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Cài đặt",
+          title: t("tabs.settings"),
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{ ios: "gearshape", android: "settings", web: "settings" }}

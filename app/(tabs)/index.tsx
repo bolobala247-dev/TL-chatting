@@ -8,12 +8,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { useRooms } from "@/src/hooks/useRooms";
 import { RoomListItem } from "@/src/components/rooms/RoomListItem";
 import { CreateRoomModal } from "@/src/components/rooms/CreateRoomModal";
 import type { RoomWithLastMessage } from "@/src/types";
 
 export default function ChatsScreen() {
+  const { t } = useTranslation("chat");
   const router = useRouter();
   const { rooms, loading, refresh } = useRooms();
   const [showCreateRoom, setShowCreateRoom] = useState(false);
@@ -46,14 +48,14 @@ export default function ChatsScreen() {
           size={64}
         />
         <Text className="mt-4 text-center text-lg font-medium text-gray-500">
-          Chưa có cuộc trò chuyện nào
+          {t("rooms.emptyTitle")}
         </Text>
         <Text className="mt-2 text-center text-sm text-gray-400">
-          Nhấn nút + để bắt đầu trò chuyện với bạn bè
+          {t("rooms.emptySubtitle")}
         </Text>
       </View>
     );
-  }, [loading]);
+  }, [loading, t]);
 
   return (
     <View className="flex-1 bg-white">

@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { useTranslation } from "react-i18next";
 import type { Message } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
@@ -9,12 +10,13 @@ interface MessageBubbleProps {
   onLongPress?: (message: Message) => void;
 }
 
-function formatTime(dateStr: string): string {
+function formatTime(dateStr: string, locale: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string }) {
+  const { t } = useTranslation("chat");
   const messages = useChatStore((s) => s.messages[roomId] ?? []);
   const replyMessage = messages.find((m) => m.id === replyToId);
 
@@ -23,13 +25,14 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   return (
     <View className="mb-1.5 rounded-lg border-l-2 border-primary-300 bg-black/5 px-2.5 py-1.5">
       <Text className="text-xs text-gray-500" numberOfLines={1}>
-        {replyMessage.content || "[Hình ảnh]"}
+        {replyMessage.content || t("message.imagePlaceholder")}
       </Text>
     </View>
   );
 }
 
 export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
+  const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
   const isMine = message.sender_id === userId;
 
@@ -87,7 +90,7 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
               isMine ? "text-blue-200" : "text-gray-400"
             }`}
           >
-            {message.created_at ? formatTime(message.created_at) : ""}
+            {message.created_at ? formatTime(message.created_at, i18n.language) : ""}
           </Text>
           {message.is_edited && (
             <Text
@@ -95,7 +98,7 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
                 isMine ? "text-blue-200" : "text-gray-400"
               }`}
             >
-              (đã sửa)
+              {t("message.edited")}
             </Text>
           )}
         </View>

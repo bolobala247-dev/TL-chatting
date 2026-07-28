@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import { useTranslation } from "react-i18next";
 import { useMessages } from "@/src/hooks/useMessages";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { roomService } from "@/src/services/roomService";
@@ -28,6 +29,7 @@ import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import type { Message, Profile } from "@/src/types";
 
 export default function ChatScreen() {
+  const { t } = useTranslation(["chat", "common", "errors"]);
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
@@ -37,7 +39,7 @@ export default function ChatScreen() {
     useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
 
-  const [roomName, setRoomName] = useState("Chat");
+  const [roomName, setRoomName] = useState("");
   const [roomAvatar, setRoomAvatar] = useState<string | null>(null);
   const [participantCount, setParticipantCount] = useState(0);
 
@@ -85,7 +87,7 @@ export default function ChatScreen() {
 
   const confirmEdit = async () => {
     if (!editingMessage || !editContent.trim()) {
-      setEditError("Nội dung tin nhắn không được để trống");
+      setEditError(t("message.editEmpty"));
       return;
     }
 
@@ -101,7 +103,7 @@ export default function ChatScreen() {
     } catch (err: unknown) {
       console.error("[ChatScreen] edit message", err);
       const msg =
-        err instanceof Error ? err.message : "Không thể chỉnh sửa tin nhắn";
+        err instanceof Error ? err.message : t("message.editFailed");
       setEditError(msg);
     }
   };
@@ -122,7 +124,7 @@ export default function ChatScreen() {
     } catch (err: unknown) {
       console.error("[ChatScreen] delete message", err);
       const msg =
-        err instanceof Error ? err.message : "Không thể xoá tin nhắn";
+        err instanceof Error ? err.message : t("message.deleteFailed");
       setChatError(msg);
     }
   };
@@ -144,7 +146,7 @@ export default function ChatScreen() {
         } catch (err: unknown) {
           console.error("[ChatScreen] send reply", err);
           const msg =
-            err instanceof Error ? err.message : "Không thể gửi tin nhắn";
+            err instanceof Error ? err.message : t("message.sendFailed");
           setChatError(msg);
         }
         setReplyTo(null);
@@ -162,7 +164,7 @@ export default function ChatScreen() {
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setChatError("Cần quyền truy cập thư viện ảnh");
+      setChatError(t("errors:mediaLibraryPermission"));
       return;
     }
 
@@ -183,8 +185,8 @@ export default function ChatScreen() {
       console.error("[ChatScreen] send image", err);
       const msg =
         err instanceof Error
-          ? `Không thể gửi ảnh: ${err.message}`
-          : "Không thể gửi ảnh";
+          ? t("message.sendImageFailedDetail", { message: err.message })
+          : t("message.sendImageFailed");
       setChatError(msg);
     }
   }, [roomId, user, chatError]);
@@ -200,7 +202,7 @@ export default function ChatScreen() {
     >
       <View style={{ paddingTop: insets.top }}>
         <ChatHeader
-          name={roomName}
+          name={roomName || t("defaultRoomName")}
           avatarUrl={roomAvatar}
           participantCount={participantCount}
         />
@@ -248,10 +250,10 @@ export default function ChatScreen() {
 
       <ConfirmDialog
         visible={!!deleteTarget}
-        title="Xoá tin nhắn"
-        message="Bạn có chắc muốn xoá tin nhắn này?"
-        confirmText="Xoá"
-        cancelText="Huỷ"
+        title={t("message.deleteTitle")}
+        message={t("message.deleteConfirm")}
+        confirmText={t("common:actions.delete")}
+        cancelText={t("common:actions.cancel")}
         destructive
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
@@ -272,7 +274,7 @@ export default function ChatScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-lg font-bold text-gray-900">
-              Chỉnh sửa tin nhắn
+              {t("message.editTitle")}
             </Text>
             <TextInput
               className={`mt-4 min-h-[88px] rounded-xl border bg-gray-50 px-4 py-3 text-base text-gray-900 ${
@@ -295,7 +297,7 @@ export default function ChatScreen() {
                 onPress={() => setEditingMessage(null)}
               >
                 <Text className="text-sm font-semibold text-gray-700">
-                  Huỷ
+                  {t("common:actions.cancel")}
                 </Text>
               </Pressable>
               <Pressable
@@ -303,7 +305,7 @@ export default function ChatScreen() {
                 onPress={confirmEdit}
               >
                 <Text className="text-sm font-semibold text-white">
-                  Lưu
+                  {t("common:actions.save")}
                 </Text>
               </Pressable>
             </View>

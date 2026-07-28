@@ -1,0 +1,21 @@
+{
+  "notifications": {
+    "sectionTitle": "Thông báo",
+    "statusUnsupported": "Thiết bị này không hỗ trợ push Android",
+    "statusGranted": "Đã bật quyền thông báo",
+    "statusNotGranted": "Chưa bật quyền thông báo",
+    "registered": "Đã đăng ký thông báo thành công",
+    "enable": "Bật thông báo tin nhắn"
+  },
+  "language": {
+    "sectionTitle": "Ngôn ngữ"
+  },
+  "account": {
+    "sectionTitle": "Tài khoản",
+    "email": "Email",
+    "signOut": "Đăng xuất",
+    "signOutConfirmTitle": "Đăng xuất",
+    "signOutConfirmMessage": "Bạn có chắc muốn đăng xuất?",
+    "signOutFailed": "Không thể đăng xuất, vui lòng thử lại"
+  }
+}

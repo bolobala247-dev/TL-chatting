@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
 
 interface ChatHeaderProps {
@@ -16,6 +17,7 @@ export function ChatHeader({
   isOnline,
   participantCount,
 }: ChatHeaderProps) {
+  const { t } = useTranslation("chat");
   const router = useRouter();
 
   return (
@@ -39,10 +41,10 @@ export function ChatHeader({
         </Text>
         <Text className="text-xs text-gray-400">
           {isOnline
-            ? "Đang hoạt động"
+            ? t("header.online")
             : participantCount
-              ? `${participantCount} thành viên`
-              : "Không hoạt động"}
+              ? t("header.members", { count: participantCount })
+              : t("header.offline")}
         </Text>
       </View>
     </View>

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { View, Text, FlatList, ActivityIndicator } from "react-native";
+import { useTranslation } from "react-i18next";
 import { MessageBubble } from "./MessageBubble";
 import type { Message } from "@/src/types";
 
@@ -18,6 +19,7 @@ export function MessageList({
   onLoadMore,
   onMessageLongPress,
 }: MessageListProps) {
+  const { t } = useTranslation("chat");
   const renderItem = useCallback(
     ({ item }: { item: Message }) => (
       <MessageBubble message={item} onLongPress={onMessageLongPress} />
@@ -51,14 +53,14 @@ export function MessageList({
         style={{ transform: [{ scaleY: -1 }] }}
       >
         <Text className="text-base text-gray-400">
-          Chưa có tin nhắn nào
+          {t("message.emptyTitle")}
         </Text>
         <Text className="mt-1 text-sm text-gray-300">
-          Hãy bắt đầu cuộc trò chuyện!
+          {t("message.emptyCta")}
         </Text>
       </View>
     );
-  }, [loading]);
+  }, [loading, t]);
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
 

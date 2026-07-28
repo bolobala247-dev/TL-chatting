@@ -7,6 +7,8 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
+import i18n from "@/src/i18n";
 import { useAuthStore } from "@/src/stores/authStore";
 import { supabase } from "@/src/lib/supabase";
 import { Button } from "@/src/components/ui/Button";
@@ -15,20 +17,21 @@ import { PasswordInput } from "@/src/components/ui/PasswordInput";
 
 function getResetPasswordErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
-    return "Đã xảy ra lỗi, vui lòng thử lại";
+    return i18n.t("errors:generic");
   }
 
   if (
     error.name === "AuthSessionMissingError" ||
     error.message.toLowerCase().includes("auth session missing")
   ) {
-    return "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới.";
+    return i18n.t("auth:errors.invalidResetLink");
   }
 
   return error.message;
 }
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation(["auth", "common"]);
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -57,9 +60,7 @@ export default function ResetPasswordScreen() {
           setSession(session);
           setHasRecoverySession(true);
         } else {
-          setFormError(
-            "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới."
-          );
+          setFormError(t("errors.invalidResetLink"));
         }
       } catch (error: unknown) {
         console.error("[ResetPassword] verify session", error);
@@ -86,22 +87,20 @@ export default function ResetPasswordScreen() {
     setFormError("");
 
     if (!hasRecoverySession) {
-      setFormError(
-        "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới."
-      );
+      setFormError(t("errors.invalidResetLink"));
       return;
     }
 
     if (!password.trim()) {
-      setPasswordError("Vui lòng nhập mật khẩu mới");
+      setPasswordError(t("validation.enterNewPassword"));
       return;
     }
     if (password.length < 6) {
-      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự");
+      setPasswordError(t("validation.passwordTooShort"));
       return;
     }
     if (password !== confirmPassword) {
-      setConfirmPasswordError("Mật khẩu xác nhận không khớp");
+      setConfirmPasswordError(t("validation.passwordMismatch"));
       return;
     }
 
@@ -123,14 +122,14 @@ export default function ResetPasswordScreen() {
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-5xl">✅</Text>
         <Text className="mt-6 text-center text-xl font-bold text-gray-900">
-          Mật khẩu đã được cập nhật
+          {t("reset.successTitle")}
         </Text>
         <Text className="mt-3 text-center text-base text-gray-500">
-          Bạn có thể đăng nhập bằng mật khẩu mới.
+          {t("reset.successBody")}
         </Text>
         <View className="mt-8 w-full">
           <Button
-            title="Đăng nhập"
+            title={t("reset.signIn")}
             onPress={() => router.replace("/(auth)/login")}
           />
         </View>
@@ -149,21 +148,21 @@ export default function ResetPasswordScreen() {
       >
         <View className="mb-10">
           <Text className="text-2xl font-bold text-gray-900">
-            Đặt lại mật khẩu
+            {t("reset.title")}
           </Text>
           <Text className="mt-2 text-base text-gray-500">
-            Nhập mật khẩu mới cho tài khoản của bạn.
+            {t("reset.subtitle")}
           </Text>
         </View>
 
         <View className="gap-4">
           <View>
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Mật khẩu mới
+              {t("fields.newPassword.label")}
             </Text>
             <PasswordInput
               error={!!passwordError}
-              placeholder="Ít nhất 6 ký tự"
+              placeholder={t("fields.newPassword.placeholder")}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -180,11 +179,11 @@ export default function ResetPasswordScreen() {
 
           <View>
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Xác nhận mật khẩu
+              {t("fields.confirmPassword.label")}
             </Text>
             <PasswordInput
               error={!!confirmPasswordError}
-              placeholder="Nhập lại mật khẩu mới"
+              placeholder={t("fields.confirmNewPassword.placeholder")}
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
@@ -207,14 +206,14 @@ export default function ResetPasswordScreen() {
 
           {hasRecoverySession ? (
             <Button
-              title="Cập nhật mật khẩu"
+              title={t("reset.submit")}
               onPress={handleUpdate}
               loading={loading}
             />
           ) : (
             <Link href="/(auth)/forgot-password" asChild>
               <Text className="text-center text-sm font-semibold text-primary-600">
-                Yêu cầu link mới
+                {t("reset.requestNewLink")}
               </Text>
             </Link>
           )}

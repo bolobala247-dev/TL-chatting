@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { View, TextInput, Pressable, Platform } from "react-native";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
@@ -15,6 +16,7 @@ export function MessageInput({
   onTypingStart,
   onTypingStop,
 }: MessageInputProps) {
+  const { t } = useTranslation("chat");
   const [text, setText] = useState("");
   const typingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -63,7 +65,7 @@ export function MessageInput({
       <View className="min-h-[36px] flex-1 justify-center rounded-2xl bg-gray-100 px-4 py-2">
         <TextInput
           className="max-h-24 text-[15px] leading-5 text-gray-900"
-          placeholder="Nhập tin nhắn..."
+          placeholder={t("input.placeholder")}
           placeholderTextColor="#9CA3AF"
           value={text}
           onChangeText={handleChangeText}

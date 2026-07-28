@@ -1,4 +1,6 @@
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import i18n from "@/src/i18n";
 import { Avatar } from "@/src/components/ui/Avatar";
 import type { RoomWithLastMessage } from "@/src/types";
 
@@ -16,18 +18,19 @@ function formatRelativeTime(dateStr: string | null): string {
   const diffHour = Math.floor(diffMs / 3600000);
   const diffDay = Math.floor(diffMs / 86400000);
 
-  if (diffMin < 1) return "Vừa xong";
-  if (diffMin < 60) return `${diffMin} phút`;
-  if (diffHour < 24) return `${diffHour} giờ`;
-  if (diffDay < 7) return `${diffDay} ngày`;
+  if (diffMin < 1) return i18n.t("time.justNow");
+  if (diffMin < 60) return i18n.t("time.minutes", { count: diffMin });
+  if (diffHour < 24) return i18n.t("time.hours", { count: diffHour });
+  if (diffDay < 7) return i18n.t("time.days", { count: diffDay });
 
-  return date.toLocaleDateString("vi-VN", {
+  return date.toLocaleDateString(i18n.language, {
     day: "2-digit",
     month: "2-digit",
   });
 }
 
 export function RoomListItem({ room, onPress }: RoomListItemProps) {
+  const { t } = useTranslation("chat");
   const hasUnread = room.unread_count > 0;
 
   return (
@@ -37,7 +40,7 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
     >
       <Avatar
         uri={room.room_avatar}
-        name={room.room_name || "Chat"}
+        name={room.room_name || t("defaultRoomName")}
         size={52}
       />
 
@@ -47,7 +50,7 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
             className={`flex-1 text-[15px] ${hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-800"}`}
             numberOfLines={1}
           >
-            {room.room_name || "Tin nhắn"}
+            {room.room_name || t("defaultRoomName")}
           </Text>
           <Text className="ml-2 text-xs text-gray-400">
             {formatRelativeTime(room.last_message_at)}
@@ -61,7 +64,7 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
           >
             {room.last_message_sender
               ? `${room.last_message_sender}: ${room.last_message_content || ""}`
-              : room.last_message_content || "Chưa có tin nhắn"}
+              : room.last_message_content || t("rooms.noMessages")}
           </Text>
 
           {hasUnread && (

@@ -48,7 +48,8 @@
       ],
       "expo-secure-store",
       "expo-image",
-      "./plugins/withGradleBuildOptimizations"
+      "./plugins/withGradleBuildOptimizations",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

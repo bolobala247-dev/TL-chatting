@@ -1,0 +1,56 @@
+{
+  "defaultRoomName": "Chat",
+  "rooms": {
+    "emptyTitle": "No conversations yet",
+    "emptySubtitle": "Tap the + button to start chatting with friends",
+    "noMessages": "No messages yet",
+    "unread_one": "{{count}} unread message",
+    "unread_other": "{{count}} unread messages"
+  },
+  "create": {
+    "title": "New conversation",
+    "groupNamePlaceholder": "Group name...",
+    "groupNameRequired": "Please enter a group name",
+    "createGroup": "Create group",
+    "startChat": "Start chatting",
+    "failed": "Couldn't create the conversation, please try again",
+    "typeToSearch": "Type a name to search"
+  },
+  "search": {
+    "placeholder": "Search users...",
+    "searching": "Searching...",
+    "noResults": "No users found",
+    "prompt": "Enter a name or username to search"
+  },
+  "header": {
+    "online": "Active now",
+    "offline": "Offline",
+    "members_one": "{{count}} member",
+    "members_other": "{{count}} members"
+  },
+  "input": {
+    "placeholder": "Type a message..."
+  },
+  "message": {
+    "imagePlaceholder": "[Photo]",
+    "edited": "(edited)",
+    "emptyTitle": "No messages yet",
+    "emptyCta": "Start the conversation!",
+    "editTitle": "Edit message",
+    "editEmpty": "Message cannot be empty",
+    "editFailed": "Couldn't edit the message",
+    "deleteTitle": "Delete message",
+    "deleteConfirm": "Are you sure you want to delete this message?",
+    "deleteFailed": "Couldn't delete the message",
+    "sendFailed": "Couldn't send the message",
+    "sendImageFailed": "Couldn't send the photo",
+    "sendImageFailedDetail": "Couldn't send the photo: {{message}}",
+    "replyingTo": "Replying to message"
+  },
+  "typing": {
+    "one": "{{name}} is typing",
+    "two": "{{name1}} and {{name2}} are typing",
+    "many": "{{count}} people are typing"
+  },
+  "startChatFailed": "Couldn't start the conversation, please try again"
+}

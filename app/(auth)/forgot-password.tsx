@@ -8,12 +8,14 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useCooldown } from "@/src/hooks/useCooldown";
 import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation(["auth", "common", "errors"]);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const { resetPassword, loading } = useAuthStore();
@@ -24,7 +26,7 @@ export default function ForgotPasswordScreen() {
   const handleReset = async () => {
     setError("");
     if (!email.trim()) {
-      setError("Vui lòng nhập email");
+      setError(t("validation.enterEmail"));
       return;
     }
 
@@ -35,7 +37,7 @@ export default function ForgotPasswordScreen() {
       logAuthErrorDebug("ForgotPassword", err);
       const { message, cooldownSeconds } = formatAuthFormError(
         err,
-        "Đã xảy ra lỗi, vui lòng thử lại",
+        t("errors:generic"),
         "password_reset",
       );
       setError(message);
@@ -48,15 +50,15 @@ export default function ForgotPasswordScreen() {
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-5xl">✉️</Text>
         <Text className="mt-6 text-center text-xl font-bold text-gray-900">
-          Kiểm tra email của bạn
+          {t("forgot.sentTitle")}
         </Text>
         <Text className="mt-3 text-center text-base text-gray-500">
-          Chúng tôi đã gửi link đặt lại mật khẩu đến{"\n"}
+          {t("forgot.sentBody")}{"\n"}
           <Text className="font-medium text-gray-700">{email}</Text>
         </Text>
         <View className="mt-8 w-full">
           <Button
-            title="Quay lại đăng nhập"
+            title={t("forgot.backToLogin")}
             onPress={() => router.replace("/(auth)/login")}
           />
         </View>
@@ -75,21 +77,21 @@ export default function ForgotPasswordScreen() {
       >
         <View className="mb-10">
           <Text className="text-2xl font-bold text-gray-900">
-            Quên mật khẩu?
+            {t("forgot.title")}
           </Text>
           <Text className="mt-2 text-base text-gray-500">
-            Nhập email đã đăng ký, chúng tôi sẽ gửi link đặt lại mật khẩu.
+            {t("forgot.subtitle")}
           </Text>
         </View>
 
         <View className="gap-4">
           <View>
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Email
+              {t("fields.email.label")}
             </Text>
             <TextInput
               className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
-              placeholder="email@example.com"
+              placeholder={t("fields.email.placeholder")}
               placeholderTextColor="#9CA3AF"
               value={email}
               onChangeText={setEmail}
@@ -106,7 +108,11 @@ export default function ForgotPasswordScreen() {
           ) : null}
 
           <Button
-            title={cooldown > 0 ? `Gửi lại sau (${cooldown}s)` : "Gửi link đặt lại"}
+            title={
+              cooldown > 0
+                ? t("forgot.submitCooldown", { count: cooldown })
+                : t("forgot.submit")
+            }
             onPress={handleReset}
             loading={loading}
             disabled={cooldown > 0}
@@ -115,7 +121,7 @@ export default function ForgotPasswordScreen() {
           <View className="mt-4 items-center">
             <Link href="/(auth)/login" asChild>
               <Text className="text-sm font-semibold text-primary-600">
-                Quay lại đăng nhập
+                {t("forgot.backToLogin")}
               </Text>
             </Link>
           </View>

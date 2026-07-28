@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { initI18n } from "@/src/i18n";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import { useRealtimeRooms } from "@/src/hooks/useRealtime";
@@ -47,18 +48,24 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
+  // i18n must be ready before the first screen renders so no raw keys flash
+  const [i18nReady, setI18nReady] = useState(false);
+
+  useEffect(() => {
+    initI18n().finally(() => setI18nReady(true));
+  }, []);
 
   useEffect(() => {
     if (fontError) throw fontError;
   }, [fontError]);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && i18nReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, i18nReady]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !i18nReady) {
     return null;
   }
 

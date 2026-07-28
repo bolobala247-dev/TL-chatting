@@ -1,0 +1,31 @@
+{
+  "appName": "Talo",
+  "tabs": {
+    "messages": "Messages",
+    "contacts": "Contacts",
+    "settings": "Settings"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "reply": "Reply"
+  },
+  "password": {
+    "show": "Show password",
+    "hide": "Hide password"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutes_one": "{{count}} min",
+    "minutes_other": "{{count}} min",
+    "hours_one": "{{count}} hr",
+    "hours_other": "{{count}} hrs",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
+  },
+  "user": "User",
+  "someone": "Someone"
+}

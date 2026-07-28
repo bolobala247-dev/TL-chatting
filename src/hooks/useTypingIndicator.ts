@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import i18n from "@/src/i18n";
 import { supabase } from "@/src/lib/supabase";
 import { useAuthStore } from "@/src/stores/authStore";
 import { TYPING_DEBOUNCE_MS, TYPING_TIMEOUT_MS } from "@/src/lib/constants";
@@ -35,7 +36,7 @@ export function useTypingIndicator(roomId: string) {
           if (latest?.typing) {
             users.push({
               user_id: presenceUserId,
-              display_name: latest.display_name || "Someone",
+              display_name: latest.display_name || i18n.t("someone"),
             });
           }
         }
@@ -60,7 +61,7 @@ export function useTypingIndicator(roomId: string) {
 
     channelRef.current?.track({
       typing: true,
-      display_name: profile?.display_name || profile?.username || "User",
+      display_name: profile?.display_name || profile?.username || i18n.t("user"),
     });
 
     clearTimeout(timeoutRef.current);

@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { roomService } from "@/src/services/roomService";
@@ -15,6 +16,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import type { Profile } from "@/src/types";
 
 export default function ContactsScreen() {
+  const { t } = useTranslation("chat");
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [query, setQuery] = useState("");
@@ -55,11 +57,11 @@ export default function ContactsScreen() {
         const msg =
           err instanceof Error
             ? err.message
-            : "Không thể bắt đầu trò chuyện, vui lòng thử lại";
+            : t("startChatFailed");
         setChatError(msg);
       }
     },
-    [user, router]
+    [user, router, t]
   );
 
   const renderItem = useCallback(
@@ -104,7 +106,7 @@ export default function ContactsScreen() {
           />
           <TextInput
             className="ml-2 h-10 flex-1 text-[15px] text-gray-900"
-            placeholder="Tìm kiếm người dùng..."
+            placeholder={t("search.placeholder")}
             placeholderTextColor="#9CA3AF"
             value={query}
             onChangeText={handleSearch}
@@ -131,9 +133,9 @@ export default function ContactsScreen() {
             <Text className="mt-4 text-sm text-gray-400">
               {query
                 ? searching
-                  ? "Đang tìm kiếm..."
-                  : "Không tìm thấy người dùng"
-                : "Nhập tên hoặc username để tìm kiếm"}
+                  ? t("search.searching")
+                  : t("search.noResults")
+                : t("search.prompt")}
             </Text>
           </View>
         }

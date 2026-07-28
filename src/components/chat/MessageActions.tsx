@@ -1,5 +1,6 @@
 import { View, Text, Pressable, Modal } from "react-native";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import type { Message } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 
@@ -28,6 +29,7 @@ export function MessageActions({
   onEdit,
   onDelete,
 }: MessageActionsProps) {
+  const { t } = useTranslation();
   const userId = useAuthStore((s) => s.user?.id);
   if (!message) return null;
 
@@ -35,7 +37,7 @@ export function MessageActions({
 
   const actions: ActionItem[] = [
     {
-      label: "Trả lời",
+      label: t("actions.reply"),
       icon: { ios: "arrowshape.turn.up.left", android: "reply", web: "reply" },
       color: "#374151",
       onPress: () => {
@@ -47,7 +49,7 @@ export function MessageActions({
 
   if (isMine && message.type === "text") {
     actions.push({
-      label: "Chỉnh sửa",
+      label: t("actions.edit"),
       icon: { ios: "pencil", android: "edit", web: "edit" },
       color: "#374151",
       onPress: () => {
@@ -59,7 +61,7 @@ export function MessageActions({
 
   if (isMine) {
     actions.push({
-      label: "Xoá",
+      label: t("actions.delete"),
       icon: { ios: "trash", android: "delete", web: "delete" },
       color: "#DC2626",
       destructive: true,

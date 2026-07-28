@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { roomService } from "@/src/services/roomService";
@@ -24,6 +25,7 @@ interface CreateRoomModalProps {
 }
 
 export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
+  const { t } = useTranslation(["chat", "common"]);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,7 +78,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
       let room;
       if (isGroup) {
         if (!groupName.trim()) {
-          setGroupNameError("Vui lòng nhập tên nhóm");
+          setGroupNameError(t("create.groupNameRequired"));
           setLoading(false);
           return;
         }
@@ -99,7 +101,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể tạo cuộc trò chuyện, vui lòng thử lại";
+          : t("create.failed");
       setFormError(msg);
     } finally {
       setLoading(false);
@@ -153,10 +155,10 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
       >
         <View className="flex-row items-center justify-between border-b border-gray-100 px-4 pb-3 pt-4">
           <Pressable onPress={handleClose}>
-            <Text className="text-base text-gray-500">Huỷ</Text>
+            <Text className="text-base text-gray-500">{t("common:actions.cancel")}</Text>
           </Pressable>
           <Text className="text-lg font-semibold text-gray-900">
-            Cuộc trò chuyện mới
+            {t("create.title")}
           </Text>
           <View style={{ width: 40 }} />
         </View>
@@ -164,7 +166,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
         <View className="border-b border-gray-100 px-4 py-3">
           <TextInput
             className="h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900"
-            placeholder="Tìm kiếm người dùng..."
+            placeholder={t("search.placeholder")}
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={handleSearch}
@@ -201,7 +203,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
               className={`h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900 ${
                 groupNameError ? "border border-red-500" : ""
               }`}
-              placeholder="Tên nhóm..."
+              placeholder={t("create.groupNamePlaceholder")}
               placeholderTextColor="#9CA3AF"
               value={groupName}
               onChangeText={(text) => {
@@ -225,9 +227,9 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
               <Text className="text-sm text-gray-400">
                 {searchQuery
                   ? searching
-                    ? "Đang tìm kiếm..."
-                    : "Không tìm thấy người dùng"
-                  : "Nhập tên để tìm kiếm"}
+                    ? t("search.searching")
+                    : t("search.noResults")
+                  : t("create.typeToSearch")}
               </Text>
             </View>
           }
@@ -239,7 +241,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
               <Text className="mb-2 text-sm text-red-600">{formError}</Text>
             ) : null}
             <Button
-              title={isGroup ? "Tạo nhóm" : "Bắt đầu trò chuyện"}
+              title={isGroup ? t("create.createGroup") : t("create.startChat")}
               onPress={handleCreate}
               loading={loading}
             />

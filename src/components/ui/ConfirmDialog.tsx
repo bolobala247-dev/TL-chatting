@@ -1,4 +1,5 @@
 import { Modal, View, Text, Pressable } from "react-native";
+import { useTranslation } from "react-i18next";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -15,12 +16,15 @@ export function ConfirmDialog({
   visible,
   title,
   message,
-  confirmText = "Xác nhận",
-  cancelText = "Huỷ",
+  confirmText,
+  cancelText,
   destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const confirmLabel = confirmText ?? t("actions.confirm");
+  const cancelLabel = cancelText ?? t("actions.cancel");
   return (
     <Modal
       visible={visible}
@@ -47,7 +51,7 @@ export function ConfirmDialog({
               onPress={onCancel}
             >
               <Text className="text-sm font-semibold text-gray-700">
-                {cancelText}
+                {cancelLabel}
               </Text>
             </Pressable>
             <Pressable
@@ -59,7 +63,7 @@ export function ConfirmDialog({
               onPress={onConfirm}
             >
               <Text className="text-sm font-semibold text-white">
-                {confirmText}
+                {confirmLabel}
               </Text>
             </Pressable>
           </View>

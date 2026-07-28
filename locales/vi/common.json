@@ -1,0 +1,28 @@
+{
+  "appName": "Talo",
+  "tabs": {
+    "messages": "Tin nhắn",
+    "contacts": "Danh bạ",
+    "settings": "Cài đặt"
+  },
+  "actions": {
+    "cancel": "Huỷ",
+    "save": "Lưu",
+    "confirm": "Xác nhận",
+    "delete": "Xoá",
+    "edit": "Chỉnh sửa",
+    "reply": "Trả lời"
+  },
+  "password": {
+    "show": "Hiển thị mật khẩu",
+    "hide": "Ẩn mật khẩu"
+  },
+  "time": {
+    "justNow": "Vừa xong",
+    "minutes_other": "{{count}} phút",
+    "hours_other": "{{count}} giờ",
+    "days_other": "{{count}} ngày"
+  },
+  "user": "Người dùng",
+  "someone": "Ai đó"
+}

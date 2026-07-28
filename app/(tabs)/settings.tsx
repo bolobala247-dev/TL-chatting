@@ -7,6 +7,14 @@ import {
   ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
+import {
+  LANGUAGE_LABELS,
+  SUPPORTED_LANGUAGES,
+  setAppLanguage,
+  type AppLanguage,
+} from "@/src/i18n";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import {
@@ -17,7 +25,18 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 
+// Static keys so the notification status stays translated after a language switch
+const NOTIFICATION_STATUS_KEYS = {
+  unsupported: "notifications.statusUnsupported",
+  granted: "notifications.statusGranted",
+  notGranted: "notifications.statusNotGranted",
+  registered: "notifications.registered",
+} as const;
+
+type NotificationStatusKey = keyof typeof NOTIFICATION_STATUS_KEYS;
+
 export default function SettingsScreen() {
+  const { t, i18n } = useTranslation(["settings", "profile", "common", "errors"]);
   const { profile, user, signOut, fetchProfile } = useAuthStore();
   const [displayName, setDisplayName] = useState(
     profile?.display_name || ""
@@ -29,7 +48,8 @@ export default function SettingsScreen() {
   const [profileError, setProfileError] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [signOutError, setSignOutError] = useState("");
-  const [notificationStatus, setNotificationStatus] = useState("");
+  const [notificationStatus, setNotificationStatus] =
+    useState<NotificationStatusKey | "">("");
   const [notificationError, setNotificationError] = useState("");
   const [registeringNotifications, setRegisteringNotifications] =
     useState(false);
@@ -37,14 +57,14 @@ export default function SettingsScreen() {
   const refreshNotificationStatus = useCallback(async () => {
     const status = await getNotificationPermissionStatus();
     if (status === "unsupported") {
-      setNotificationStatus("Thiết bị này không hỗ trợ push Android");
+      setNotificationStatus("unsupported");
       return;
     }
     if (status === "granted") {
-      setNotificationStatus("Đã bật quyền thông báo");
+      setNotificationStatus("granted");
       return;
     }
-    setNotificationStatus("Chưa bật quyền thông báo");
+    setNotificationStatus("notGranted");
   }, []);
 
   useEffect(() => {
@@ -61,7 +81,7 @@ export default function SettingsScreen() {
     await refreshNotificationStatus();
 
     if (result.ok) {
-      setNotificationStatus("Đã đăng ký thông báo thành công");
+      setNotificationStatus("registered");
     } else {
       setNotificationError(result.reason);
     }
@@ -79,11 +99,11 @@ export default function SettingsScreen() {
         display_name: displayName.trim() || null,
       });
       await fetchProfile();
-      setProfileSuccess("Đã cập nhật hồ sơ");
+      setProfileSuccess(t("profile:updated"));
     } catch (err: unknown) {
       console.error("[Settings] save profile", err);
       const msg =
-        err instanceof Error ? err.message : "Không thể cập nhật hồ sơ";
+        err instanceof Error ? err.message : t("profile:updateFailed");
       setProfileError(msg);
     } finally {
       setSaving(false);
@@ -97,7 +117,7 @@ export default function SettingsScreen() {
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setAvatarError("Cần quyền truy cập thư viện ảnh");
+      setAvatarError(t("errors:mediaLibraryPermission"));
       return;
     }
 
@@ -117,7 +137,7 @@ export default function SettingsScreen() {
     } catch (err: unknown) {
       console.error("[Settings] upload avatar", err);
       const msg =
-        err instanceof Error ? err.message : "Không thể tải ảnh đại diện";
+        err instanceof Error ? err.message : t("profile:avatarUploadFailed");
       setAvatarError(msg);
     } finally {
       setUploadingAvatar(false);
@@ -138,8 +158,23 @@ export default function SettingsScreen() {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể đăng xuất, vui lòng thử lại";
+          : t("account.signOutFailed");
       setSignOutError(msg);
+    }
+  };
+
+  const handleSelectLanguage = async (language: AppLanguage) => {
+    await setAppLanguage(language);
+
+    // Logged-in users carry their language across devices via the profile
+    if (user) {
+      try {
+        await profileService.updateProfile(user.id, {
+          preferred_language: language,
+        });
+      } catch (err: unknown) {
+        console.error("[Settings] save preferred language", err);
+      }
     }
   };
 
@@ -173,13 +208,13 @@ export default function SettingsScreen() {
 
       <View className="mt-6 px-4">
         <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          Hồ sơ
+          {t("profile:sectionTitle")}
         </Text>
 
         <View className="gap-4">
           <View>
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Tên hiển thị
+              {t("profile:displayName.label")}
             </Text>
             <TextInput
               className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
@@ -191,7 +226,7 @@ export default function SettingsScreen() {
                 if (profileError) setProfileError("");
                 if (profileSuccess) setProfileSuccess("");
               }}
-              placeholder="Nhập tên hiển thị"
+              placeholder={t("profile:displayName.placeholder")}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -204,7 +239,7 @@ export default function SettingsScreen() {
           ) : null}
 
           <Button
-            title="Lưu thay đổi"
+            title={t("profile:save")}
             onPress={handleSaveProfile}
             loading={saving}
             variant="primary"
@@ -214,18 +249,51 @@ export default function SettingsScreen() {
 
       <View className="mt-8 px-4">
         <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          Thông báo
+          {t("language.sectionTitle")}
+        </Text>
+
+        <View className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+          {SUPPORTED_LANGUAGES.map((language, index) => (
+            <Pressable
+              key={language}
+              className={`flex-row items-center justify-between px-4 py-3.5 active:bg-gray-100 ${
+                index > 0 ? "border-t border-gray-200" : ""
+              }`}
+              onPress={() => handleSelectLanguage(language)}
+            >
+              <Text className="text-[15px] text-gray-900">
+                {LANGUAGE_LABELS[language]}
+              </Text>
+              {i18n.language === language ? (
+                <SymbolView
+                  name={{ ios: "checkmark", android: "check", web: "check" }}
+                  tintColor="#2563EB"
+                  size={18}
+                />
+              ) : null}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View className="mt-8 px-4">
+        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
+          {t("notifications.sectionTitle")}
         </Text>
 
         <View className="gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <Text className="text-sm text-gray-600">{notificationStatus}</Text>
+          <Text className="text-sm text-gray-600">
+            {notificationStatus
+              ? t(NOTIFICATION_STATUS_KEYS[notificationStatus])
+              : ""}
+          </Text>
 
           {notificationError ? (
             <Text className="text-sm text-red-600">{notificationError}</Text>
           ) : null}
 
           <Button
-            title="Bật thông báo tin nhắn"
+            title={t("notifications.enable")}
             onPress={handleEnableNotifications}
             loading={registeringNotifications}
             variant="secondary"
@@ -235,12 +303,12 @@ export default function SettingsScreen() {
 
       <View className="mt-8 px-4 pb-10">
         <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          Tài khoản
+          {t("account.sectionTitle")}
         </Text>
 
         <View className="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm text-gray-600">Email</Text>
+            <Text className="text-sm text-gray-600">{t("account.email")}</Text>
             <Text className="text-sm font-medium text-gray-900">
               {user?.email || "N/A"}
             </Text>
@@ -258,7 +326,7 @@ export default function SettingsScreen() {
           onPress={handleSignOut}
         >
           <Text className="text-base font-semibold text-red-600">
-            Đăng xuất
+            {t("account.signOut")}
           </Text>
         </Pressable>
       </View>
@@ -266,10 +334,10 @@ export default function SettingsScreen() {
 
     <ConfirmDialog
       visible={showSignOutConfirm}
-      title="Đăng xuất"
-      message="Bạn có chắc muốn đăng xuất?"
-      confirmText="Đăng xuất"
-      cancelText="Huỷ"
+      title={t("account.signOutConfirmTitle")}
+      message={t("account.signOutConfirmMessage")}
+      confirmText={t("account.signOut")}
+      cancelText={t("common:actions.cancel")}
       destructive
       onConfirm={confirmSignOut}
       onCancel={() => setShowSignOutConfirm(false)}

@@ -1,0 +1,18 @@
+{
+  "generic": "Something went wrong, please try again",
+  "sessionNotReady": "Your session isn't ready yet",
+  "mediaLibraryPermission": "Photo library access is required",
+  "notFound": {
+    "title": "Not found",
+    "message": "This page doesn't exist",
+    "goHome": "Go back home"
+  },
+  "auth": {
+    "actionSignup": "sign up",
+    "actionRequest": "send a request",
+    "rateLimited_one": "You've tried to {{action}} too many times. Please wait {{count}} second and try again.",
+    "rateLimited_other": "You've tried to {{action}} too many times. Please wait {{count}} seconds and try again.",
+    "emailQuota": "The project has exceeded its email sending limit (default SMTP: ~2 emails/hour). Check Supabase Dashboard → Authentication → Rate Limits, or configure custom SMTP for faster testing.",
+    "tooManyRequests": "Too many requests to {{action}}. Supabase didn't return a wait time — check the console (log [{{logTag}}]) for details."
+  }
+}

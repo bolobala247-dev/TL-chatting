@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { View, TextInput, Pressable, type TextInputProps } from "react-native";
 import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 
 interface PasswordInputProps extends TextInputProps {
   error?: boolean;
 }
 
 export function PasswordInput({ error = false, ...props }: PasswordInputProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   return (
@@ -23,7 +25,7 @@ export function PasswordInput({ error = false, ...props }: PasswordInputProps) {
         className="absolute right-0 top-0 h-12 w-12 items-center justify-center"
         onPress={() => setVisible((v) => !v)}
         hitSlop={8}
-        accessibilityLabel={visible ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+        accessibilityLabel={visible ? t("password.hide") : t("password.show")}
       >
         <SymbolView
           name={

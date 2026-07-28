@@ -1,0 +1,17 @@
+{
+  "channelName": "Tin nhắn",
+  "push": {
+    "sentImage": "Đã gửi ảnh",
+    "sentFile": "Đã gửi tệp",
+    "newMessage": "Tin nhắn mới"
+  },
+  "errors": {
+    "androidOnly": "Push hiện chỉ hỗ trợ Android",
+    "physicalDeviceRequired": "Cần cài trên điện thoại thật, không phải emulator",
+    "sessionNotReady": "Phiên đăng nhập chưa sẵn sàng, thử lại sau vài giây",
+    "permissionDenied": "Chưa cấp quyền thông báo. Vào Cài đặt → Talo → Thông báo → Bật",
+    "fcmMisconfigured": "FCM chưa cấu hình đúng trên bản build. Cần build lại APK sau khi upload FCM lên EAS",
+    "tokenFetchFailed": "Không lấy được push token",
+    "tokenSaveFailed": "Không lưu được token lên server"
+  }
+}

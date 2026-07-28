@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import i18n from "@/src/i18n";
 import { supabase } from "@/src/lib/supabase";
 import type { InsertTables } from "@/src/types";
 
@@ -53,7 +54,7 @@ export const pushTokenService = {
     } = await supabase.auth.getSession();
 
     if (!session?.user || session.user.id !== userId) {
-      throw new Error("Phiên đăng nhập chưa sẵn sàng");
+      throw new Error(i18n.t("errors:sessionNotReady"));
     }
 
     // Already synced for this user/token pair: skip the DB round-trip

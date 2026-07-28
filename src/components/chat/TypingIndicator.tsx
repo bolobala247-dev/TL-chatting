@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Animated } from "react-native";
+import { useTranslation } from "react-i18next";
 
 interface TypingIndicatorProps {
   typingUsers: Array<{ user_id: string; display_name: string }>;
@@ -61,17 +62,18 @@ function TypingDots() {
 }
 
 export function TypingIndicator({ typingUsers }: TypingIndicatorProps) {
+  const { t } = useTranslation("chat");
   if (typingUsers.length === 0) return null;
 
   const names = typingUsers.map((u) => u.display_name);
   let text: string;
 
   if (names.length === 1) {
-    text = `${names[0]} đang nhập`;
+    text = t("typing.one", { name: names[0] });
   } else if (names.length === 2) {
-    text = `${names[0]} và ${names[1]} đang nhập`;
+    text = t("typing.two", { name1: names[0], name2: names[1] });
   } else {
-    text = `${names.length} người đang nhập`;
+    text = t("typing.many", { count: names.length });
   }
 
   return (
