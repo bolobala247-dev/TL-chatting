@@ -14,14 +14,14 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Icon } from "@/src/components/ui/Icon";
 import { SearchField } from "@/src/components/ui/SearchField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Profile } from "@/src/types";
+import type { ProfileSearchResult } from "@/src/types";
 
 export default function ContactsScreen() {
   const { t } = useTranslation("chat");
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Profile[]>([]);
+  const [results, setResults] = useState<ProfileSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [chatError, setChatError] = useState("");
 
@@ -47,7 +47,7 @@ export default function ContactsScreen() {
   );
 
   const handleStartChat = useCallback(
-    async (profile: Profile) => {
+    async (profile: ProfileSearchResult) => {
       if (!user) return;
       setChatError("");
       try {
@@ -66,7 +66,7 @@ export default function ContactsScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Profile }) => (
+    ({ item }: { item: ProfileSearchResult }) => (
       <Pressable
         className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
         onPress={() => handleStartChat(item)}

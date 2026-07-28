@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Icon } from "@/src/components/ui/Icon";
 
@@ -8,20 +9,53 @@ interface ChatHeaderProps {
   name: string;
   avatarUrl?: string | null;
   isOnline?: boolean;
+  /** Peer's last activity (already privacy-gated server-side); DM only. */
+  lastSeenAt?: string | null;
   participantCount?: number;
   /** Opens the shared media / files / links screen. */
   onPressMedia?: () => void;
+  /** Opens the contact info sheet (DM only). */
+  onPressInfo?: () => void;
+}
+
+// Relative "last seen" copy; anything beyond a week falls back to offline
+function formatLastSeen(
+  t: TFunction<"chat">,
+  lastSeenAt: string
+): string | null {
+  const diffMs = Date.now() - new Date(lastSeenAt).getTime();
+  if (Number.isNaN(diffMs) || diffMs < 0) return null;
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return t("header.lastSeenJustNow");
+  if (minutes < 60) return t("header.lastSeenMinutes", { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("header.lastSeenHours", { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days <= 7) return t("header.lastSeenDays", { count: days });
+  return null;
 }
 
 export function ChatHeader({
   name,
   avatarUrl,
   isOnline,
+  lastSeenAt,
   participantCount,
   onPressMedia,
+  onPressInfo,
 }: ChatHeaderProps) {
   const { t } = useTranslation("chat");
   const router = useRouter();
+
+  const lastSeenText = lastSeenAt ? formatLastSeen(t, lastSeenAt) : null;
+  const subtitle = isOnline
+    ? t("header.online")
+    : lastSeenText
+      ? lastSeenText
+      : participantCount
+        ? t("header.members", { count: participantCount })
+        : t("header.offline");
 
   return (
     <View className="flex-row items-center gap-3 border-b border-divider bg-surface px-4 pb-3 pt-2">
@@ -41,18 +75,19 @@ export function ChatHeader({
 
       <Avatar uri={avatarUrl} name={name} size={36} />
 
-      <View className="flex-1">
+      <Pressable
+        className="flex-1"
+        onPress={onPressInfo}
+        disabled={!onPressInfo}
+        accessibilityRole={onPressInfo ? "button" : undefined}
+      >
         <Text className="font-sans-semibold text-body text-fg" numberOfLines={1}>
           {name}
         </Text>
         <Text className="font-sans text-label text-fg-tertiary">
-          {isOnline
-            ? t("header.online")
-            : participantCount
-              ? t("header.members", { count: participantCount })
-              : t("header.offline")}
+          {subtitle}
         </Text>
-      </View>
+      </Pressable>
 
       {onPressMedia && (
         <Pressable

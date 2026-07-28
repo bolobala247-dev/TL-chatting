@@ -14,7 +14,9 @@ import { initI18n } from "@/src/i18n";
 import { ThemeProvider, useTheme, useThemeBootstrap } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
+import { usePresenceHeartbeat } from "@/src/hooks/usePresence";
 import { useRealtimeRooms } from "@/src/hooks/useRealtime";
+import { AppLockGate } from "@/src/components/AppLockGate";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { VercelInsights } from "@/src/components/VercelInsights";
 import "../global.css";
@@ -29,6 +31,8 @@ function AuthGate() {
   const router = useRouter();
 
   useNotifications(!!session && initialized);
+  // Own presence heartbeat + privacy settings bootstrap (owner-only writes)
+  usePresenceHeartbeat(!!session && initialized);
   // Mounted once at the root so unread badges update on every screen,
   // including when deep-linked directly into a chat from a notification
   useRealtimeRooms();
@@ -59,7 +63,10 @@ function ThemedApp() {
   return (
     <>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      <AuthGate />
+      {/* Lock sits above everything, including the auth flow */}
+      <AppLockGate>
+        <AuthGate />
+      </AppLockGate>
     </>
   );
 }

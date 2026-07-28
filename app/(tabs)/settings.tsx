@@ -296,6 +296,40 @@ export default function SettingsScreen() {
       </View>
 
       <View className="mt-8 px-4">
+        <SectionHeader title={t("privacy.title")} className="mb-4" />
+
+        <ListGroup>
+          <Pressable
+            className="flex-row items-center gap-3 px-4 py-3.5 active:bg-pressed"
+            onPress={() => router.push("/settings/privacy")}
+            accessibilityRole="button"
+          >
+            <Icon
+              name={{
+                ios: "lock.shield",
+                android: "shield_lock",
+                web: "shield_lock",
+              }}
+              tone="secondary"
+              size="md"
+            />
+            <Text className="flex-1 font-sans text-body text-fg">
+              {t("privacy.entry")}
+            </Text>
+            <Icon
+              name={{
+                ios: "chevron.right",
+                android: "chevron_right",
+                web: "chevron_right",
+              }}
+              tone="tertiary"
+              size="sm"
+            />
+          </Pressable>
+        </ListGroup>
+      </View>
+
+      <View className="mt-8 px-4">
         <SectionHeader title={t("appearance.sectionTitle")} className="mb-4" />
 
         <ListGroup>

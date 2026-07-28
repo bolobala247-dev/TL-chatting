@@ -22,6 +22,8 @@ interface MessageActionsProps {
   onReact: (message: MessageWithMeta, emoji: string) => void;
   /** Open the "seen by" list for an own message. */
   onViewReceipts: (message: MessageWithMeta) => void;
+  /** Report someone else's message (evidence snapshotted server-side). */
+  onReport: (message: MessageWithMeta) => void;
 }
 
 interface ActionItem {
@@ -43,6 +45,7 @@ export function MessageActions({
   onDelete,
   onReact,
   onViewReceipts,
+  onReport,
 }: MessageActionsProps) {
   const { t } = useTranslation(["common", "chat"]);
   const userId = useAuthStore((s) => s.user?.id);
@@ -112,6 +115,20 @@ export function MessageActions({
       destructive: true,
       onPress: () => {
         onDelete(message);
+        onClose();
+      },
+    });
+  } else {
+    actions.push({
+      label: t("chat:report.action"),
+      icon: {
+        ios: "exclamationmark.bubble",
+        android: "flag",
+        web: "flag",
+      },
+      destructive: true,
+      onPress: () => {
+        onReport(message);
         onClose();
       },
     });

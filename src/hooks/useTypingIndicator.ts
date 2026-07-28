@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import i18n from "@/src/i18n";
 import { supabase } from "@/src/lib/supabase";
 import { useAuthStore } from "@/src/stores/authStore";
+import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { TYPING_DEBOUNCE_MS, TYPING_TIMEOUT_MS } from "@/src/lib/constants";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -55,6 +56,11 @@ export function useTypingIndicator(roomId: string) {
   }, [roomId, userId]);
 
   const startTyping = useCallback(() => {
+    // Privacy: user opted out of broadcasting typing activity. Channel
+    // presence bypasses RLS, so the gate lives on the sender's device.
+    const settings = usePrivacyStore.getState().settings;
+    if (settings && !settings.typing_indicators_enabled) return;
+
     const now = Date.now();
     if (now - lastTypingRef.current < TYPING_DEBOUNCE_MS) return;
     lastTypingRef.current = now;

@@ -10,6 +10,7 @@ import type {
   MessageReaction,
   PollVote,
   RoomParticipant,
+  RoomRead,
 } from "@/src/types";
 
 const RESUBSCRIBE_DELAY_MS = 3000;
@@ -351,6 +352,34 @@ export function useRealtimeRooms() {
             if (participant.user_id === userId) {
               useRoomStore.getState().clearUnread(participant.room_id);
             }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "room_reads",
+          },
+          (payload) => {
+            // Private read watermark (always written even when read
+            // receipts are off). RLS limits events to own rows only.
+            useRoomStore
+              .getState()
+              .clearUnread((payload.new as RoomRead).room_id);
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "room_reads",
+          },
+          (payload) => {
+            useRoomStore
+              .getState()
+              .clearUnread((payload.new as RoomRead).room_id);
           }
         )
         .subscribe((status) => {

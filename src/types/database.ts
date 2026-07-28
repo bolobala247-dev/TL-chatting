@@ -208,6 +208,50 @@ export type Database = {
           },
         ]
       }
+      privacy_settings: {
+        Row: {
+          avatar_visibility: string
+          last_seen_visibility: string
+          online_visibility: string
+          phone_number: string | null
+          phone_visibility: string
+          read_receipts_enabled: boolean
+          typing_indicators_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_visibility?: string
+          last_seen_visibility?: string
+          online_visibility?: string
+          phone_number?: string | null
+          phone_visibility?: string
+          read_receipts_enabled?: boolean
+          typing_indicators_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_visibility?: string
+          last_seen_visibility?: string
+          online_visibility?: string
+          phone_number?: string | null
+          phone_visibility?: string
+          read_receipts_enabled?: boolean
+          typing_indicators_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "privacy_settings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -306,6 +350,39 @@ export type Database = {
           },
           {
             foreignKeyName: "room_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_reads: {
+        Row: {
+          last_read_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_reads_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_reads_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -452,13 +529,160 @@ export type Database = {
           },
         ]
       }
+      user_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_presence: {
+        Row: {
+          last_active_at: string
+          user_id: string
+        }
+        Insert: {
+          last_active_at?: string
+          user_id: string
+        }
+        Update: {
+          last_active_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_presence_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          message_id: string | null
+          message_snapshot: string | null
+          reason: string
+          reported_user_id: string
+          reporter_id: string
+          room_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id?: string | null
+          message_snapshot?: string | null
+          reason: string
+          reported_user_id: string
+          reporter_id: string
+          room_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          message_id?: string | null
+          message_snapshot?: string | null
+          reason?: string
+          reported_user_id?: string
+          reporter_id?: string
+          room_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reported_user_id_fkey"
+            columns: ["reported_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_blocked_profiles: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          blocked_at: string
+          display_name: string
+          id: string
+          username: string
+        }[]
+      }
       get_email_by_username: { Args: { p_username: string }; Returns: string }
       get_my_room_ids: { Args: never; Returns: string[] }
+      get_peer_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          is_blocked_by_me: boolean
+          is_online: boolean
+          last_seen_at: string
+          phone_number: string
+          username: string
+        }[]
+      }
       get_user_rooms: {
         Args: { p_user_id: string }
         Returns: {
@@ -473,9 +697,26 @@ export type Database = {
           unread_count: number
         }[]
       }
+      is_blocked_with: { Args: { p_user_id: string }; Returns: boolean }
+      is_dm_blocked: { Args: { p_room_id: string }; Returns: boolean }
+      is_dm_peer_blocked: {
+        Args: { p_room_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_room_admin: { Args: { p_room_id: string }; Returns: boolean }
       is_room_creator: { Args: { p_room_id: string }; Returns: boolean }
+      is_username_available: { Args: { p_username: string }; Returns: boolean }
+      mark_room_read: { Args: { p_room_id: string }; Returns: undefined }
       process_scheduled_messages: { Args: never; Returns: undefined }
+      search_profiles: {
+        Args: { p_query: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          username: string
+        }[]
+      }
       set_message_pin: {
         Args: { p_message_id: string; p_pinned: boolean }
         Returns: {
@@ -503,6 +744,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      shares_room_with: { Args: { p_user_id: string }; Returns: boolean }
+      submit_report: {
+        Args: {
+          p_details?: string
+          p_message_id?: string
+          p_reason: string
+          p_reported_user_id: string
+        }
+        Returns: string
       }
     }
     Enums: {

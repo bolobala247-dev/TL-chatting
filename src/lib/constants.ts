@@ -10,6 +10,15 @@ export const DRAFT_SAVE_DEBOUNCE_MS = 400;
 // Upper bounds for album / poll composition
 export const MAX_ALBUM_IMAGES = 10;
 export const MAX_POLL_OPTIONS = 10;
+// Presence: own heartbeat cadence + peer status refresh while a DM is open.
+// Server counts a user online while last_active_at is within 75s.
+export const PRESENCE_HEARTBEAT_MS = 45000;
+export const PEER_PRESENCE_POLL_MS = 30000;
+
+// Local app lock: failed-attempt lockout (brute-force slowdown)
+export const APP_LOCK_MAX_ATTEMPTS = 5;
+export const APP_LOCK_COOLDOWN_SECONDS = 30;
+export const APP_LOCK_PIN_LENGTH = { min: 4, max: 6 } as const;
 
 // Quick-reaction palette (minimal, no full emoji keyboard)
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"] as const;

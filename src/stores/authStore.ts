@@ -11,6 +11,7 @@ import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
+import { usePrivacyStore } from "@/src/stores/privacyStore";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -165,6 +166,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Clear per-account client state so the next user never sees stale data
     useChatStore.getState().reset();
     useRoomStore.getState().reset();
+    usePrivacyStore.getState().reset();
     set({ session: null, user: null, profile: null });
   },
 

@@ -13,7 +13,7 @@ import { Icon } from "@/src/components/ui/Icon";
 import { SearchField } from "@/src/components/ui/SearchField";
 import { TextField } from "@/src/components/ui/TextField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Profile } from "@/src/types";
+import type { ProfileSearchResult } from "@/src/types";
 
 interface CreateRoomModalProps {
   visible: boolean;
@@ -26,8 +26,8 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<Profile[]>([]);
+  const [searchResults, setSearchResults] = useState<ProfileSearchResult[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<ProfileSearchResult[]>([]);
   const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -57,7 +57,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
     [user]
   );
 
-  const toggleUser = (profile: Profile) => {
+  const toggleUser = (profile: ProfileSearchResult) => {
     setSelectedUsers((prev) => {
       const exists = prev.find((u) => u.id === profile.id);
       if (exists) return prev.filter((u) => u.id !== profile.id);
@@ -115,7 +115,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
     onClose();
   };
 
-  const renderUserItem = ({ item }: { item: Profile }) => {
+  const renderUserItem = ({ item }: { item: ProfileSearchResult }) => {
     const isSelected = selectedUsers.some((u) => u.id === item.id);
     return (
       <Pressable

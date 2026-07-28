@@ -15,12 +15,14 @@ import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useMessages } from "@/src/hooks/useMessages";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { useRoomParticipants } from "@/src/hooks/useRoomParticipants";
+import { usePeerPresence } from "@/src/hooks/usePresence";
 import { messageService } from "@/src/services/messageService";
 import { savedMessageService } from "@/src/services/savedMessageService";
 import { scheduledMessageService } from "@/src/services/scheduledMessageService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useDraftStore } from "@/src/stores/draftStore";
+import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES } from "@/src/lib/constants";
 import { getAttachments } from "@/src/lib/messageMeta";
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
@@ -40,6 +42,8 @@ import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
 import { ScheduleSheet } from "@/src/components/chat/ScheduleSheet";
 import { ScheduledMessagesSheet } from "@/src/components/chat/ScheduledMessagesSheet";
 import { UndoSendBar } from "@/src/components/chat/UndoSendBar";
+import { ContactInfoSheet } from "@/src/components/chat/ContactInfoSheet";
+import { ReportUserSheet } from "@/src/components/chat/ReportUserSheet";
 import { Icon } from "@/src/components/ui/Icon";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
@@ -79,6 +83,11 @@ export default function ChatScreen() {
   const participantCount = participants.length;
   const isGroup = participantCount > 2;
 
+  // DM-only: privacy-gated peer presence + block state (get_peer_profile)
+  const peerId = !isGroup ? otherProfile?.id ?? null : null;
+  const { peer, refresh: refreshPeer } = usePeerPresence(peerId);
+  const isDmBlocked = !!peer?.is_blocked_by_me;
+
   // Composer text lives here so drafts can persist per room
   const [inputText, setInputText] = useState("");
   const inputTextRef = useRef("");
@@ -102,6 +111,12 @@ export default function ChatScreen() {
   } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [chatError, setChatError] = useState("");
+  const [showContactInfo, setShowContactInfo] = useState(false);
+  // Report target: DM peer (from contact sheet) or a message sender
+  const [reportTarget, setReportTarget] = useState<{
+    userId: string;
+    messageId?: string;
+  } | null>(null);
 
   const [recallTarget, setRecallTarget] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
@@ -217,6 +232,20 @@ export default function ChatScreen() {
   const handleViewVoters = useCallback((message: MessageWithMeta) => {
     setVotersTarget(message);
   }, []);
+
+  const handleReportMessage = useCallback((message: MessageWithMeta) => {
+    setReportTarget({ userId: message.sender_id, messageId: message.id });
+  }, []);
+
+  const handleUnblockPeer = useCallback(async () => {
+    if (!user || !peer) return;
+    try {
+      await usePrivacyStore.getState().unblockUser(user.id, peer.id);
+      refreshPeer();
+    } catch {
+      setChatError(t("block.unblockFailed"));
+    }
+  }, [user, peer, refreshPeer, t]);
 
   const handleOpenAlbum = useCallback(
     (message: MessageWithMeta, index: number) => {
@@ -483,7 +512,14 @@ export default function ChatScreen() {
         <ChatHeader
           name={roomName || t("defaultRoomName")}
           avatarUrl={roomAvatar}
-          participantCount={participantCount}
+          isOnline={!isGroup ? peer?.is_online : undefined}
+          lastSeenAt={!isGroup ? peer?.last_seen_at : undefined}
+          participantCount={isGroup ? participantCount : undefined}
+          onPressInfo={
+            !isGroup && otherProfile
+              ? () => setShowContactInfo(true)
+              : undefined
+          }
           onPressMedia={() =>
             router.push({ pathname: "/chat/media", params: { roomId } })
           }
@@ -542,15 +578,33 @@ export default function ChatScreen() {
             onDismiss={() => setReplyTo(null)}
           />
         )}
-        <MessageInput
-          value={inputText}
-          onChangeText={handleChangeText}
-          onSend={handleSend}
-          onAttach={handleAttach}
-          onLongPressSend={handleLongPressSend}
-          onTypingStart={startTyping}
-          onTypingStop={stopTyping}
-        />
+        {isDmBlocked ? (
+          // Blocked DM: composer is replaced — RLS also rejects sends server-side
+          <View className="flex-row items-center justify-between border-t border-divider bg-surface px-4 py-3">
+            <Text className="flex-1 font-sans text-caption text-fg-secondary">
+              {t("block.blockedBanner")}
+            </Text>
+            <Pressable
+              onPress={handleUnblockPeer}
+              className="rounded-full border border-border px-3 py-1.5 active:bg-pressed"
+              accessibilityRole="button"
+            >
+              <Text className="font-sans-medium text-caption text-fg">
+                {t("block.unblock")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <MessageInput
+            value={inputText}
+            onChangeText={handleChangeText}
+            onSend={handleSend}
+            onAttach={handleAttach}
+            onLongPressSend={handleLongPressSend}
+            onTypingStart={startTyping}
+            onTypingStop={stopTyping}
+          />
+        )}
       </Animated.View>
 
       <MessageActions
@@ -565,12 +619,32 @@ export default function ChatScreen() {
         onDelete={handleRecall}
         onReact={toggleReaction}
         onViewReceipts={handleViewReceipts}
+        onReport={handleReportMessage}
       />
 
       <ReactionsSheet
         message={reactionsTarget}
         visible={!!reactionsTarget}
         onClose={() => setReactionsTarget(null)}
+      />
+
+      <ContactInfoSheet
+        visible={showContactInfo}
+        peer={peer}
+        fallbackName={roomName || t("defaultRoomName")}
+        fallbackAvatarUrl={roomAvatar}
+        onClose={() => setShowContactInfo(false)}
+        onReport={() => {
+          if (otherProfile) setReportTarget({ userId: otherProfile.id });
+        }}
+        onBlockChanged={refreshPeer}
+      />
+
+      <ReportUserSheet
+        visible={!!reportTarget}
+        reportedUserId={reportTarget?.userId ?? null}
+        messageId={reportTarget?.messageId ?? null}
+        onClose={() => setReportTarget(null)}
       />
 
       <ReadReceiptsSheet
