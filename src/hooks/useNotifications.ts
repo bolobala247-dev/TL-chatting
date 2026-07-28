@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { startPushTokenSync } from "@/src/services/notificationService";
@@ -7,30 +8,43 @@ import { useChatStore } from "@/src/stores/chatStore";
 
 const ANDROID_CHANNEL_ID = "messages";
 
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const roomId = notification.request.content.data?.roomId as
-      | string
-      | undefined;
-    const activeRoomId = useChatStore.getState().activeRoomId;
-    const shouldShow = !(roomId && roomId === activeRoomId);
+// expo-notifications is not supported on web — guard every native call
+const isWeb = Platform.OS === "web";
 
-    return {
-      shouldShowAlert: shouldShow,
-      shouldPlaySound: shouldShow,
-      shouldSetBadge: shouldShow,
-      shouldShowBanner: shouldShow,
-      shouldShowList: shouldShow,
-    };
-  },
-});
+if (!isWeb) {
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const roomId = notification.request.content.data?.roomId as
+        | string
+        | undefined;
+      const activeRoomId = useChatStore.getState().activeRoomId;
+      const shouldShow = !(roomId && roomId === activeRoomId);
+
+      return {
+        shouldShowAlert: shouldShow,
+        shouldPlaySound: shouldShow,
+        shouldSetBadge: shouldShow,
+        shouldShowBanner: shouldShow,
+        shouldShowList: shouldShow,
+      };
+    },
+  });
+}
+
+// Resolved once at module load, so the rules of hooks are preserved
+const useLastNotificationResponse: () =>
+  | Notifications.NotificationResponse
+  | null
+  | undefined = isWeb
+  ? () => null
+  : Notifications.useLastNotificationResponse;
 
 export function useNotifications(enabled: boolean) {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
   // Covers cold start (app killed, launched by tapping the notification)
   // as well as warm taps — the response persists until a new one arrives
-  const lastResponse = Notifications.useLastNotificationResponse();
+  const lastResponse = useLastNotificationResponse();
   const handledResponseRef = useRef<string | null>(null);
 
   useEffect(() => {
