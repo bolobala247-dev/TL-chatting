@@ -62,12 +62,13 @@ export const profileService = {
 
   async uploadAvatar(userId: string, uri: string): Promise<string> {
     const fileName = `${userId}/${Date.now()}.jpg`;
+    // RN không hỗ trợ tạo Blob từ ArrayBuffer — upload ArrayBuffer trực tiếp
     const response = await fetch(uri);
-    const blob = await response.blob();
+    const arrayBuffer = await response.arrayBuffer();
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(fileName, blob, {
+      .upload(fileName, arrayBuffer, {
         contentType: "image/jpeg",
         upsert: true,
       });
