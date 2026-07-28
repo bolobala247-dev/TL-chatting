@@ -30,16 +30,16 @@ Do NOT rely on outdated Expo knowledge. Many APIs have been renamed, moved, or d
 
 Modular rules for IDE-specific context loading. Full details live in these files; this document is the cross-tool source of truth.
 
-| Topic | Cursor | Antigravity |
-|-------|--------|-------------|
-| Core project | `.cursor/rules/00-core-project.mdc` | `.agent/rules/00-core-project.md` |
-| Architecture | `.cursor/rules/01-architecture.mdc` | `.agent/rules/01-architecture.md` |
-| Screens & routing | `.cursor/rules/02-screens-routing.mdc` | `.agent/rules/02-screens-routing.md` |
-| Components & UI | `.cursor/rules/03-components-ui.mdc` | `.agent/rules/03-components-ui.md` |
-| Hooks & realtime | `.cursor/rules/04-hooks-realtime.mdc` | `.agent/rules/04-hooks-realtime.md` |
-| Zustand stores | `.cursor/rules/05-stores-zustand.mdc` | `.agent/rules/05-stores-zustand.md` |
-| Services & Supabase | `.cursor/rules/06-services-supabase.mdc` | `.agent/rules/06-services-supabase.md` |
-| Database migrations | `.cursor/rules/07-database-migrations.mdc` | `.agent/rules/07-database-migrations.md` |
+| Topic | Cursor | Antigravity | Qoder |
+|-------|--------|-------------|-------|
+| Core project | `.cursor/rules/00-core-project.mdc` | `.agent/rules/00-core-project.md` | `.qoder/rules/00-core-project.md` |
+| Architecture | `.cursor/rules/01-architecture.mdc` | `.agent/rules/01-architecture.md` | `.qoder/rules/01-architecture.md` |
+| Screens & routing | `.cursor/rules/02-screens-routing.mdc` | `.agent/rules/02-screens-routing.md` | `.qoder/rules/02-screens-routing.md` |
+| Components & UI | `.cursor/rules/03-components-ui.mdc` | `.agent/rules/03-components-ui.md` | `.qoder/rules/03-components-ui.md` |
+| Hooks & realtime | `.cursor/rules/04-hooks-realtime.mdc` | `.agent/rules/04-hooks-realtime.md` | `.qoder/rules/04-hooks-realtime.md` |
+| Zustand stores | `.cursor/rules/05-stores-zustand.mdc` | `.agent/rules/05-stores-zustand.md` | `.qoder/rules/05-stores-zustand.md` |
+| Services & Supabase | `.cursor/rules/06-services-supabase.mdc` | `.agent/rules/06-services-supabase.md` | `.qoder/rules/06-services-supabase.md` |
+| Database migrations | `.cursor/rules/07-database-migrations.mdc` | `.agent/rules/07-database-migrations.md` | `.qoder/rules/07-database-migrations.md` |
 
 Also read `GEMINI.md` when using Antigravity (imports this file + Antigravity-specific overrides).
 

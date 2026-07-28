@@ -1,16 +1,41 @@
 import { AppState, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import { EAS_PROJECT_ID } from "@/src/lib/constants";
 import { supabase } from "@/src/lib/supabase";
 import { pushTokenService } from "@/src/services/pushTokenService";
 
 const ANDROID_CHANNEL_ID = "messages";
+// Per-install identifier — Device.modelName collides between identical
+// phone models and caused sibling token deletion (audit P11)
+const INSTALL_ID_STORAGE_KEY = "tl-install-id";
 
 export type PushRegistrationResult =
   | { ok: true; token: string }
   | { ok: false; reason: string };
+
+async function getInstallId(): Promise<string> {
+  try {
+    const existing = await SecureStore.getItemAsync(INSTALL_ID_STORAGE_KEY);
+    if (existing) return existing;
+  } catch {
+    // fall through and generate a fresh id
+  }
+
+  const installId = `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  try {
+    await SecureStore.setItemAsync(INSTALL_ID_STORAGE_KEY, installId);
+  } catch {
+    // non-fatal: worst case a new id is generated next launch
+  }
+
+  return installId;
+}
 
 function resolveProjectId(): string {
   return (
@@ -95,11 +120,12 @@ export async function registerPushNotificationsForUser(
   }
 
   try {
+    const installId = await getInstallId();
     await pushTokenService.upsertToken(
       userId,
       expoToken,
       "android",
-      Device.modelName ?? undefined
+      installId
     );
   } catch (error) {
     console.error("[notificationService] upsertToken", error);

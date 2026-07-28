@@ -38,8 +38,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         );
         unique.sort(
           (a, b) =>
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime()
+            new Date(b.created_at ?? 0).getTime() -
+            new Date(a.created_at ?? 0).getTime()
         );
 
         return {
@@ -112,6 +112,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   replaceOptimisticMessage: (tempId, message) => {
     set((state) => {
       const roomMessages = state.messages[message.room_id] ?? [];
+      // Realtime INSERT may have already delivered the real message:
+      // drop the temp copy instead of creating a duplicate id
+      if (roomMessages.some((m) => m.id === message.id)) {
+        return {
+          messages: {
+            ...state.messages,
+            [message.room_id]: roomMessages.filter((m) => m.id !== tempId),
+          },
+        };
+      }
       return {
         messages: {
           ...state.messages,

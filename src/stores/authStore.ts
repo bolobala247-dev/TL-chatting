@@ -2,8 +2,10 @@ import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
+import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
-import { registerPushNotificationsForUser } from "@/src/services/notificationService";
+import { useChatStore } from "@/src/stores/chatStore";
+import { useRoomStore } from "@/src/stores/roomStore";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -18,8 +20,9 @@ interface AuthState {
   setInitialized: (initialized: boolean) => void;
   initialize: () => Promise<void>;
   fetchProfile: () => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  // Trả về true nếu có session ngay (auto-confirm email đang bật)
+  signUp: (email: string, password: string, username: string) => Promise<boolean>;
+  signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -48,16 +51,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (session?.user) {
         await get().fetchProfile();
-        void registerPushNotificationsForUser(session.user.id);
       }
 
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      // Push registration is handled by useNotifications/startPushTokenSync.
+      // Never await Supabase calls inside this callback (deadlock risk).
+      supabase.auth.onAuthStateChange((event, session) => {
         set({ session, user: session?.user ?? null });
         if (session?.user) {
-          await get().fetchProfile();
-          if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-            void registerPushNotificationsForUser(session.user.id);
-          }
+          setTimeout(() => {
+            void get().fetchProfile();
+          }, 0);
         } else {
           set({ profile: null });
         }
@@ -85,7 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, password, username) => {
     set({ loading: true });
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -93,24 +96,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
       if (error) throw error;
+      return !!data.session;
     } finally {
       set({ loading: false });
     }
   },
 
-  signIn: async (email, password) => {
+  signIn: async (identifier, password) => {
     set({ loading: true });
     try {
+      // Cho phép đăng nhập bằng email hoặc username
+      let email = identifier;
+      if (!identifier.includes("@")) {
+        const resolved = await profileService.getEmailByUsername(identifier);
+        if (!resolved) {
+          throw new Error("Tên người dùng không tồn tại");
+        }
+        email = resolved;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
-
-      const user = get().user;
-      if (user) {
-        void registerPushNotificationsForUser(user.id);
-      }
     } finally {
       set({ loading: false });
     }
@@ -125,6 +134,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+
+    // Clear per-account client state so the next user never sees stale data
+    useChatStore.getState().reset();
+    useRoomStore.getState().reset();
     set({ session: null, user: null, profile: null });
   },
 

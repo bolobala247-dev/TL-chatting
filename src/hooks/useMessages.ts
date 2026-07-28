@@ -31,17 +31,26 @@ export function useMessages(roomId: string) {
     fetchMessages(roomId);
     clearUnread(roomId);
 
-    if (user) {
-      roomService.updateLastRead(roomId, user.id);
+    const userId = user?.id;
+    if (userId) {
+      roomService
+        .updateLastRead(roomId, userId)
+        .catch((err) => console.error("[useMessages] updateLastRead", err));
     }
 
     return () => {
       setActiveRoom(null);
-      if (user) {
-        roomService.updateLastRead(roomId, user.id);
+      if (userId) {
+        roomService
+          .updateLastRead(roomId, userId)
+          .catch((err) =>
+            console.error("[useMessages] updateLastRead", err)
+          );
       }
     };
-  }, [roomId, user]);
+    // user?.id (not the user object) — avoids re-runs on token refresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, user?.id]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -81,7 +90,7 @@ export function useMessages(roomId: string) {
   const loadMore = useCallback(() => {
     if (loading || !hasMore || messages.length === 0) return;
     const oldest = messages[messages.length - 1];
-    fetchMessages(roomId, oldest.created_at);
+    fetchMessages(roomId, oldest.created_at ?? undefined);
   }, [roomId, loading, hasMore, messages]);
 
   return {

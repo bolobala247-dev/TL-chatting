@@ -87,7 +87,7 @@ export function MessageBubble({ message, onLongPress }: MessageBubbleProps) {
               isMine ? "text-blue-200" : "text-gray-400"
             }`}
           >
-            {formatTime(message.created_at)}
+            {message.created_at ? formatTime(message.created_at) : ""}
           </Text>
           {message.is_edited && (
             <Text
