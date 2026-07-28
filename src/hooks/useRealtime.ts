@@ -82,7 +82,7 @@ export function useRealtimeRooms() {
             message.room_id,
             message.content,
             null,
-            message.created_at
+            message.created_at ?? new Date().toISOString()
           );
           if (
             message.sender_id !== user.id &&

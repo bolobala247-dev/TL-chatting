@@ -10,8 +10,12 @@ import {
 import { Link, useRouter } from "expo-router";
 import { useCooldown } from "@/src/hooks/useCooldown";
 import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
+import { profileService } from "@/src/services/profileService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
+import { PasswordInput } from "@/src/components/ui/PasswordInput";
+
+const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,30}$/;
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -20,6 +24,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState("");
+  const [usernameError, setUsernameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -28,11 +33,20 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     setFormError("");
+    setUsernameError("");
     setPasswordError("");
     setConfirmPasswordError("");
 
     if (!username.trim() || !email.trim() || !password.trim()) {
       setFormError("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+
+    // Username dùng để đăng nhập nên không được chứa @ hay khoảng trắng
+    if (!USERNAME_REGEX.test(username.trim())) {
+      setUsernameError(
+        "Tên người dùng chỉ gồm chữ, số, dấu chấm, gạch dưới, gạch nối (3-30 ký tự)",
+      );
       return;
     }
 
@@ -47,8 +61,17 @@ export default function RegisterScreen() {
     }
 
     try {
-      await signUp(email.trim(), password, username.trim());
-      setSuccess(true);
+      if (await profileService.isUsernameTaken(username.trim())) {
+        setUsernameError("Tên người dùng đã được sử dụng");
+        return;
+      }
+
+      const hasSession = await signUp(email.trim(), password, username.trim());
+      // Có session ngay (auto-confirm) thì AuthGate tự chuyển vào app,
+      // chỉ hiện màn "kiểm tra email" khi còn cần xác thực
+      if (!hasSession) {
+        setSuccess(true);
+      }
     } catch (err: unknown) {
       logAuthErrorDebug("Register", err);
       const { message, cooldownSeconds } = formatAuthFormError(
@@ -108,7 +131,7 @@ export default function RegisterScreen() {
             </Text>
             <TextInput
               className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                formError ? "border-red-500" : "border-gray-300"
+                formError || usernameError ? "border-red-500" : "border-gray-300"
               }`}
               placeholder="username"
               placeholderTextColor="#9CA3AF"
@@ -116,11 +139,15 @@ export default function RegisterScreen() {
               onChangeText={(text) => {
                 setUsername(text);
                 if (formError) setFormError("");
+                if (usernameError) setUsernameError("");
               }}
               autoCapitalize="none"
               textContentType="username"
               autoComplete="username"
             />
+            {usernameError ? (
+              <Text className="mt-1.5 text-sm text-red-600">{usernameError}</Text>
+            ) : null}
           </View>
 
           <View>
@@ -149,18 +176,14 @@ export default function RegisterScreen() {
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
               Mật khẩu
             </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                passwordError ? "border-red-500" : "border-gray-300"
-              }`}
+            <PasswordInput
+              error={!!passwordError}
               placeholder="Ít nhất 6 ký tự"
-              placeholderTextColor="#9CA3AF"
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
                 if (passwordError) setPasswordError("");
               }}
-              secureTextEntry
               textContentType="newPassword"
               autoComplete="new-password"
             />
@@ -173,18 +196,14 @@ export default function RegisterScreen() {
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
               Xác nhận mật khẩu
             </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                confirmPasswordError ? "border-red-500" : "border-gray-300"
-              }`}
+            <PasswordInput
+              error={!!confirmPasswordError}
               placeholder="Nhập lại mật khẩu"
-              placeholderTextColor="#9CA3AF"
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
                 if (confirmPasswordError) setConfirmPasswordError("");
               }}
-              secureTextEntry
               textContentType="newPassword"
               autoComplete="new-password"
             />

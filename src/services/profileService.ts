@@ -28,6 +28,26 @@ export const profileService = {
     return data;
   },
 
+  async getEmailByUsername(username: string): Promise<string | null> {
+    const { data, error } = await supabase.rpc("get_email_by_username", {
+      p_username: username,
+    });
+
+    if (error) throw error;
+    return data ?? null;
+  },
+
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("username", username)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data !== null;
+  },
+
   async searchUsers(query: string, currentUserId: string): Promise<Profile[]> {
     const { data, error } = await supabase
       .from("profiles")

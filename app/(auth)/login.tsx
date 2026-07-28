@@ -10,22 +10,23 @@ import {
 import { Link } from "expo-router";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
+import { PasswordInput } from "@/src/components/ui/PasswordInput";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { signIn, loading } = useAuthStore();
 
   const handleLogin = async () => {
     setError("");
-    if (!email.trim() || !password.trim()) {
-      setError("Vui lòng nhập email và mật khẩu");
+    if (!identifier.trim() || !password.trim()) {
+      setError("Vui lòng nhập email/tên người dùng và mật khẩu");
       return;
     }
 
     try {
-      await signIn(email.trim(), password);
+      await signIn(identifier.trim(), password);
     } catch (err: unknown) {
       console.error("[Login]", err);
       const msg =
@@ -55,23 +56,23 @@ export default function LoginScreen() {
         <View className="gap-4">
           <View>
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Email
+              Email hoặc tên người dùng
             </Text>
             <TextInput
               className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
                 error ? "border-red-500" : "border-gray-300"
               }`}
-              placeholder="email@example.com"
+              placeholder="email@example.com hoặc username"
               placeholderTextColor="#9CA3AF"
-              value={email}
+              value={identifier}
               onChangeText={(text) => {
-                setEmail(text);
+                setIdentifier(text);
                 if (error) setError("");
               }}
               autoCapitalize="none"
               keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
+              textContentType="username"
+              autoComplete="username"
             />
           </View>
 
@@ -79,18 +80,14 @@ export default function LoginScreen() {
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
               Mật khẩu
             </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                error ? "border-red-500" : "border-gray-300"
-              }`}
+            <PasswordInput
+              error={!!error}
               placeholder="Nhập mật khẩu"
-              placeholderTextColor="#9CA3AF"
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
                 if (error) setError("");
               }}
-              secureTextEntry
               textContentType="password"
               autoComplete="password"
             />

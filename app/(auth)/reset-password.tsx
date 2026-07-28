@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,6 +11,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { supabase } from "@/src/lib/supabase";
 import { Button } from "@/src/components/ui/Button";
 import { LoadingSpinner } from "@/src/components/ui/LoadingSpinner";
+import { PasswordInput } from "@/src/components/ui/PasswordInput";
 
 function getResetPasswordErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -161,18 +161,14 @@ export default function ResetPasswordScreen() {
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
               Mật khẩu mới
             </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                passwordError ? "border-red-500" : "border-gray-300"
-              }`}
+            <PasswordInput
+              error={!!passwordError}
               placeholder="Ít nhất 6 ký tự"
-              placeholderTextColor="#9CA3AF"
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
                 if (passwordError) setPasswordError("");
               }}
-              secureTextEntry
               editable={hasRecoverySession}
               textContentType="newPassword"
               autoComplete="new-password"
@@ -186,18 +182,14 @@ export default function ResetPasswordScreen() {
             <Text className="mb-1.5 text-sm font-medium text-gray-700">
               Xác nhận mật khẩu
             </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                confirmPasswordError ? "border-red-500" : "border-gray-300"
-              }`}
+            <PasswordInput
+              error={!!confirmPasswordError}
               placeholder="Nhập lại mật khẩu mới"
-              placeholderTextColor="#9CA3AF"
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
                 if (confirmPasswordError) setConfirmPasswordError("");
               }}
-              secureTextEntry
               editable={hasRecoverySession}
               textContentType="newPassword"
               autoComplete="new-password"

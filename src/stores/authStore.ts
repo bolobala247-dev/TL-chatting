@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
+import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
 import { registerPushNotificationsForUser } from "@/src/services/notificationService";
 import type { Profile } from "@/src/types";
@@ -18,8 +19,9 @@ interface AuthState {
   setInitialized: (initialized: boolean) => void;
   initialize: () => Promise<void>;
   fetchProfile: () => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  // Trả về true nếu có session ngay (auto-confirm email đang bật)
+  signUp: (email: string, password: string, username: string) => Promise<boolean>;
+  signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -85,7 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, password, username) => {
     set({ loading: true });
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -93,14 +95,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
       if (error) throw error;
+      return !!data.session;
     } finally {
       set({ loading: false });
     }
   },
 
-  signIn: async (email, password) => {
+  signIn: async (identifier, password) => {
     set({ loading: true });
     try {
+      // Cho phép đăng nhập bằng email hoặc username
+      let email = identifier;
+      if (!identifier.includes("@")) {
+        const resolved = await profileService.getEmailByUsername(identifier);
+        if (!resolved) {
+          throw new Error("Tên người dùng không tồn tại");
+        }
+        email = resolved;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,

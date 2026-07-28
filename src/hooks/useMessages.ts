@@ -81,7 +81,7 @@ export function useMessages(roomId: string) {
   const loadMore = useCallback(() => {
     if (loading || !hasMore || messages.length === 0) return;
     const oldest = messages[messages.length - 1];
-    fetchMessages(roomId, oldest.created_at);
+    fetchMessages(roomId, oldest.created_at ?? undefined);
   }, [roomId, loading, hasMore, messages]);
 
   return {
