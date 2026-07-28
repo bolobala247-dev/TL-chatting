@@ -1,4 +1,4 @@
-# TL-Chatting — Project Rules for AI Agents
+# Talo — Project Rules for AI Agents
 
 ## Critical: Expo SDK 56
 
@@ -10,7 +10,7 @@ Do NOT rely on outdated Expo knowledge. Many APIs have been renamed, moved, or d
 
 ## Project Overview
 
-**TL-Chatting** is a real-time chat application built with:
+**Talo** is a real-time chat application built with:
 
 | Layer | Technology |
 |-------|-----------|
@@ -71,7 +71,7 @@ Realtime hooks subscribe here and dispatch store actions
 ## Directory Structure
 
 ```
-TL-chatting/
+TL-chatting/                      # repo folder (app brand name: Talo)
 ├── app/                          # Expo Router screens & layouts
 │   ├── _layout.tsx               # Root layout + AuthGate
 │   ├── (auth)/                   # Auth group (login, register, forgot/reset password)

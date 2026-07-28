@@ -1,5 +1,5 @@
 -- ============================================
--- TL-Chatting: Push notification tokens
+-- Talo: Push notification tokens
 -- ============================================
 
 CREATE TABLE public.push_tokens (

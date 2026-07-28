@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <!-- Talo Open Graph image — 1200x630, light -->
+  <rect width="1200" height="630" fill="#FFFFFF"/>
+  <g transform="translate(250 221) scale(0.5058)">
+    <g fill="#000000">
+      <rect x="0" y="0" width="132" height="88" rx="44"/>
+      <rect x="284" y="0" width="132" height="88" rx="44"/>
+      <rect x="164" y="0" width="88" height="384" rx="44"/>
+    </g>
+    <g fill="none" stroke="#000000" stroke-width="72" stroke-linecap="round" transform="translate(512 24)">
+      <path d="M96 60V324"/>
+      <path d="M36 132H156"/>
+      <circle cx="352" cy="240" r="84"/>
+      <path d="M436 156V324"/>
+      <path d="M552 36V324"/>
+      <circle cx="752" cy="240" r="84"/>
+    </g>
+  </g>
+</svg>

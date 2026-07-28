@@ -1,4 +1,4 @@
-# Notification System Audit — TL-Chatting
+# Notification System Audit — Talo
 
 > Date: 2026-07-28 · Scope: end-to-end notification flow (in-app realtime badges + Android push)
 > Status: **REPORT ONLY — no code was modified.**

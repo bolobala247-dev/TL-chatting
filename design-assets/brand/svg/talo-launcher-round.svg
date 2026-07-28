@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Talo round launcher tile (legacy Android round icon) -->
+  <circle cx="256" cy="256" r="256" fill="#000000"/>
+  <g fill="#FFFFFF" transform="translate(112.64 112.64) scale(0.56)">
+    <rect x="48" y="64" width="132" height="88" rx="44"/>
+    <rect x="332" y="64" width="132" height="88" rx="44"/>
+    <rect x="212" y="64" width="88" height="384" rx="44"/>
+  </g>
+</svg>

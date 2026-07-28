@@ -1,5 +1,5 @@
 -- ============================================
--- TL-Chatting: Initial Database Schema
+-- Talo: Initial Database Schema
 -- ============================================
 
 -- 1. PROFILES TABLE

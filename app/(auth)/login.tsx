@@ -45,8 +45,8 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10 items-center">
-          <Text className="text-4xl font-bold text-primary-600">
-            TL Chat
+          <Text className="text-4xl font-bold text-black">
+            Talo
           </Text>
           <Text className="mt-2 text-base text-gray-500">
             Kết nối mọi lúc, mọi nơi

@@ -1,5 +1,5 @@
 -- ============================================
--- TL-Chatting: Login with username
+-- Talo: Login with username
 -- Resolve a username to the account email so the
 -- client can sign in via supabase.auth (email-based).
 -- ============================================

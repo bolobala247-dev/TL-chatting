@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 920 408">
+  <!-- Talo wordmark — custom geometric lowercase, stroke 72, round terminals -->
+  <g fill="none" stroke="#000000" stroke-width="72" stroke-linecap="round">
+    <path d="M96 60V324"/>
+    <path d="M36 132H156"/>
+    <circle cx="352" cy="240" r="84"/>
+    <path d="M436 156V324"/>
+    <path d="M552 36V324"/>
+    <circle cx="752" cy="240" r="84"/>
+  </g>
+</svg>

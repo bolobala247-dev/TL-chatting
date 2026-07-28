@@ -93,7 +93,7 @@ export async function registerPushNotificationsForUser(
   if (finalStatus !== "granted") {
     return {
       ok: false,
-      reason: "Chưa cấp quyền thông báo. Vào Cài đặt → TL Chatting → Thông báo → Bật",
+      reason: "Chưa cấp quyền thông báo. Vào Cài đặt → Talo → Thông báo → Bật",
     };
   }
 

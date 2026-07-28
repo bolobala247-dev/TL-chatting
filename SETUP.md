@@ -1,4 +1,4 @@
-# TL-Chatting -- Hướng dẫn cài đặt & chạy dự án
+# Talo -- Hướng dẫn cài đặt & chạy dự án
 
 ## Yêu cầu hệ thống
 
@@ -133,7 +133,7 @@ npx expo start
 ## Cấu trúc dự án
 
 ```
-TL-chatting/
+TL-chatting/                      # repo folder (app brand name: Talo)
 ├── app/                    # Expo Router -- màn hình & navigation
 │   ├── (auth)/             # Login, Register
 │   ├── (tabs)/             # Tab chính (Tin nhắn, Danh bạ, Cài đặt)
