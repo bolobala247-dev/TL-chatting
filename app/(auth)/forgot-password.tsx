@@ -2,18 +2,22 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useCooldown } from "@/src/hooks/useCooldown";
 import { formatAuthFormError, logAuthErrorDebug } from "@/src/lib/authErrors";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
+import { TextField } from "@/src/components/ui/TextField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
+import { StatusScreen } from "@/src/components/ui/StatusScreen";
 
 export default function ForgotPasswordScreen() {
+  const { t } = useTranslation(["auth", "common", "errors"]);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const { resetPassword, loading } = useAuthStore();
@@ -24,7 +28,7 @@ export default function ForgotPasswordScreen() {
   const handleReset = async () => {
     setError("");
     if (!email.trim()) {
-      setError("Vui lòng nhập email");
+      setError(t("validation.enterEmail"));
       return;
     }
 
@@ -35,7 +39,7 @@ export default function ForgotPasswordScreen() {
       logAuthErrorDebug("ForgotPassword", err);
       const { message, cooldownSeconds } = formatAuthFormError(
         err,
-        "Đã xảy ra lỗi, vui lòng thử lại",
+        t("errors:generic"),
         "password_reset",
       );
       setError(message);
@@ -45,28 +49,28 @@ export default function ForgotPasswordScreen() {
 
   if (sent) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-5xl">✉️</Text>
-        <Text className="mt-6 text-center text-xl font-bold text-gray-900">
-          Kiểm tra email của bạn
-        </Text>
-        <Text className="mt-3 text-center text-base text-gray-500">
-          Chúng tôi đã gửi link đặt lại mật khẩu đến{"\n"}
-          <Text className="font-medium text-gray-700">{email}</Text>
-        </Text>
-        <View className="mt-8 w-full">
-          <Button
-            title="Quay lại đăng nhập"
-            onPress={() => router.replace("/(auth)/login")}
-          />
-        </View>
-      </View>
+      <StatusScreen
+        icon={{ ios: "envelope", android: "mail", web: "mail" }}
+        tone="info"
+        title={t("forgot.sentTitle")}
+        message={
+          <>
+            {t("forgot.sentBody")}{"\n"}
+            <Text className="font-sans-medium text-fg">{email}</Text>
+          </>
+        }
+      >
+        <Button
+          title={t("forgot.backToLogin")}
+          onPress={() => router.replace("/(auth)/login")}
+        />
+      </StatusScreen>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
@@ -74,39 +78,35 @@ export default function ForgotPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10">
-          <Text className="text-2xl font-bold text-gray-900">
-            Quên mật khẩu?
+          <Text className="font-sans-bold text-headline text-fg">
+            {t("forgot.title")}
           </Text>
-          <Text className="mt-2 text-base text-gray-500">
-            Nhập email đã đăng ký, chúng tôi sẽ gửi link đặt lại mật khẩu.
+          <Text className="mt-2 font-sans text-body text-fg-tertiary">
+            {t("forgot.subtitle")}
           </Text>
         </View>
 
         <View className="gap-4">
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Email
-            </Text>
-            <TextInput
-              className="h-12 rounded-xl border border-gray-300 bg-gray-50 px-4 text-base text-gray-900"
-              placeholder="email@example.com"
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
-              autoFocus
-            />
-          </View>
+          <TextField
+            label={t("fields.email.label")}
+            placeholder={t("fields.email.placeholder")}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+            autoFocus
+          />
 
-          {error ? (
-            <Text className="text-sm text-red-600">{error}</Text>
-          ) : null}
+          {error ? <FormMessage>{error}</FormMessage> : null}
 
           <Button
-            title={cooldown > 0 ? `Gửi lại sau (${cooldown}s)` : "Gửi link đặt lại"}
+            title={
+              cooldown > 0
+                ? t("forgot.submitCooldown", { count: cooldown })
+                : t("forgot.submit")
+            }
             onPress={handleReset}
             loading={loading}
             disabled={cooldown > 0}
@@ -114,8 +114,8 @@ export default function ForgotPasswordScreen() {
 
           <View className="mt-4 items-center">
             <Link href="/(auth)/login" asChild>
-              <Text className="text-sm font-semibold text-primary-600">
-                Quay lại đăng nhập
+              <Text className="font-sans-semibold text-caption text-ink">
+                {t("forgot.backToLogin")}
               </Text>
             </Link>
           </View>

@@ -2,19 +2,22 @@ import { useState, useCallback } from "react";
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { roomService } from "@/src/services/roomService";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { Icon } from "@/src/components/ui/Icon";
+import { SearchField } from "@/src/components/ui/SearchField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
 import type { Profile } from "@/src/types";
 
 export default function ContactsScreen() {
+  const { t } = useTranslation("chat");
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [query, setQuery] = useState("");
@@ -55,18 +58,19 @@ export default function ContactsScreen() {
         const msg =
           err instanceof Error
             ? err.message
-            : "Không thể bắt đầu trò chuyện, vui lòng thử lại";
+            : t("startChatFailed");
         setChatError(msg);
       }
     },
-    [user, router]
+    [user, router, t]
   );
 
   const renderItem = useCallback(
     ({ item }: { item: Profile }) => (
       <Pressable
-        className="flex-row items-center gap-3 px-4 py-3 active:bg-gray-50"
+        className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
         onPress={() => handleStartChat(item)}
+        accessibilityRole="button"
       >
         <Avatar
           uri={item.avatar_url}
@@ -74,19 +78,19 @@ export default function ContactsScreen() {
           size={48}
         />
         <View className="flex-1">
-          <Text className="text-[15px] font-medium text-gray-900">
+          <Text className="font-sans-medium text-body text-fg">
             {item.display_name || item.username}
           </Text>
-          <Text className="text-sm text-gray-500">@{item.username}</Text>
+          <Text className="font-sans text-caption text-fg-tertiary">@{item.username}</Text>
         </View>
-        <SymbolView
+        <Icon
           name={{
             ios: "bubble.left",
             android: "chat_bubble",
             web: "chat_bubble",
           }}
-          tintColor="#9CA3AF"
-          size={20}
+          tone="tertiary"
+          size="md"
         />
       </Pressable>
     ),
@@ -94,26 +98,17 @@ export default function ContactsScreen() {
   );
 
   return (
-    <View className="flex-1 bg-white">
-      <View className="border-b border-gray-100 px-4 py-3">
-        <View className="flex-row items-center rounded-xl bg-gray-100 px-3">
-          <SymbolView
-            name={{ ios: "magnifyingglass", android: "search", web: "search" }}
-            tintColor="#9CA3AF"
-            size={18}
-          />
-          <TextInput
-            className="ml-2 h-10 flex-1 text-[15px] text-gray-900"
-            placeholder="Tìm kiếm người dùng..."
-            placeholderTextColor="#9CA3AF"
-            value={query}
-            onChangeText={handleSearch}
-            autoCapitalize="none"
-          />
-        </View>
+    <View className="flex-1 bg-background">
+      <View className="border-b border-divider px-4 py-3">
+        <SearchField
+          placeholder={t("search.placeholder")}
+          value={query}
+          onChangeText={handleSearch}
+          autoCapitalize="none"
+        />
 
         {chatError ? (
-          <Text className="mt-2 text-sm text-red-600">{chatError}</Text>
+          <FormMessage className="mt-2">{chatError}</FormMessage>
         ) : null}
       </View>
 
@@ -123,17 +118,17 @@ export default function ContactsScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           <View className="items-center pt-20">
-            <SymbolView
+            <Icon
               name={{ ios: "person.2", android: "group", web: "group" }}
-              tintColor="#D1D5DB"
-              size={48}
+              tone="tertiary"
+              size="empty"
             />
-            <Text className="mt-4 text-sm text-gray-400">
+            <Text className="mt-4 font-sans text-caption text-fg-tertiary">
               {query
                 ? searching
-                  ? "Đang tìm kiếm..."
-                  : "Không tìm thấy người dùng"
-                : "Nhập tên hoặc username để tìm kiếm"}
+                  ? t("search.searching")
+                  : t("search.noResults")
+                : t("search.prompt")}
             </Text>
           </View>
         }

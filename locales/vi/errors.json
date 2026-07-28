@@ -1,0 +1,17 @@
+{
+  "generic": "Đã xảy ra lỗi, vui lòng thử lại",
+  "sessionNotReady": "Phiên đăng nhập chưa sẵn sàng",
+  "mediaLibraryPermission": "Cần quyền truy cập thư viện ảnh",
+  "notFound": {
+    "title": "Không tìm thấy",
+    "message": "Trang này không tồn tại",
+    "goHome": "Quay về trang chủ"
+  },
+  "auth": {
+    "actionSignup": "đăng ký",
+    "actionRequest": "gửi yêu cầu",
+    "rateLimited_other": "Bạn đã {{action}} quá nhiều lần. Vui lòng đợi {{count}} giây rồi thử lại.",
+    "emailQuota": "Project đã vượt giới hạn gửi email (SMTP mặc định: ~2 email/giờ). Kiểm tra Supabase Dashboard → Authentication → Rate Limits, hoặc cấu hình SMTP tùy chỉnh để test nhanh hơn.",
+    "tooManyRequests": "Quá nhiều yêu cầu {{action}}. Supabase không trả về thời gian chờ — mở console (log [{{logTag}}]) để xem chi tiết."
+  }
+}

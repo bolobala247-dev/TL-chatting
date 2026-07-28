@@ -1,0 +1,57 @@
+{
+  "defaultRoomName": "Chat",
+  "rooms": {
+    "emptyTitle": "Chưa có cuộc trò chuyện nào",
+    "emptySubtitle": "Nhấn nút + để bắt đầu trò chuyện với bạn bè",
+    "noMessages": "Chưa có tin nhắn",
+    "unread_other": "{{count}} tin nhắn chưa đọc"
+  },
+  "create": {
+    "title": "Cuộc trò chuyện mới",
+    "groupNamePlaceholder": "Tên nhóm...",
+    "groupNameRequired": "Vui lòng nhập tên nhóm",
+    "createGroup": "Tạo nhóm",
+    "startChat": "Bắt đầu trò chuyện",
+    "failed": "Không thể tạo cuộc trò chuyện, vui lòng thử lại",
+    "typeToSearch": "Nhập tên để tìm kiếm"
+  },
+  "search": {
+    "placeholder": "Tìm kiếm người dùng...",
+    "searching": "Đang tìm kiếm...",
+    "noResults": "Không tìm thấy người dùng",
+    "prompt": "Nhập tên hoặc username để tìm kiếm"
+  },
+  "header": {
+    "online": "Đang hoạt động",
+    "offline": "Không hoạt động",
+    "members_other": "{{count}} thành viên",
+    "back": "Quay lại"
+  },
+  "input": {
+    "placeholder": "Nhập tin nhắn...",
+    "attach": "Đính kèm",
+    "send": "Gửi"
+  },
+  "message": {
+    "imagePlaceholder": "[Hình ảnh]",
+    "edited": "(đã sửa)",
+    "emptyTitle": "Chưa có tin nhắn nào",
+    "emptyCta": "Hãy bắt đầu cuộc trò chuyện!",
+    "editTitle": "Chỉnh sửa tin nhắn",
+    "editEmpty": "Nội dung tin nhắn không được để trống",
+    "editFailed": "Không thể chỉnh sửa tin nhắn",
+    "deleteTitle": "Xoá tin nhắn",
+    "deleteConfirm": "Bạn có chắc muốn xoá tin nhắn này?",
+    "deleteFailed": "Không thể xoá tin nhắn",
+    "sendFailed": "Không thể gửi tin nhắn",
+    "sendImageFailed": "Không thể gửi ảnh",
+    "sendImageFailedDetail": "Không thể gửi ảnh: {{message}}",
+    "replyingTo": "Trả lời tin nhắn"
+  },
+  "typing": {
+    "one": "{{name}} đang nhập",
+    "two": "{{name1}} và {{name2}} đang nhập",
+    "many": "{{count}} người đang nhập"
+  },
+  "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"
+}

@@ -5,6 +5,32 @@ const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const ANDROID_CHANNEL_ID = "messages";
 const EXPO_PUSH_CHUNK_SIZE = 100;
 
+// Localized push copy keyed by the recipient's profiles.preferred_language
+type PushLanguage = "en" | "vi";
+const DEFAULT_LANGUAGE: PushLanguage = "en";
+
+const PUSH_COPY: Record<
+  PushLanguage,
+  { sentImage: string; sentFile: string; newMessage: string; userFallback: string }
+> = {
+  en: {
+    sentImage: "Sent a photo",
+    sentFile: "Sent a file",
+    newMessage: "New message",
+    userFallback: "User",
+  },
+  vi: {
+    sentImage: "Đã gửi ảnh",
+    sentFile: "Đã gửi tệp",
+    newMessage: "Tin nhắn mới",
+    userFallback: "Người dùng",
+  },
+};
+
+function resolveLanguage(value: string | null | undefined): PushLanguage {
+  return value === "vi" || value === "en" ? value : DEFAULT_LANGUAGE;
+}
+
 interface MessageRecord {
   id: string;
   room_id: string;
@@ -37,17 +63,22 @@ interface ExpoPushTicket {
   details?: { error?: string };
 }
 
-function getMessagePreview(message: MessageRecord): string {
+function getMessagePreview(
+  message: MessageRecord,
+  language: PushLanguage
+): string {
+  const copy = PUSH_COPY[language];
+
   if (message.type === "image") {
-    return "Đã gửi ảnh";
+    return copy.sentImage;
   }
 
   if (message.type === "file") {
-    return "Đã gửi tệp";
+    return copy.sentFile;
   }
 
   const content = message.content?.trim();
-  return content && content.length > 0 ? content : "Tin nhắn mới";
+  return content && content.length > 0 ? content : copy.newMessage;
 }
 
 // Sends one chunk and returns tickets in the same order as the input
@@ -156,9 +187,7 @@ Deno.serve(async (req) => {
     }
 
     const senderName =
-      sender.display_name?.trim() ||
-      sender.username?.trim() ||
-      "Người dùng";
+      sender.display_name?.trim() || sender.username?.trim() || "";
 
     const { data: participants, error: participantsError } = await supabase
       .from("room_participants")
@@ -179,9 +208,26 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Each recipient gets push copy in their own preferred language
+    const { data: recipientProfiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, preferred_language")
+      .in("id", recipientIds);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    const languageByUserId = new Map<string, PushLanguage>(
+      (recipientProfiles ?? []).map((profile) => [
+        profile.id,
+        resolveLanguage(profile.preferred_language),
+      ])
+    );
+
     const { data: tokens, error: tokensError } = await supabase
       .from("push_tokens")
-      .select("token")
+      .select("token, user_id")
       .in("user_id", recipientIds)
       .eq("platform", "android");
 
@@ -189,22 +235,31 @@ Deno.serve(async (req) => {
       throw tokensError;
     }
 
-    const uniqueTokens: string[] = [
-      ...new Set((tokens ?? []).map((entry) => entry.token)),
-    ];
+    // Dedupe tokens while keeping each token's owner for language lookup
+    const tokenOwners = new Map<string, string>();
+    for (const entry of tokens ?? []) {
+      if (!tokenOwners.has(entry.token)) {
+        tokenOwners.set(entry.token, entry.user_id);
+      }
+    }
 
-    const pushMessages: ExpoPushMessage[] = uniqueTokens.map((token) => ({
-      to: token,
-      title: senderName,
-      body: getMessagePreview(message),
-      data: {
-        roomId: message.room_id,
-        type: "message",
-      },
-      channelId: ANDROID_CHANNEL_ID,
-      priority: "high",
-      sound: "default",
-    }));
+    const pushMessages: ExpoPushMessage[] = [...tokenOwners.entries()].map(
+      ([token, userId]) => {
+        const language = languageByUserId.get(userId) ?? DEFAULT_LANGUAGE;
+        return {
+          to: token,
+          title: senderName || PUSH_COPY[language].userFallback,
+          body: getMessagePreview(message, language),
+          data: {
+            roomId: message.room_id,
+            type: "message",
+          },
+          channelId: ANDROID_CHANNEL_ID,
+          priority: "high",
+          sound: "default",
+        };
+      }
+    );
 
     // Send in chunks of 100 (Expo limit) and collect dead tokens from tickets
     const deadTokens: string[] = [];

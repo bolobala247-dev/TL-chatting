@@ -1,0 +1,11 @@
+{
+  "sectionTitle": "Hồ sơ",
+  "displayName": {
+    "label": "Tên hiển thị",
+    "placeholder": "Nhập tên hiển thị"
+  },
+  "save": "Lưu thay đổi",
+  "updated": "Đã cập nhật hồ sơ",
+  "updateFailed": "Không thể cập nhật hồ sơ",
+  "avatarUploadFailed": "Không thể tải ảnh đại diện"
+}

@@ -1,23 +1,23 @@
 import { ActivityIndicator, View } from "react-native";
+import { useThemeColors } from "@/src/theme";
 
-interface LoadingSpinnerProps {
+interface SpinnerProps {
   size?: "small" | "large";
   color?: string;
   fullScreen?: boolean;
 }
 
-export function LoadingSpinner({
-  size = "large",
-  color = "#3B82F6",
-  fullScreen = false,
-}: LoadingSpinnerProps) {
+export function Spinner({ size = "large", color, fullScreen = false }: SpinnerProps) {
+  const colors = useThemeColors();
+  const tint = color ?? colors.fgTertiary;
+
   if (fullScreen) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size={size} color={color} />
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator size={size} color={tint} />
       </View>
     );
   }
 
-  return <ActivityIndicator size={size} color={color} />;
+  return <ActivityIndicator size={size} color={tint} />;
 }

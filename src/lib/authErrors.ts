@@ -1,4 +1,6 @@
 /** Supabase: "For security purposes, you can only request this after 56 seconds." */
+import i18n from "@/src/i18n";
+
 const RATE_LIMIT_SECONDS_RE = /after (\d+) seconds?/i;
 
 /** Legacy GoTrue message format */
@@ -81,7 +83,7 @@ export function logAuthErrorDebug(label: string, error: unknown): AuthErrorDebug
 }
 
 /**
- * Maps Supabase Auth errors to Vietnamese UI messages.
+ * Maps Supabase Auth errors to localized UI messages.
  * Parses exact cooldown from per-email frequency limits when Supabase includes seconds.
  */
 export function formatAuthFormError(
@@ -90,25 +92,30 @@ export function formatAuthFormError(
   context: AuthRateLimitContext,
 ): AuthFormErrorResult {
   const info = classifyAuthError(error);
-  const action = context === "signup" ? "đăng ký" : "gửi yêu cầu";
+  const action =
+    context === "signup"
+      ? i18n.t("errors:auth.actionSignup")
+      : i18n.t("errors:auth.actionRequest");
 
   if (info.limitType === "email_frequency" && info.parsedSeconds) {
     return {
-      message: `Bạn đã ${action} quá nhiều lần. Vui lòng đợi ${info.parsedSeconds} giây rồi thử lại.`,
+      message: i18n.t("errors:auth.rateLimited", {
+        action,
+        count: info.parsedSeconds,
+      }),
       cooldownSeconds: info.parsedSeconds,
     };
   }
 
   if (info.limitType === "project_email_quota") {
     return {
-      message:
-        "Project đã vượt giới hạn gửi email (SMTP mặc định: ~2 email/giờ). Kiểm tra Supabase Dashboard → Authentication → Rate Limits, hoặc cấu hình SMTP tùy chỉnh để test nhanh hơn.",
+      message: i18n.t("errors:auth.emailQuota"),
     };
   }
 
   if (info.status === 429) {
     return {
-      message: `Quá nhiều yêu cầu ${action}. Supabase không trả về thời gian chờ — mở console (log [${context}]) để xem chi tiết.`,
+      message: i18n.t("errors:auth.tooManyRequests", { action, logTag: context }),
     };
   }
 

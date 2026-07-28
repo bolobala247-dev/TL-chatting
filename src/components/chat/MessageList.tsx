@@ -1,6 +1,9 @@
-import { useCallback } from "react";
-import { View, Text, FlatList, ActivityIndicator } from "react-native";
+import { useCallback, useMemo } from "react";
+import { View, Text, ActivityIndicator } from "react-native";
+import { useTranslation } from "react-i18next";
+import { FlashList } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
+import { useThemeColors } from "@/src/theme";
 import type { Message } from "@/src/types";
 
 interface MessageListProps {
@@ -18,6 +21,16 @@ export function MessageList({
   onLoadMore,
   onMessageLongPress,
 }: MessageListProps) {
+  const { t } = useTranslation("chat");
+  const colors = useThemeColors();
+
+  // Store keeps messages newest-first (legacy inverted-list order);
+  // FlashList v2 renders chat bottom-up from chronological data instead.
+  const orderedMessages = useMemo(
+    () => [...messages].reverse(),
+    [messages]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: Message }) => (
       <MessageBubble message={item} onLongPress={onMessageLongPress} />
@@ -25,61 +38,52 @@ export function MessageList({
     [onMessageLongPress]
   );
 
-  const renderFooter = useCallback(() => {
+  const renderHeader = useCallback(() => {
     if (!loading || messages.length === 0) return null;
     return (
       <View className="items-center py-4">
-        <ActivityIndicator size="small" color="#3B82F6" />
+        <ActivityIndicator size="small" color={colors.fgTertiary} />
       </View>
     );
-  }, [loading, messages.length]);
+  }, [loading, messages.length, colors.fgTertiary]);
 
-  const renderEmpty = useCallback(() => {
+  const keyExtractor = useCallback((item: Message) => item.id, []);
+
+  // FlashList does not support flex styles in contentContainerStyle,
+  // so the loading/empty states render outside the list.
+  if (messages.length === 0) {
     if (loading) {
       return (
-        <View
-          className="flex-1 items-center justify-center"
-          style={{ transform: [{ scaleY: -1 }] }}
-        >
-          <ActivityIndicator size="large" color="#3B82F6" />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={colors.fgTertiary} />
         </View>
       );
     }
     return (
-      <View
-        className="flex-1 items-center justify-center"
-        style={{ transform: [{ scaleY: -1 }] }}
-      >
-        <Text className="text-base text-gray-400">
-          Chưa có tin nhắn nào
+      <View className="flex-1 items-center justify-center">
+        <Text className="font-sans-semibold text-title text-fg">
+          {t("message.emptyTitle")}
         </Text>
-        <Text className="mt-1 text-sm text-gray-300">
-          Hãy bắt đầu cuộc trò chuyện!
+        <Text className="mt-1 font-sans text-caption text-fg-tertiary">
+          {t("message.emptyCta")}
         </Text>
       </View>
     );
-  }, [loading]);
-
-  const keyExtractor = useCallback((item: Message) => item.id, []);
+  }
 
   return (
-    <FlatList
-      data={messages}
+    <FlashList
+      data={orderedMessages}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
-      inverted
-      onEndReached={hasMore ? onLoadMore : undefined}
-      onEndReachedThreshold={0.5}
-      ListFooterComponent={renderFooter}
-      ListEmptyComponent={renderEmpty}
-      contentContainerStyle={
-        messages.length === 0
-          ? { flex: 1, paddingVertical: 8 }
-          : { paddingVertical: 8 }
-      }
-      maxToRenderPerBatch={15}
-      windowSize={10}
-      removeClippedSubviews
+      maintainVisibleContentPosition={{
+        startRenderingFromBottom: true,
+        autoscrollToBottomThreshold: 0.2,
+      }}
+      onStartReached={hasMore ? onLoadMore : undefined}
+      onStartReachedThreshold={0.2}
+      ListHeaderComponent={renderHeader}
+      contentContainerStyle={{ paddingVertical: 8 }}
     />
   );
 }

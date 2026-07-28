@@ -1,7 +1,8 @@
 import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { Icon } from "@/src/components/ui/Icon";
 
 interface ChatHeaderProps {
   name: string;
@@ -16,17 +17,20 @@ export function ChatHeader({
   isOnline,
   participantCount,
 }: ChatHeaderProps) {
+  const { t } = useTranslation("chat");
   const router = useRouter();
 
   return (
-    <View className="flex-row items-center gap-3 border-b border-gray-100 bg-white px-4 pb-3 pt-2">
+    <View className="flex-row items-center gap-3 border-b border-divider bg-surface px-4 pb-3 pt-2">
       <Pressable
         onPress={() => router.back()}
         className="mr-1 active:opacity-50"
+        accessibilityRole="button"
+        accessibilityLabel={t("header.back")}
       >
-        <SymbolView
+        <Icon
           name={{ ios: "chevron.left", android: "arrow_back", web: "arrow_back" }}
-          tintColor="#374151"
+          tone="primary"
           size={22}
         />
       </Pressable>
@@ -34,15 +38,15 @@ export function ChatHeader({
       <Avatar uri={avatarUrl} name={name} size={36} />
 
       <View className="flex-1">
-        <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
+        <Text className="font-sans-semibold text-body text-fg" numberOfLines={1}>
           {name}
         </Text>
-        <Text className="text-xs text-gray-400">
+        <Text className="font-sans text-label text-fg-tertiary">
           {isOnline
-            ? "Đang hoạt động"
+            ? t("header.online")
             : participantCount
-              ? `${participantCount} thành viên`
-              : "Không hoạt động"}
+              ? t("header.members", { count: participantCount })
+              : t("header.offline")}
         </Text>
       </View>
     </View>

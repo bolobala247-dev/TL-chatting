@@ -1,0 +1,11 @@
+{
+  "sectionTitle": "Profile",
+  "displayName": {
+    "label": "Display name",
+    "placeholder": "Enter your display name"
+  },
+  "save": "Save changes",
+  "updated": "Profile updated",
+  "updateFailed": "Couldn't update profile",
+  "avatarUploadFailed": "Couldn't upload profile photo"
+}

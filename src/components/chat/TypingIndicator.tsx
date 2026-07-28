@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Animated } from "react-native";
+import { useTranslation } from "react-i18next";
 
 interface TypingIndicatorProps {
   typingUsers: Array<{ user_id: string; display_name: string }>;
@@ -47,7 +48,7 @@ function TypingDots() {
       {[dot1, dot2, dot3].map((dot, i) => (
         <Animated.View
           key={i}
-          className="h-1.5 w-1.5 rounded-full bg-gray-400"
+          className="h-1.5 w-1.5 rounded-full bg-fg-tertiary"
           style={{
             opacity: dot.interpolate({
               inputRange: [0, 1],
@@ -61,23 +62,24 @@ function TypingDots() {
 }
 
 export function TypingIndicator({ typingUsers }: TypingIndicatorProps) {
+  const { t } = useTranslation("chat");
   if (typingUsers.length === 0) return null;
 
   const names = typingUsers.map((u) => u.display_name);
   let text: string;
 
   if (names.length === 1) {
-    text = `${names[0]} đang nhập`;
+    text = t("typing.one", { name: names[0] });
   } else if (names.length === 2) {
-    text = `${names[0]} và ${names[1]} đang nhập`;
+    text = t("typing.two", { name1: names[0], name2: names[1] });
   } else {
-    text = `${names.length} người đang nhập`;
+    text = t("typing.many", { count: names.length });
   }
 
   return (
     <View className="flex-row items-center gap-2 px-4 py-1.5">
       <TypingDots />
-      <Text className="text-xs text-gray-400">{text}</Text>
+      <Text className="font-sans text-label text-fg-tertiary">{text}</Text>
     </View>
   );
 }

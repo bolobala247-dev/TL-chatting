@@ -1,4 +1,7 @@
-import { Modal, View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Dialog } from "./Dialog";
+import { Button } from "./Button";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -11,60 +14,49 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/** Thin wrapper over `Dialog` — public API unchanged for existing callers. */
 export function ConfirmDialog({
   visible,
   title,
   message,
-  confirmText = "Xác nhận",
-  cancelText = "Huỷ",
+  confirmText,
+  cancelText,
   destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const confirmLabel = confirmText ?? t("actions.confirm");
+  const cancelLabel = cancelText ?? t("actions.cancel");
   return (
-    <Modal
+    <Dialog
       visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
-      <Pressable
-        className="flex-1 items-center justify-center bg-black/50"
-        onPress={onCancel}
-      >
-        <Pressable
-          className="mx-8 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
-          onPress={(e) => e.stopPropagation()}
-        >
-          <Text className="text-lg font-bold text-gray-900">{title}</Text>
-          <Text className="mt-2 text-base leading-6 text-gray-600">
-            {message}
-          </Text>
-
-          <View className="mt-6 flex-row justify-end gap-3">
-            <Pressable
-              className="rounded-xl bg-gray-100 px-5 py-3 active:bg-gray-200"
+      onClose={onCancel}
+      title={title}
+      footer={
+        <>
+          <View className="flex-1">
+            <Button
+              title={cancelLabel}
+              variant="secondary"
+              size="md"
               onPress={onCancel}
-            >
-              <Text className="text-sm font-semibold text-gray-700">
-                {cancelText}
-              </Text>
-            </Pressable>
-            <Pressable
-              className={`rounded-xl px-5 py-3 ${
-                destructive
-                  ? "bg-red-600 active:bg-red-700"
-                  : "bg-primary-600 active:bg-primary-700"
-              }`}
-              onPress={onConfirm}
-            >
-              <Text className="text-sm font-semibold text-white">
-                {confirmText}
-              </Text>
-            </Pressable>
+            />
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+          <View className="flex-1">
+            <Button
+              title={confirmLabel}
+              variant={destructive ? "danger" : "primary"}
+              size="md"
+              onPress={onConfirm}
+            />
+          </View>
+        </>
+      }
+    >
+      <Text className="font-sans text-body leading-6 text-fg-secondary">
+        {message}
+      </Text>
+    </Dialog>
   );
 }

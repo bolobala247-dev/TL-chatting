@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Web-only cascade: native Text gets Inter via font-sans* utilities instead */
+@layer base {
+  html,
+  body {
+    font-family: Inter_400Regular, Inter, -apple-system, "Segoe UI", Roboto,
+      sans-serif;
+  }
+}
+
+/*
+ * Talo semantic color variables — DESIGN_SYSTEM.md §4.
+ * Values are RGB triplets so Tailwind alpha modifiers keep working.
+ * Keep in sync with src/theme/tokens.ts (JS-side mirror for native props).
+ */
+:root {
+  --color-background: 255 255 255;
+  --color-surface: 255 255 255;
+  --color-surface-secondary: 250 250 250;
+  --color-card: 250 250 250;
+  --color-border: 229 229 229;
+  --color-divider: 245 245 245;
+  --color-ink: 0 0 0;
+  --color-ink-inverse: 255 255 255;
+  --color-fg: 23 23 23;
+  --color-fg-secondary: 82 82 82;
+  --color-fg-tertiary: 115 115 115;
+  --color-placeholder: 163 163 163;
+  --color-disabled: 212 212 212;
+  --color-hover: 250 250 250;
+  --color-pressed: 245 245 245;
+  --color-success: 21 128 61;
+  --color-success-bg: 240 253 244;
+  --color-warning: 161 98 7;
+  --color-warning-bg: 255 251 235;
+  --color-danger: 185 28 28;
+  --color-danger-bg: 254 242 242;
+  --color-info: 29 78 216;
+  --color-info-bg: 239 246 255;
+}
+
+.dark:root {
+  --color-background: 10 10 10;
+  --color-surface: 10 10 10;
+  --color-surface-secondary: 23 23 23;
+  --color-card: 23 23 23;
+  --color-border: 38 38 38;
+  --color-divider: 23 23 23;
+  --color-ink: 255 255 255;
+  --color-ink-inverse: 0 0 0;
+  --color-fg: 250 250 250;
+  --color-fg-secondary: 163 163 163;
+  --color-fg-tertiary: 115 115 115;
+  --color-placeholder: 82 82 82;
+  --color-disabled: 64 64 64;
+  --color-hover: 23 23 23;
+  --color-pressed: 38 38 38;
+  --color-success: 74 222 128;
+  --color-success-bg: 15 36 23;
+  --color-warning: 251 191 36;
+  --color-warning-bg: 39 30 11;
+  --color-danger: 248 113 113;
+  --color-danger-bg: 42 18 18;
+  --color-info: 96 165 250;
+  --color-info-bg: 17 32 58;
+}

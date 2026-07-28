@@ -82,6 +82,7 @@ export type Database = {
           display_name: string | null
           id: string
           last_seen_at: string | null
+          preferred_language: string | null
           status: string | null
           updated_at: string | null
           username: string
@@ -92,6 +93,7 @@ export type Database = {
           display_name?: string | null
           id: string
           last_seen_at?: string | null
+          preferred_language?: string | null
           status?: string | null
           updated_at?: string | null
           username: string
@@ -102,6 +104,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           last_seen_at?: string | null
+          preferred_language?: string | null
           status?: string | null
           updated_at?: string | null
           username?: string

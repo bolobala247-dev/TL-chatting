@@ -7,28 +7,33 @@ import {
   ScrollView,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
+import i18n from "@/src/i18n";
 import { useAuthStore } from "@/src/stores/authStore";
 import { supabase } from "@/src/lib/supabase";
 import { Button } from "@/src/components/ui/Button";
-import { LoadingSpinner } from "@/src/components/ui/LoadingSpinner";
+import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { PasswordInput } from "@/src/components/ui/PasswordInput";
+import { FormMessage } from "@/src/components/ui/FormMessage";
+import { StatusScreen } from "@/src/components/ui/StatusScreen";
 
 function getResetPasswordErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) {
-    return "Đã xảy ra lỗi, vui lòng thử lại";
+    return i18n.t("errors:generic");
   }
 
   if (
     error.name === "AuthSessionMissingError" ||
     error.message.toLowerCase().includes("auth session missing")
   ) {
-    return "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới.";
+    return i18n.t("auth:errors.invalidResetLink");
   }
 
   return error.message;
 }
 
 export default function ResetPasswordScreen() {
+  const { t } = useTranslation(["auth", "common"]);
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -57,9 +62,7 @@ export default function ResetPasswordScreen() {
           setSession(session);
           setHasRecoverySession(true);
         } else {
-          setFormError(
-            "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới."
-          );
+          setFormError(t("errors.invalidResetLink"));
         }
       } catch (error: unknown) {
         console.error("[ResetPassword] verify session", error);
@@ -86,22 +89,20 @@ export default function ResetPasswordScreen() {
     setFormError("");
 
     if (!hasRecoverySession) {
-      setFormError(
-        "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu link mới."
-      );
+      setFormError(t("errors.invalidResetLink"));
       return;
     }
 
     if (!password.trim()) {
-      setPasswordError("Vui lòng nhập mật khẩu mới");
+      setPasswordError(t("validation.enterNewPassword"));
       return;
     }
     if (password.length < 6) {
-      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự");
+      setPasswordError(t("validation.passwordTooShort"));
       return;
     }
     if (password !== confirmPassword) {
-      setConfirmPasswordError("Mật khẩu xác nhận không khớp");
+      setConfirmPasswordError(t("validation.passwordMismatch"));
       return;
     }
 
@@ -115,32 +116,31 @@ export default function ResetPasswordScreen() {
   };
 
   if (checkingSession) {
-    return <LoadingSpinner fullScreen />;
+    return <Spinner fullScreen />;
   }
 
   if (success) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-5xl">✅</Text>
-        <Text className="mt-6 text-center text-xl font-bold text-gray-900">
-          Mật khẩu đã được cập nhật
-        </Text>
-        <Text className="mt-3 text-center text-base text-gray-500">
-          Bạn có thể đăng nhập bằng mật khẩu mới.
-        </Text>
-        <View className="mt-8 w-full">
-          <Button
-            title="Đăng nhập"
-            onPress={() => router.replace("/(auth)/login")}
-          />
-        </View>
-      </View>
+      <StatusScreen
+        icon={{
+          ios: "checkmark.circle",
+          android: "check_circle",
+          web: "check_circle",
+        }}
+        title={t("reset.successTitle")}
+        message={t("reset.successBody")}
+      >
+        <Button
+          title={t("reset.signIn")}
+          onPress={() => router.replace("/(auth)/login")}
+        />
+      </StatusScreen>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
@@ -148,73 +148,55 @@ export default function ResetPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10">
-          <Text className="text-2xl font-bold text-gray-900">
-            Đặt lại mật khẩu
+          <Text className="font-sans-bold text-headline text-fg">
+            {t("reset.title")}
           </Text>
-          <Text className="mt-2 text-base text-gray-500">
-            Nhập mật khẩu mới cho tài khoản của bạn.
+          <Text className="mt-2 font-sans text-body text-fg-tertiary">
+            {t("reset.subtitle")}
           </Text>
         </View>
 
         <View className="gap-4">
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Mật khẩu mới
-            </Text>
-            <PasswordInput
-              error={!!passwordError}
-              placeholder="Ít nhất 6 ký tự"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (passwordError) setPasswordError("");
-              }}
-              editable={hasRecoverySession}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
-            {passwordError ? (
-              <Text className="mt-1.5 text-sm text-red-600">{passwordError}</Text>
-            ) : null}
-          </View>
+          <PasswordInput
+            label={t("fields.newPassword.label")}
+            error={passwordError}
+            placeholder={t("fields.newPassword.placeholder")}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (passwordError) setPasswordError("");
+            }}
+            editable={hasRecoverySession}
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
 
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              Xác nhận mật khẩu
-            </Text>
-            <PasswordInput
-              error={!!confirmPasswordError}
-              placeholder="Nhập lại mật khẩu mới"
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (confirmPasswordError) setConfirmPasswordError("");
-              }}
-              editable={hasRecoverySession}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
-            {confirmPasswordError ? (
-              <Text className="mt-1.5 text-sm text-red-600">
-                {confirmPasswordError}
-              </Text>
-            ) : null}
-          </View>
+          <PasswordInput
+            label={t("fields.confirmPassword.label")}
+            error={confirmPasswordError}
+            placeholder={t("fields.confirmNewPassword.placeholder")}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (confirmPasswordError) setConfirmPasswordError("");
+            }}
+            editable={hasRecoverySession}
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
 
-          {formError ? (
-            <Text className="text-sm text-red-600">{formError}</Text>
-          ) : null}
+          {formError ? <FormMessage>{formError}</FormMessage> : null}
 
           {hasRecoverySession ? (
             <Button
-              title="Cập nhật mật khẩu"
+              title={t("reset.submit")}
               onPress={handleUpdate}
               loading={loading}
             />
           ) : (
             <Link href="/(auth)/forgot-password" asChild>
-              <Text className="text-center text-sm font-semibold text-primary-600">
-                Yêu cầu link mới
+              <Text className="text-center font-sans-semibold text-caption text-ink">
+                {t("reset.requestNewLink")}
               </Text>
             </Link>
           )}

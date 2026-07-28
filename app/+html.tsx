@@ -2,12 +2,12 @@ import { ScrollViewStyleReset } from "expo-router/html";
 import type { PropsWithChildren } from "react";
 
 const SITE_URL = "https://tl-chatting.vercel.app";
-const DESCRIPTION = "Talo — Nhắn tin theo thời gian thực. Nhanh, đơn giản, riêng tư.";
+const DESCRIPTION = "Talo — Real-time messaging. Fast, simple, private.";
 
 // Static HTML shell for web export — branding meta, favicons, PWA manifest
 export default function Root({ children }: PropsWithChildren) {
   return (
-    <html lang="vi">
+    <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />

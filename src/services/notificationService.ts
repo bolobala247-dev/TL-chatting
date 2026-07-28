@@ -3,6 +3,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
+import i18n from "@/src/i18n";
 import { EAS_PROJECT_ID } from "@/src/lib/constants";
 import { supabase } from "@/src/lib/supabase";
 import { pushTokenService } from "@/src/services/pushTokenService";
@@ -60,11 +61,11 @@ export async function registerPushNotificationsForUser(
   userId: string
 ): Promise<PushRegistrationResult> {
   if (Platform.OS !== "android") {
-    return { ok: false, reason: "Push hiện chỉ hỗ trợ Android" };
+    return { ok: false, reason: i18n.t("notifications:errors.androidOnly") };
   }
 
   if (!Device.isDevice) {
-    return { ok: false, reason: "Cần cài trên điện thoại thật, không phải emulator" };
+    return { ok: false, reason: i18n.t("notifications:errors.physicalDeviceRequired") };
   }
 
   const {
@@ -72,11 +73,11 @@ export async function registerPushNotificationsForUser(
   } = await supabase.auth.getSession();
 
   if (!session?.user || session.user.id !== userId) {
-    return { ok: false, reason: "Phiên đăng nhập chưa sẵn sàng, thử lại sau vài giây" };
+    return { ok: false, reason: i18n.t("notifications:errors.sessionNotReady") };
   }
 
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: "Tin nhắn",
+    name: i18n.t("notifications:channelName"),
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
   });
@@ -93,7 +94,7 @@ export async function registerPushNotificationsForUser(
   if (finalStatus !== "granted") {
     return {
       ok: false,
-      reason: "Chưa cấp quyền thông báo. Vào Cài đặt → Talo → Thông báo → Bật",
+      reason: i18n.t("notifications:errors.permissionDenied"),
     };
   }
 
@@ -107,12 +108,14 @@ export async function registerPushNotificationsForUser(
   } catch (error) {
     console.error("[notificationService] getExpoPushTokenAsync", error);
     const message =
-      error instanceof Error ? error.message : "Không lấy được push token";
+      error instanceof Error
+        ? error.message
+        : i18n.t("notifications:errors.tokenFetchFailed");
 
     if (message.includes("Firebase") || message.includes("FCM")) {
       return {
         ok: false,
-        reason: "FCM chưa cấu hình đúng trên bản build. Cần build lại APK sau khi upload FCM lên EAS",
+        reason: i18n.t("notifications:errors.fcmMisconfigured"),
       };
     }
 
@@ -130,7 +133,9 @@ export async function registerPushNotificationsForUser(
   } catch (error) {
     console.error("[notificationService] upsertToken", error);
     const message =
-      error instanceof Error ? error.message : "Không lưu được token lên server";
+      error instanceof Error
+        ? error.message
+        : i18n.t("notifications:errors.tokenSaveFailed");
     return { ok: false, reason: message };
   }
 

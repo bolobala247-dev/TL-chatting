@@ -1,0 +1,17 @@
+{
+  "channelName": "Messages",
+  "push": {
+    "sentImage": "Sent a photo",
+    "sentFile": "Sent a file",
+    "newMessage": "New message"
+  },
+  "errors": {
+    "androidOnly": "Push notifications are currently Android-only",
+    "physicalDeviceRequired": "Requires a physical phone, not an emulator",
+    "sessionNotReady": "Your session isn't ready yet, try again in a few seconds",
+    "permissionDenied": "Notification permission not granted. Go to Settings → Talo → Notifications → Enable",
+    "fcmMisconfigured": "FCM is not configured correctly in this build. Rebuild the APK after uploading FCM credentials to EAS",
+    "tokenFetchFailed": "Couldn't get a push token",
+    "tokenSaveFailed": "Couldn't save the token to the server"
+  }
+}

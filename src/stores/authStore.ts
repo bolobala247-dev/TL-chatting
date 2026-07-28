@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import type { Session, User } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
+import i18n, {
+  getStoredLanguage,
+  isSupportedLanguage,
+  setAppLanguage,
+} from "@/src/i18n";
 import { supabase } from "@/src/lib/supabase";
 import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
@@ -82,6 +87,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (data) {
       set({ profile: data });
+
+      // An explicit choice on this device (e.g. the login-screen toggle)
+      // wins over the profile and is synced up to it; the profile language
+      // only applies when this device has no local choice yet.
+      const localChoice = await getStoredLanguage();
+      if (localChoice) {
+        if (data.preferred_language !== localChoice) {
+          try {
+            await profileService.updateProfile(user.id, {
+              preferred_language: localChoice,
+            });
+            set({ profile: { ...data, preferred_language: localChoice } });
+          } catch (error) {
+            console.error("[AuthStore.fetchProfile] sync language", error);
+          }
+        }
+      } else if (
+        isSupportedLanguage(data.preferred_language) &&
+        data.preferred_language !== i18n.language
+      ) {
+        void setAppLanguage(data.preferred_language);
+      }
     }
   },
 
@@ -110,7 +137,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (!identifier.includes("@")) {
         const resolved = await profileService.getEmailByUsername(identifier);
         if (!resolved) {
-          throw new Error("Tên người dùng không tồn tại");
+          throw new Error(i18n.t("auth:errors.usernameNotFound"));
         }
         email = resolved;
       }

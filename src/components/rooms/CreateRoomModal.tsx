@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   Pressable,
   Modal,
@@ -10,12 +9,16 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SymbolView } from "expo-symbols";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
 import { roomService } from "@/src/services/roomService";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
+import { Icon } from "@/src/components/ui/Icon";
+import { SearchField } from "@/src/components/ui/SearchField";
+import { TextField } from "@/src/components/ui/TextField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
 import type { Profile } from "@/src/types";
 
 interface CreateRoomModalProps {
@@ -24,6 +27,7 @@ interface CreateRoomModalProps {
 }
 
 export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
+  const { t } = useTranslation(["chat", "common"]);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
@@ -76,7 +80,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
       let room;
       if (isGroup) {
         if (!groupName.trim()) {
-          setGroupNameError("Vui lòng nhập tên nhóm");
+          setGroupNameError(t("create.groupNameRequired"));
           setLoading(false);
           return;
         }
@@ -99,7 +103,7 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
       const msg =
         err instanceof Error
           ? err.message
-          : "Không thể tạo cuộc trò chuyện, vui lòng thử lại";
+          : t("create.failed");
       setFormError(msg);
     } finally {
       setLoading(false);
@@ -120,8 +124,9 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
     const isSelected = selectedUsers.some((u) => u.id === item.id);
     return (
       <Pressable
-        className={`flex-row items-center gap-3 px-4 py-3 ${isSelected ? "bg-primary-50" : "active:bg-gray-50"}`}
+        className={`flex-row items-center gap-3 px-4 py-3 ${isSelected ? "bg-surface-secondary" : "active:bg-pressed"}`}
         onPress={() => toggleUser(item)}
+        accessibilityRole="button"
       >
         <Avatar
           uri={item.avatar_url}
@@ -129,16 +134,16 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
           size={44}
         />
         <View className="flex-1">
-          <Text className="text-[15px] font-medium text-gray-900">
+          <Text className="font-sans-medium text-body text-fg">
             {item.display_name || item.username}
           </Text>
-          <Text className="text-sm text-gray-500">@{item.username}</Text>
+          <Text className="font-sans text-caption text-fg-tertiary">@{item.username}</Text>
         </View>
         {isSelected && (
-          <SymbolView
+          <Icon
             name={{ ios: "checkmark.circle.fill", android: "check_circle", web: "check_circle" }}
-            tintColor="#2563EB"
-            size={22}
+            tone="ink"
+            size="md"
           />
         )}
       </Pressable>
@@ -148,24 +153,22 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
       <KeyboardAvoidingView
-        className="flex-1 bg-white"
+        className="flex-1 bg-background"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-row items-center justify-between border-b border-gray-100 px-4 pb-3 pt-4">
-          <Pressable onPress={handleClose}>
-            <Text className="text-base text-gray-500">Huỷ</Text>
+        <View className="flex-row items-center justify-between border-b border-divider px-4 pb-3 pt-4">
+          <Pressable onPress={handleClose} accessibilityRole="button">
+            <Text className="font-sans text-body text-fg-secondary">{t("common:actions.cancel")}</Text>
           </Pressable>
-          <Text className="text-lg font-semibold text-gray-900">
-            Cuộc trò chuyện mới
+          <Text className="font-sans-semibold text-title text-fg">
+            {t("create.title")}
           </Text>
           <View style={{ width: 40 }} />
         </View>
 
-        <View className="border-b border-gray-100 px-4 py-3">
-          <TextInput
-            className="h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900"
-            placeholder="Tìm kiếm người dùng..."
-            placeholderTextColor="#9CA3AF"
+        <View className="border-b border-divider px-4 py-3">
+          <SearchField
+            placeholder={t("search.placeholder")}
             value={searchQuery}
             onChangeText={handleSearch}
             autoCapitalize="none"
@@ -173,20 +176,21 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
         </View>
 
         {selectedUsers.length > 0 && (
-          <View className="border-b border-gray-100 px-4 py-3">
+          <View className="border-b border-divider px-4 py-3">
             <View className="flex-row flex-wrap gap-2">
               {selectedUsers.map((u) => (
                 <Pressable
                   key={u.id}
-                  className="flex-row items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1.5"
+                  className="flex-row items-center gap-1.5 rounded-full border border-border bg-surface-secondary px-3 py-1.5 active:bg-pressed"
                   onPress={() => toggleUser(u)}
+                  accessibilityRole="button"
                 >
-                  <Text className="text-sm font-medium text-primary-700">
+                  <Text className="font-sans-medium text-caption text-fg">
                     {u.display_name || u.username}
                   </Text>
-                  <SymbolView
+                  <Icon
                     name={{ ios: "xmark", android: "close", web: "close" }}
-                    tintColor="#1D4ED8"
+                    tone="secondary"
                     size={12}
                   />
                 </Pressable>
@@ -196,22 +200,16 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
         )}
 
         {isGroup && (
-          <View className="border-b border-gray-100 px-4 py-3">
-            <TextInput
-              className={`h-10 rounded-xl bg-gray-100 px-4 text-[15px] text-gray-900 ${
-                groupNameError ? "border border-red-500" : ""
-              }`}
-              placeholder="Tên nhóm..."
-              placeholderTextColor="#9CA3AF"
+          <View className="border-b border-divider px-4 py-3">
+            <TextField
+              placeholder={t("create.groupNamePlaceholder")}
               value={groupName}
               onChangeText={(text) => {
                 setGroupName(text);
                 if (groupNameError) setGroupNameError("");
               }}
+              error={groupNameError || undefined}
             />
-            {groupNameError ? (
-              <Text className="mt-1.5 text-sm text-red-600">{groupNameError}</Text>
-            ) : null}
           </View>
         )}
 
@@ -222,24 +220,24 @@ export function CreateRoomModal({ visible, onClose }: CreateRoomModalProps) {
           className="flex-1"
           ListEmptyComponent={
             <View className="items-center py-10">
-              <Text className="text-sm text-gray-400">
+              <Text className="font-sans text-caption text-fg-tertiary">
                 {searchQuery
                   ? searching
-                    ? "Đang tìm kiếm..."
-                    : "Không tìm thấy người dùng"
-                  : "Nhập tên để tìm kiếm"}
+                    ? t("search.searching")
+                    : t("search.noResults")
+                  : t("create.typeToSearch")}
               </Text>
             </View>
           }
         />
 
         {selectedUsers.length > 0 && (
-          <View className="border-t border-gray-100 px-4 py-3">
+          <View className="border-t border-divider px-4 py-3">
             {formError ? (
-              <Text className="mb-2 text-sm text-red-600">{formError}</Text>
+              <FormMessage className="mb-2">{formError}</FormMessage>
             ) : null}
             <Button
-              title={isGroup ? "Tạo nhóm" : "Bắt đầu trò chuyện"}
+              title={isGroup ? t("create.createGroup") : t("create.startChat")}
               onPress={handleCreate}
               loading={loading}
             />

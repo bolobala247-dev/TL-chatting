@@ -1,0 +1,27 @@
+{
+  "notifications": {
+    "sectionTitle": "Notifications",
+    "statusUnsupported": "This device doesn't support Android push notifications",
+    "statusGranted": "Notification permission enabled",
+    "statusNotGranted": "Notification permission not enabled",
+    "registered": "Notifications enabled successfully",
+    "enable": "Enable message notifications"
+  },
+  "language": {
+    "sectionTitle": "Language"
+  },
+  "appearance": {
+    "sectionTitle": "Appearance",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "account": {
+    "sectionTitle": "Account",
+    "email": "Email",
+    "signOut": "Sign out",
+    "signOutConfirmTitle": "Sign out",
+    "signOutConfirmMessage": "Are you sure you want to sign out?",
+    "signOutFailed": "Couldn't sign out, please try again"
+  }
+}
