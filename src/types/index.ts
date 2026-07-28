@@ -18,6 +18,49 @@ export type SavedMessage = Tables<"saved_messages">;
 export type ScheduledMessage = Tables<"scheduled_messages">;
 export type MessageReaction = Tables<"message_reactions">;
 export type PollVote = Tables<"poll_votes">;
+export type PrivacySettings = Tables<"privacy_settings">;
+export type UserPresence = Tables<"user_presence">;
+export type RoomRead = Tables<"room_reads">;
+export type UserBlock = Tables<"user_blocks">;
+export type UserReport = Tables<"user_reports">;
+
+// Privacy visibility levels (privacy_settings CHECK constraints)
+export type VisibilityLevel = "everyone" | "contacts" | "nobody";
+export type AvatarVisibility = "everyone" | "contacts";
+export type PhoneVisibility = "contacts" | "nobody";
+
+// Report reasons accepted by submit_report RPC
+export type ReportReason = "spam" | "harassment" | "hate" | "scam" | "other";
+
+// Shape returned by get_peer_profile RPC (privacy-gated peer view).
+// Generated Functions types lose nullability for RETURNS TABLE, so kept explicit.
+export interface PeerProfile {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  phone_number: string | null;
+  is_online: boolean;
+  last_seen_at: string | null;
+  is_blocked_by_me: boolean;
+}
+
+// Shape returned by get_blocked_profiles RPC
+export interface BlockedProfile {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  blocked_at: string;
+}
+
+// Shape returned by search_profiles RPC (avatar already privacy-masked)
+export interface ProfileSearchResult {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+}
 
 // One image inside a multi-attachment (album) message.
 export interface MessageAttachment {

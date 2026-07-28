@@ -20,6 +20,65 @@
     "dark": "Dark",
     "system": "System"
   },
+  "privacy": {
+    "entry": "Privacy & security",
+    "title": "Privacy",
+    "activitySection": "Activity",
+    "lastSeen": "Last seen",
+    "onlineStatus": "Online status",
+    "messagingSection": "Messaging",
+    "readReceipts": "Read receipts",
+    "readReceiptsHint": "When off, others won't see when you've read their messages",
+    "typingIndicators": "Typing indicator",
+    "typingIndicatorsHint": "When off, others won't see when you're typing",
+    "profileSection": "Profile",
+    "profilePhoto": "Profile photo",
+    "phoneVisibility": "Who can see my phone number",
+    "phoneNumberLabel": "Phone number",
+    "phonePlaceholder": "Add a phone number",
+    "visibility": {
+      "everyone": "Everyone",
+      "contacts": "My contacts",
+      "nobody": "Nobody"
+    },
+    "blocked": {
+      "entry": "Blocked users",
+      "title": "Blocked users",
+      "empty": "No blocked users",
+      "emptyHint": "People you block will appear here",
+      "unblock": "Unblock",
+      "unblockFailed": "Couldn't unblock, please try again"
+    },
+    "updateFailed": "Couldn't update settings, please try again",
+    "loadFailed": "Couldn't load privacy settings",
+    "appLock": {
+      "entry": "App lock",
+      "title": "App lock",
+      "description": "Require a PIN (or biometrics) every time you reopen Talo. The PIN is stored on this device only.",
+      "pinLabel": "PIN (4\u20136 digits)",
+      "pinPlaceholder": "Enter PIN",
+      "confirmPinLabel": "Re-enter PIN",
+      "enable": "Turn on app lock",
+      "disable": "Turn off app lock",
+      "currentPinLabel": "Current PIN",
+      "biometrics": "Unlock with biometrics",
+      "biometricsHint": "Face ID / Touch ID / fingerprint",
+      "pinTooShort": "PIN must be 4\u20136 digits",
+      "pinMismatch": "PINs don't match",
+      "wrongPin": "Incorrect PIN",
+      "enabledStatus": "App lock is on",
+      "saveFailed": "Couldn't save lock settings, please try again",
+      "unsupported": "App lock is only available on iOS and Android",
+      "lock": {
+        "title": "Talo is locked",
+        "subtitle": "Enter your PIN to continue",
+        "unlock": "Unlock",
+        "useBiometrics": "Use biometrics",
+        "biometricPrompt": "Unlock Talo",
+        "tooManyAttempts": "Too many attempts. Try again in {{count}}s"
+      }
+    }
+  },
   "account": {
     "sectionTitle": "Account",
     "email": "Email",

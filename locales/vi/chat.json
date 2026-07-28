@@ -24,6 +24,10 @@
   "header": {
     "online": "Đang hoạt động",
     "offline": "Không hoạt động",
+    "lastSeenJustNow": "Hoạt động vừa xong",
+    "lastSeenMinutes_other": "Hoạt động {{count}} phút trước",
+    "lastSeenHours_other": "Hoạt động {{count}} giờ trước",
+    "lastSeenDays_other": "Hoạt động {{count}} ngày trước",
     "members_other": "{{count}} thành viên",
     "back": "Quay lại",
     "media": "Phương tiện & liên kết"
@@ -154,6 +158,34 @@
   },
   "album": {
     "sendFailed": "Không thể gửi ảnh"
+  },
+  "report": {
+    "title": "Báo cáo người dùng",
+    "action": "Báo cáo",
+    "reasons": {
+      "spam": "Tin rác",
+      "harassment": "Quấy rối",
+      "hate": "Ngôn từ thù ghét",
+      "scam": "Lừa đảo",
+      "other": "Khác"
+    },
+    "detailsPlaceholder": "Chi tiết bổ sung (không bắt buộc)...",
+    "submit": "Gửi báo cáo",
+    "success": "Cảm ơn bạn đã báo cáo. Chúng tôi sẽ sớm xem xét.",
+    "failed": "Không thể gửi báo cáo"
+  },
+  "block": {
+    "action": "Chặn người dùng",
+    "unblock": "Bỏ chặn",
+    "confirmTitle": "Chặn người dùng này?",
+    "confirmMessage": "Họ sẽ không thể nhắn tin cho bạn trong cuộc trò chuyện này. Họ sẽ không được thông báo.",
+    "blockedBanner": "Bạn đã chặn người dùng này",
+    "failed": "Không thể chặn người dùng",
+    "unblockFailed": "Không thể bỏ chặn người dùng"
+  },
+  "contact": {
+    "title": "Thông tin liên hệ",
+    "phone": "Số điện thoại"
   },
   "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"
 }

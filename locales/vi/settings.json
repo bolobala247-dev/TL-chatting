@@ -20,6 +20,65 @@
     "dark": "Tối",
     "system": "Hệ thống"
   },
+  "privacy": {
+    "entry": "Quyền riêng tư & bảo mật",
+    "title": "Quyền riêng tư",
+    "activitySection": "Hoạt động",
+    "lastSeen": "Lần truy cập cuối",
+    "onlineStatus": "Trạng thái trực tuyến",
+    "messagingSection": "Tin nhắn",
+    "readReceipts": "Xác nhận đã đọc",
+    "readReceiptsHint": "Khi tắt, người khác sẽ không biết bạn đã đọc tin nhắn",
+    "typingIndicators": "Trạng thái đang nhập",
+    "typingIndicatorsHint": "Khi tắt, người khác sẽ không thấy khi bạn đang nhập",
+    "profileSection": "Hồ sơ",
+    "profilePhoto": "Ảnh đại diện",
+    "phoneVisibility": "Ai có thể xem số điện thoại",
+    "phoneNumberLabel": "Số điện thoại",
+    "phonePlaceholder": "Thêm số điện thoại",
+    "visibility": {
+      "everyone": "Mọi người",
+      "contacts": "Người liên hệ",
+      "nobody": "Không ai"
+    },
+    "blocked": {
+      "entry": "Người bị chặn",
+      "title": "Người bị chặn",
+      "empty": "Chưa chặn ai",
+      "emptyHint": "Những người bạn chặn sẽ hiển thị ở đây",
+      "unblock": "Bỏ chặn",
+      "unblockFailed": "Không thể bỏ chặn, vui lòng thử lại"
+    },
+    "updateFailed": "Không thể cập nhật cài đặt, vui lòng thử lại",
+    "loadFailed": "Không thể tải cài đặt quyền riêng tư",
+    "appLock": {
+      "entry": "Khóa ứng dụng",
+      "title": "Khóa ứng dụng",
+      "description": "Yêu cầu mã PIN (hoặc sinh trắc học) mỗi khi mở lại Talo. Mã PIN chỉ được lưu trên thiết bị này.",
+      "pinLabel": "Mã PIN (4\u20136 số)",
+      "pinPlaceholder": "Nhập mã PIN",
+      "confirmPinLabel": "Nhập lại mã PIN",
+      "enable": "Bật khóa ứng dụng",
+      "disable": "Tắt khóa ứng dụng",
+      "currentPinLabel": "Mã PIN hiện tại",
+      "biometrics": "Mở khóa bằng sinh trắc học",
+      "biometricsHint": "Face ID / Touch ID / vân tay",
+      "pinTooShort": "Mã PIN phải có 4\u20136 chữ số",
+      "pinMismatch": "Mã PIN nhập lại không khớp",
+      "wrongPin": "Mã PIN không đúng",
+      "enabledStatus": "Khóa ứng dụng đang bật",
+      "saveFailed": "Không thể lưu cài đặt khóa, vui lòng thử lại",
+      "unsupported": "Khóa ứng dụng chỉ khả dụng trên iOS và Android",
+      "lock": {
+        "title": "Talo đã khóa",
+        "subtitle": "Nhập mã PIN để tiếp tục",
+        "unlock": "Mở khóa",
+        "useBiometrics": "Dùng sinh trắc học",
+        "biometricPrompt": "Mở khóa Talo",
+        "tooManyAttempts": "Quá nhiều lần sai. Thử lại sau {{count}} giây"
+      }
+    }
+  },
   "account": {
     "sectionTitle": "Tài khoản",
     "email": "Email",

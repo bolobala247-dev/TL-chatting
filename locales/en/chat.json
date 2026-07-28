@@ -25,6 +25,13 @@
   "header": {
     "online": "Active now",
     "offline": "Offline",
+    "lastSeenJustNow": "Active just now",
+    "lastSeenMinutes_one": "Active {{count}} minute ago",
+    "lastSeenMinutes_other": "Active {{count}} minutes ago",
+    "lastSeenHours_one": "Active {{count}} hour ago",
+    "lastSeenHours_other": "Active {{count}} hours ago",
+    "lastSeenDays_one": "Active {{count}} day ago",
+    "lastSeenDays_other": "Active {{count}} days ago",
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
     "back": "Back",
@@ -160,6 +167,34 @@
   },
   "album": {
     "sendFailed": "Couldn't send the photos"
+  },
+  "report": {
+    "title": "Report user",
+    "action": "Report",
+    "reasons": {
+      "spam": "Spam",
+      "harassment": "Harassment",
+      "hate": "Hate speech",
+      "scam": "Scam or fraud",
+      "other": "Other"
+    },
+    "detailsPlaceholder": "Additional details (optional)...",
+    "submit": "Submit report",
+    "success": "Thanks for your report. We'll review it soon.",
+    "failed": "Couldn't submit the report"
+  },
+  "block": {
+    "action": "Block user",
+    "unblock": "Unblock",
+    "confirmTitle": "Block this user?",
+    "confirmMessage": "They won't be able to message you in this conversation. They won't be notified.",
+    "blockedBanner": "You have blocked this user",
+    "failed": "Couldn't block this user",
+    "unblockFailed": "Couldn't unblock this user"
+  },
+  "contact": {
+    "title": "Contact info",
+    "phone": "Phone"
   },
   "startChatFailed": "Couldn't start the conversation, please try again"
 }

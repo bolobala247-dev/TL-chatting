@@ -1,5 +1,5 @@
 import { supabase } from "@/src/lib/supabase";
-import type { Profile, UpdateTables } from "@/src/types";
+import type { Profile, ProfileSearchResult, UpdateTables } from "@/src/types";
 
 export const profileService = {
   async getProfile(userId: string): Promise<Profile | null> {
@@ -38,26 +38,26 @@ export const profileService = {
   },
 
   async isUsernameTaken(username: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id")
-      .ilike("username", username)
-      .maybeSingle();
+    // SECURITY DEFINER RPC: works for anon (registration) without exposing profiles
+    const { data, error } = await supabase.rpc("is_username_available", {
+      p_username: username,
+    });
 
     if (error) throw error;
-    return data !== null;
+    return data === false;
   },
 
-  async searchUsers(query: string, currentUserId: string): Promise<Profile[]> {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", currentUserId)
-      .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
-      .limit(20);
+  async searchUsers(
+    query: string,
+    _currentUserId: string
+  ): Promise<ProfileSearchResult[]> {
+    // SECURITY DEFINER RPC: excludes blocked users, masks avatar per privacy settings
+    const { data, error } = await supabase.rpc("search_profiles", {
+      p_query: query,
+    });
 
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []) as ProfileSearchResult[];
   },
 
   async uploadAvatar(userId: string, uri: string): Promise<string> {

@@ -120,12 +120,13 @@ export const roomService = {
     return (data ?? []) as any;
   },
 
-  async updateLastRead(roomId: string, userId: string) {
-    const { error } = await supabase
-      .from("room_participants")
-      .update({ last_read_at: new Date().toISOString() })
-      .eq("room_id", roomId)
-      .eq("user_id", userId);
+  async updateLastRead(roomId: string, _userId: string) {
+    // RPC always updates the private room_reads watermark; the public
+    // room_participants.last_read_at mirror only moves when the user
+    // has read receipts enabled (privacy_settings.read_receipts_enabled).
+    const { error } = await supabase.rpc("mark_room_read", {
+      p_room_id: roomId,
+    });
 
     if (error) throw error;
   },
