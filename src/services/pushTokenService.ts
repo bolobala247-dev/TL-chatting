@@ -1,7 +1,37 @@
+import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/src/lib/supabase";
 import type { InsertTables } from "@/src/types";
 
+// Persisted so sign-out cleanup still works after an app restart (audit P7)
+const TOKEN_STORAGE_KEY = "tl-push-token";
+// Marks which user/token pair is already synced to avoid a DB write on every
+// app foreground (audit P15)
+const SYNCED_STORAGE_KEY = "tl-push-token-synced";
+
 let currentToken: string | null = null;
+
+async function readStoredValue(key: string): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoredValue(key: string, value: string | null) {
+  if (Platform.OS === "web") return;
+  try {
+    if (value === null) {
+      await SecureStore.deleteItemAsync(key);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  } catch {
+    // Storage failure must not break push registration
+  }
+}
 
 export const pushTokenService = {
   setCurrentToken(token: string | null) {
@@ -24,6 +54,14 @@ export const pushTokenService = {
 
     if (!session?.user || session.user.id !== userId) {
       throw new Error("Phiên đăng nhập chưa sẵn sàng");
+    }
+
+    // Already synced for this user/token pair: skip the DB round-trip
+    const syncedMarker = `${userId}:${token}`;
+    const previousMarker = await readStoredValue(SYNCED_STORAGE_KEY);
+    if (previousMarker === syncedMarker) {
+      currentToken = token;
+      return;
     }
 
     if (deviceId) {
@@ -55,6 +93,8 @@ export const pushTokenService = {
     }
 
     currentToken = token;
+    await writeStoredValue(TOKEN_STORAGE_KEY, token);
+    await writeStoredValue(SYNCED_STORAGE_KEY, syncedMarker);
   },
 
   async removeToken(token: string): Promise<void> {
@@ -68,10 +108,14 @@ export const pushTokenService = {
     if (currentToken === token) {
       currentToken = null;
     }
+    await writeStoredValue(TOKEN_STORAGE_KEY, null);
+    await writeStoredValue(SYNCED_STORAGE_KEY, null);
   },
 
   async removeCurrentToken(): Promise<void> {
-    if (!currentToken) return;
-    await this.removeToken(currentToken);
+    // Fall back to the persisted token so cleanup survives app restarts
+    const token = currentToken ?? (await readStoredValue(TOKEN_STORAGE_KEY));
+    if (!token) return;
+    await this.removeToken(token);
   },
 };

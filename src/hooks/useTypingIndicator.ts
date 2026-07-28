@@ -10,7 +10,7 @@ interface TypingUser {
 }
 
 export function useTypingIndicator(roomId: string) {
-  const user = useAuthStore((s) => s.user);
+  const userId = useAuthStore((s) => s.user?.id);
   const profile = useAuthStore((s) => s.profile);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -18,10 +18,10 @@ export function useTypingIndicator(roomId: string) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    if (!user || !roomId) return;
+    if (!userId || !roomId) return;
 
     const channel = supabase.channel(`typing:${roomId}`, {
-      config: { presence: { key: user.id } },
+      config: { presence: { key: userId } },
     });
 
     channel
@@ -29,12 +29,12 @@ export function useTypingIndicator(roomId: string) {
         const state = channel.presenceState();
         const users: TypingUser[] = [];
 
-        for (const [userId, presences] of Object.entries(state)) {
-          if (userId === user.id) continue;
+        for (const [presenceUserId, presences] of Object.entries(state)) {
+          if (presenceUserId === userId) continue;
           const latest = presences[presences.length - 1] as any;
           if (latest?.typing) {
             users.push({
-              user_id: userId,
+              user_id: presenceUserId,
               display_name: latest.display_name || "Someone",
             });
           }
@@ -51,7 +51,7 @@ export function useTypingIndicator(roomId: string) {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [roomId, user]);
+  }, [roomId, userId]);
 
   const startTyping = useCallback(() => {
     const now = Date.now();

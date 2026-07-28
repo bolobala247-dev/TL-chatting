@@ -5,6 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
+import { useRealtimeRooms } from "@/src/hooks/useRealtime";
 import { LoadingSpinner } from "@/src/components/ui/LoadingSpinner";
 import "../global.css";
 
@@ -17,7 +18,10 @@ function AuthGate() {
   const segments = useSegments();
   const router = useRouter();
 
-  useNotifications(!!session);
+  useNotifications(!!session && initialized);
+  // Mounted once at the root so unread badges update on every screen,
+  // including when deep-linked directly into a chat from a notification
+  useRealtimeRooms();
 
   useEffect(() => {
     if (!initialized) return;

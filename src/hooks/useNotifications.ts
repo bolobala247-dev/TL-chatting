@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { startPushTokenSync } from "@/src/services/notificationService";
@@ -28,6 +28,10 @@ Notifications.setNotificationHandler({
 export function useNotifications(enabled: boolean) {
   const router = useRouter();
   const userId = useAuthStore((s) => s.user?.id);
+  // Covers cold start (app killed, launched by tapping the notification)
+  // as well as warm taps — the response persists until a new one arrives
+  const lastResponse = Notifications.useLastNotificationResponse();
+  const handledResponseRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled || !userId) {
@@ -38,21 +42,22 @@ export function useNotifications(enabled: boolean) {
   }, [enabled, userId]);
 
   useEffect(() => {
-    const responseSub =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const roomId = response.notification.request.content.data?.roomId as
-          | string
-          | undefined;
+    // Wait until auth/navigation are ready so the deep link is not
+    // clobbered by AuthGate redirects on cold start
+    if (!enabled || !lastResponse) return;
 
-        if (roomId) {
-          router.push(`/chat/${roomId}`);
-        }
-      });
+    const responseId = `${lastResponse.notification.request.identifier}:${lastResponse.notification.date}`;
+    if (handledResponseRef.current === responseId) return;
+    handledResponseRef.current = responseId;
 
-    return () => {
-      responseSub.remove();
-    };
-  }, [router]);
+    const roomId = lastResponse.notification.request.content.data?.roomId as
+      | string
+      | undefined;
+
+    if (roomId) {
+      router.push(`/chat/${roomId}`);
+    }
+  }, [enabled, lastResponse, router]);
 }
 
 export { ANDROID_CHANNEL_ID };

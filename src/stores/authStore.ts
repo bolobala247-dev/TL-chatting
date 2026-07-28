@@ -4,7 +4,8 @@ import * as Linking from "expo-linking";
 import { supabase } from "@/src/lib/supabase";
 import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
-import { registerPushNotificationsForUser } from "@/src/services/notificationService";
+import { useChatStore } from "@/src/stores/chatStore";
+import { useRoomStore } from "@/src/stores/roomStore";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -50,16 +51,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (session?.user) {
         await get().fetchProfile();
-        void registerPushNotificationsForUser(session.user.id);
       }
 
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      // Push registration is handled by useNotifications/startPushTokenSync.
+      // Never await Supabase calls inside this callback (deadlock risk).
+      supabase.auth.onAuthStateChange((event, session) => {
         set({ session, user: session?.user ?? null });
         if (session?.user) {
-          await get().fetchProfile();
-          if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
-            void registerPushNotificationsForUser(session.user.id);
-          }
+          setTimeout(() => {
+            void get().fetchProfile();
+          }, 0);
         } else {
           set({ profile: null });
         }
@@ -119,11 +120,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       });
       if (error) throw error;
-
-      const user = get().user;
-      if (user) {
-        void registerPushNotificationsForUser(user.id);
-      }
     } finally {
       set({ loading: false });
     }
@@ -138,6 +134,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+
+    // Clear per-account client state so the next user never sees stale data
+    useChatStore.getState().reset();
+    useRoomStore.getState().reset();
     set({ session: null, user: null, profile: null });
   },
 

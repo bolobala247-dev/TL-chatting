@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const ANDROID_CHANNEL_ID = "messages";
+const EXPO_PUSH_CHUNK_SIZE = 100;
 
 interface MessageRecord {
   id: string;
@@ -29,6 +30,13 @@ interface ExpoPushMessage {
   sound?: "default";
 }
 
+interface ExpoPushTicket {
+  status: "ok" | "error";
+  id?: string;
+  message?: string;
+  details?: { error?: string };
+}
+
 function getMessagePreview(message: MessageRecord): string {
   if (message.type === "image") {
     return "Đã gửi ảnh";
@@ -42,9 +50,10 @@ function getMessagePreview(message: MessageRecord): string {
   return content && content.length > 0 ? content : "Tin nhắn mới";
 }
 
-async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
-  if (messages.length === 0) return;
-
+// Sends one chunk and returns tickets in the same order as the input
+async function sendExpoPushChunk(
+  messages: ExpoPushMessage[]
+): Promise<ExpoPushTicket[]> {
   const response = await fetch(EXPO_PUSH_URL, {
     method: "POST",
     headers: {
@@ -59,6 +68,9 @@ async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
     const errorText = await response.text();
     throw new Error(`Expo Push API error: ${response.status} ${errorText}`);
   }
+
+  const json = (await response.json()) as { data?: ExpoPushTicket[] };
+  return json.data ?? [];
 }
 
 function normalizePayload(body: unknown): WebhookPayload | null {
@@ -67,7 +79,7 @@ function normalizePayload(body: unknown): WebhookPayload | null {
   const value = body as Record<string, unknown>;
 
   if (value.type && value.table && value.record) {
-    return value as WebhookPayload;
+    return value as unknown as WebhookPayload;
   }
 
   if (value.record && typeof value.record === "object") {
@@ -86,6 +98,15 @@ Deno.serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Only the DB trigger (which reads the secret from Vault) may call this
+  const expectedSecret = Deno.env.get("PUSH_FUNCTION_SECRET");
+  if (!expectedSecret || req.headers.get("x-push-secret") !== expectedSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const body = await req.json();
     const payload = normalizePayload(body);
@@ -97,7 +118,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const message = payload.record;
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -106,6 +126,24 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Never trust the payload body: re-read the message from the database
+    const { data: message, error: messageError } = await supabase
+      .from("messages")
+      .select("id, room_id, sender_id, content, type, media_url")
+      .eq("id", payload.record.id)
+      .maybeSingle();
+
+    if (messageError) {
+      throw messageError;
+    }
+
+    if (!message) {
+      return new Response(JSON.stringify({ error: "Unknown message" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     const { data: sender, error: senderError } = await supabase
       .from("profiles")
@@ -168,10 +206,39 @@ Deno.serve(async (req) => {
       sound: "default",
     }));
 
-    await sendExpoPush(pushMessages);
+    // Send in chunks of 100 (Expo limit) and collect dead tokens from tickets
+    const deadTokens: string[] = [];
+
+    for (let i = 0; i < pushMessages.length; i += EXPO_PUSH_CHUNK_SIZE) {
+      const chunk = pushMessages.slice(i, i + EXPO_PUSH_CHUNK_SIZE);
+      const tickets = await sendExpoPushChunk(chunk);
+
+      tickets.forEach((ticket, index) => {
+        if (
+          ticket.status === "error" &&
+          ticket.details?.error === "DeviceNotRegistered"
+        ) {
+          deadTokens.push(chunk[index].to);
+        }
+      });
+    }
+
+    if (deadTokens.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from("push_tokens")
+        .delete()
+        .in("token", deadTokens);
+
+      if (cleanupError) {
+        console.error("[send-push-on-message] token cleanup", cleanupError);
+      }
+    }
 
     return new Response(
-      JSON.stringify({ sent: pushMessages.length }),
+      JSON.stringify({
+        sent: pushMessages.length - deadTokens.length,
+        removed: deadTokens.length,
+      }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },

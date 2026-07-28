@@ -1,36 +1,32 @@
 # Android Build + Push Notifications — hướng dẫn triển khai
 #
-# === 1. Migration (đã có file supabase/migrations/00003_push_tokens.sql) ===
-# Nếu chưa apply trên Supabase project của bạn:
+# === 1. Migrations ===
+# Apply 00003 (push_tokens) và 00005 (secure trigger + get_user_rooms fix):
 #   supabase db push
 # hoặc chạy SQL trong Supabase Dashboard → SQL Editor
+# (00005 thay thế hoàn toàn trigger của 00004)
 #
-# === 2. Deploy Edge Function ===
-#   supabase link --project-ref xoxnjqgumfhzwturtfhz
+# === 2. Tạo secrets trong Vault (SQL Editor, chạy MỖI project) ===
+#   SELECT vault.create_secret(
+#     'https://<project-ref>.supabase.co/functions/v1/send-push-on-message',
+#     'push_function_url'
+#   );
+#   SELECT vault.create_secret('<random-long-secret>', 'push_function_secret');
+# Tạo secret ngẫu nhiên: openssl rand -hex 32
+#
+# === 3. Deploy Edge Function ===
+#   supabase link --project-ref <project-ref>
+#   supabase secrets set PUSH_FUNCTION_SECRET=<random-long-secret>   # giống Vault
 #   supabase functions deploy send-push-on-message --no-verify-jwt
-#
-# === 3. Bật trigger tự gửi push (migration 00004) ===
-#   supabase db push
-# hoặc chạy SQL trong supabase/migrations/00004_message_push_trigger.sql
-# (Edge Function phải deploy trước trigger)
-#
-# === 3b. Database Webhook (thay thế trigger nếu muốn) ===
-# Database → Webhooks → Create a new hook
-#   - Name: send-push-on-message
-#   - Table: public.messages
-#   - Events: INSERT
-#   - Type: Supabase Edge Functions
-#   - Function: send-push-on-message
-#   - HTTP method: POST
-#
-# Lặp lại cho cả dev (xoxnjqgumfhzwturtfhz) và prod (elevsuvbbittizjxrfll)
-# nếu bạn dùng 2 project Supabase khác nhau.
+# (Function tự xác thực bằng header x-push-secret, không cần JWT)
 #
 # === 4. FCM credentials (bắt buộc cho push trên Android) ===
 # 1. Tạo Firebase project tại https://console.firebase.google.com
 # 2. Thêm Android app với package: com.haruthao.tlchatting
-# 3. Project Settings → Cloud Messaging → FCM V1 service account JSON
-# 4. Upload lên EAS:
+# 3. Tải google-services.json → đặt tại THƯ MỤC GỐC repo
+#    (app.json đã trỏ android.googleServicesFile = ./google-services.json)
+# 4. Project Settings → Cloud Messaging → FCM V1 service account JSON
+# 5. Upload lên EAS:
 #      eas credentials --platform android
 #    Chọn profile preview hoặc production, upload FCM V1 key
 #
@@ -38,17 +34,32 @@
 #   npm run env:dev          # hoặc env:prod
 #   npm run build:android:preview
 # Tải APK từ https://expo.dev → cài lên máy Android (bật cài app không xác định)
+# LƯU Ý: phải build lại sau khi thêm google-services.json (thay đổi native)
 #
 # === 6. Build AAB cho Google Play ===
 #   npm run build:android:prod
 #   eas submit --platform android --profile production
 # Cần file google-play-service-account.json (đã gitignore) và app trên Play Console
 #
-# === 7. Kiểm thử push (2 máy Android) ===
+# Lặp lại bước 1–3 cho cả dev (xoxnjqgumfhzwturtfhz) và prod (elevsuvbbittizjxrfll)
+# với đúng project-ref và secret riêng của từng project.
+#
+# === 7. Kiểm tra pipeline hoạt động (SQL Editor) ===
+#   -- Trigger đã cài?
+#   SELECT tgname, tgenabled FROM pg_trigger
+#   WHERE tgrelid = 'public.messages'::regclass AND NOT tgisinternal;
+#   -- Các lần gọi Edge Function gần nhất (200 = OK, 401 = sai secret):
+#   SELECT status_code, error_msg, created FROM net._http_response
+#   ORDER BY created DESC LIMIT 20;
+#   -- Token đã đăng ký?
+#   SELECT platform, count(*) FROM push_tokens GROUP BY platform;
+#
+# === 8. Kiểm thử push (2 máy Android) ===
 # - Cài APK preview, đăng nhập 2 tài khoản khác nhau
 # - Máy B đóng app hoàn toàn
 # - Máy A gửi tin nhắn → Máy B nhận notification
-# - Tap notification → mở đúng phòng chat
+# - Tap notification (kể cả khi app bị kill) → mở đúng phòng chat
 # - Khi B đang mở phòng chat với A → không hiện banner (client suppress)
+# - Đăng xuất máy B → máy A gửi tin → máy B KHÔNG nhận notification
 #
 # Lưu ý: Push KHÔNG hoạt động trên Expo Go. Cần bản build EAS (preview/production).
