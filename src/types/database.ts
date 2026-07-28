@@ -18,9 +18,14 @@ export type Database = {
         Row: {
           content: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          has_link: boolean | null
           id: string
           is_edited: boolean | null
           media_url: string | null
+          pinned_at: string | null
+          pinned_by: string | null
           reply_to: string | null
           room_id: string
           sender_id: string
@@ -30,9 +35,14 @@ export type Database = {
         Insert: {
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          has_link?: boolean | null
           id?: string
           is_edited?: boolean | null
           media_url?: string | null
+          pinned_at?: string | null
+          pinned_by?: string | null
           reply_to?: string | null
           room_id: string
           sender_id: string
@@ -42,9 +52,14 @@ export type Database = {
         Update: {
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          has_link?: boolean | null
           id?: string
           is_edited?: boolean | null
           media_url?: string | null
+          pinned_at?: string | null
+          pinned_by?: string | null
           reply_to?: string | null
           room_id?: string
           sender_id?: string
@@ -52,6 +67,20 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_pinned_by_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_reply_to_fkey"
             columns: ["reply_to"]
@@ -218,6 +247,107 @@ export type Database = {
           },
         ]
       }
+      saved_messages: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_messages_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          reply_to: string | null
+          room_id: string
+          scheduled_at: string
+          sender_id: string
+          sent_message_id: string | null
+          status: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          reply_to?: string | null
+          room_id: string
+          scheduled_at: string
+          sender_id: string
+          sent_message_id?: string | null
+          status?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          reply_to?: string | null
+          room_id?: string
+          scheduled_at?: string
+          sender_id?: string
+          sent_message_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_messages_sent_message_id_fkey"
+            columns: ["sent_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -240,6 +370,33 @@ export type Database = {
       }
       is_room_admin: { Args: { p_room_id: string }; Returns: boolean }
       is_room_creator: { Args: { p_room_id: string }; Returns: boolean }
+      process_scheduled_messages: { Args: never; Returns: undefined }
+      set_message_pin: {
+        Args: { p_message_id: string; p_pinned: boolean }
+        Returns: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          has_link: boolean | null
+          id: string
+          is_edited: boolean | null
+          media_url: string | null
+          pinned_at: string | null
+          pinned_by: string | null
+          reply_to: string | null
+          room_id: string
+          sender_id: string
+          type: string | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never

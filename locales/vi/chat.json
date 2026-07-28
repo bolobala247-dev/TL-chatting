@@ -25,16 +25,27 @@
     "online": "Đang hoạt động",
     "offline": "Không hoạt động",
     "members_other": "{{count}} thành viên",
-    "back": "Quay lại"
+    "back": "Quay lại",
+    "media": "Phương tiện & liên kết"
   },
   "input": {
     "placeholder": "Nhập tin nhắn...",
     "attach": "Đính kèm",
     "send": "Gửi"
   },
+  "actions": {
+    "pin": "Ghim tin nhắn",
+    "unpin": "Bỏ ghim",
+    "save": "Lưu tin nhắn",
+    "unsave": "Bỏ lưu",
+    "recall": "Thu hồi tin nhắn"
+  },
   "message": {
     "imagePlaceholder": "[Hình ảnh]",
+    "videoPlaceholder": "[Video]",
+    "filePlaceholder": "[Tệp]",
     "edited": "(đã sửa)",
+    "deleted": "Tin nhắn đã bị thu hồi",
     "emptyTitle": "Chưa có tin nhắn nào",
     "emptyCta": "Hãy bắt đầu cuộc trò chuyện!",
     "editTitle": "Chỉnh sửa tin nhắn",
@@ -43,10 +54,61 @@
     "deleteTitle": "Xoá tin nhắn",
     "deleteConfirm": "Bạn có chắc muốn xoá tin nhắn này?",
     "deleteFailed": "Không thể xoá tin nhắn",
+    "recallTitle": "Thu hồi tin nhắn?",
+    "recallConfirm": "Tin nhắn sẽ bị thu hồi với tất cả mọi người.",
+    "recallAction": "Thu hồi",
+    "recallFailed": "Không thể thu hồi tin nhắn",
+    "pinFailed": "Không thể ghim tin nhắn",
+    "saveFailed": "Không thể lưu tin nhắn",
     "sendFailed": "Không thể gửi tin nhắn",
     "sendImageFailed": "Không thể gửi ảnh",
     "sendImageFailedDetail": "Không thể gửi ảnh: {{message}}",
     "replyingTo": "Trả lời tin nhắn"
+  },
+  "pinned": {
+    "title": "Tin nhắn đã ghim",
+    "count_other": "{{count}} tin nhắn đã ghim",
+    "unpin": "Bỏ ghim"
+  },
+  "undo": {
+    "sent": "Đã gửi",
+    "action": "Hoàn tác",
+    "failed": "Không thể hoàn tác tin nhắn"
+  },
+  "schedule": {
+    "title": "Gửi theo lịch",
+    "hint": "Tin nhắn sẽ được gửi trong vòng 1 phút quanh thời điểm đã chọn.",
+    "in30m": "Sau 30 phút",
+    "in1h": "Sau 1 giờ",
+    "in3h": "Sau 3 giờ",
+    "tonight": "Tối nay 20:00",
+    "tomorrowMorning": "Sáng mai 08:00",
+    "pending_other": "{{count}} tin nhắn đã lên lịch",
+    "listTitle": "Tin nhắn đã lên lịch",
+    "sendAt": "Sẽ gửi lúc {{time}}",
+    "cancel": "Huỷ gửi",
+    "empty": "Chưa có tin nhắn đã lên lịch",
+    "failed": "Không thể lên lịch tin nhắn",
+    "cancelFailed": "Không thể huỷ tin nhắn đã lên lịch"
+  },
+  "media": {
+    "title": "Phương tiện & liên kết",
+    "tabs": {
+      "media": "Ảnh & video",
+      "files": "Tệp",
+      "links": "Liên kết"
+    },
+    "emptyMedia": "Chưa có ảnh hoặc video nào",
+    "emptyFiles": "Chưa có tệp nào",
+    "emptyLinks": "Chưa có liên kết nào",
+    "loadFailed": "Không thể tải nội dung"
+  },
+  "saved": {
+    "title": "Tin nhắn đã lưu",
+    "empty": "Chưa có tin nhắn đã lưu",
+    "emptyHint": "Nhấn giữ một tin nhắn và chọn Lưu tin nhắn để xem lại tại đây",
+    "unsave": "Bỏ lưu",
+    "loadFailed": "Không thể tải tin nhắn đã lưu"
   },
   "typing": {
     "one": "{{name}} đang nhập",

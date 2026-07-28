@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { View, TextInput, Pressable, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/src/components/ui/Icon";
@@ -7,21 +7,29 @@ import { useThemeColors } from "@/src/theme";
 interface MessageInputProps {
   onSend: (content: string) => void;
   onAttach?: () => void;
+  /** Long-press on the send button — used to schedule the drafted message. */
+  onLongPressSend?: (content: string) => void;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
 }
 
-export function MessageInput({
-  onSend,
-  onAttach,
-  onTypingStart,
-  onTypingStop,
-}: MessageInputProps) {
+export interface MessageInputHandle {
+  /** Restore composer text (e.g. after undoing a send). */
+  setText: (value: string) => void;
+}
+
+export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(
+  function MessageInput(
+    { onSend, onAttach, onLongPressSend, onTypingStart, onTypingStop },
+    ref
+  ) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
   const [text, setText] = useState("");
   const typingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useImperativeHandle(ref, () => ({ setText }), []);
 
   const handleChangeText = (value: string) => {
     setText(value);
@@ -41,6 +49,15 @@ export function MessageInput({
   const handleSend = () => {
     if (!text.trim()) return;
     onSend(text.trim());
+    setText("");
+    typingRef.current = false;
+    onTypingStop?.();
+    clearTimeout(typingTimeoutRef.current);
+  };
+
+  const handleLongPressSend = () => {
+    if (!text.trim() || !onLongPressSend) return;
+    onLongPressSend(text.trim());
     setText("");
     typingRef.current = false;
     onTypingStop?.();
@@ -87,6 +104,8 @@ export function MessageInput({
           hasText ? "bg-ink active:opacity-90" : ""
         }`}
         onPress={handleSend}
+        onLongPress={onLongPressSend ? handleLongPressSend : undefined}
+        delayLongPress={350}
         disabled={!hasText}
         hitSlop={8}
         accessibilityRole="button"
@@ -100,4 +119,5 @@ export function MessageInput({
       </Pressable>
     </View>
   );
-}
+  }
+);

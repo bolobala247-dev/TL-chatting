@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import { messageService } from "@/src/services/messageService";
 import { roomService } from "@/src/services/roomService";
+import { UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
 import type { Message } from "@/src/types";
 
@@ -24,6 +25,10 @@ export function useMessages(roomId: string) {
   const removeMessage = useChatStore((s) => s.removeMessage);
   const clearUnread = useRoomStore((s) => s.clearUnread);
 
+  // Undo-send grace window: last confirmed message stays recallable for a few seconds
+  const [undoableMessage, setUndoableMessage] = useState<Message | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   useRealtimeMessages(roomId);
 
   useEffect(() => {
@@ -40,6 +45,8 @@ export function useMessages(roomId: string) {
 
     return () => {
       setActiveRoom(null);
+      clearTimeout(undoTimerRef.current);
+      setUndoableMessage(null);
       if (userId) {
         roomService
           .updateLastRead(roomId, userId)
@@ -66,6 +73,11 @@ export function useMessages(roomId: string) {
         media_url: null,
         reply_to: null,
         is_edited: false,
+        pinned_at: null,
+        pinned_by: null,
+        deleted_at: null,
+        deleted_by: null,
+        has_link: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -80,12 +92,38 @@ export function useMessages(roomId: string) {
           type: "text",
         });
         replaceOptimisticMessage(tempId, sent);
+
+        // Open the undo window for this message
+        clearTimeout(undoTimerRef.current);
+        setUndoableMessage(sent);
+        undoTimerRef.current = setTimeout(() => {
+          setUndoableMessage(null);
+        }, UNDO_SEND_WINDOW_MS);
       } catch {
         removeMessage(tempId, roomId);
       }
     },
     [roomId, user]
   );
+
+  // Hard delete within the window — realtime DELETE removes it for everyone.
+  // Returns the recalled text so the composer can restore it.
+  const undoSend = useCallback(async (): Promise<string | null> => {
+    if (!undoableMessage) return null;
+
+    const target = undoableMessage;
+    clearTimeout(undoTimerRef.current);
+    setUndoableMessage(null);
+
+    try {
+      await messageService.deleteMessage(target.id);
+      removeMessage(target.id, roomId);
+      return target.content;
+    } catch (err) {
+      console.error("[useMessages] undo send", err);
+      throw err;
+    }
+  }, [undoableMessage, roomId]);
 
   const loadMore = useCallback(() => {
     if (loading || !hasMore || messages.length === 0) return;
@@ -99,5 +137,7 @@ export function useMessages(roomId: string) {
     hasMore,
     sendMessage,
     loadMore,
+    undoableMessage,
+    undoSend,
   };
 }

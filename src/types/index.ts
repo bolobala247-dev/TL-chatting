@@ -14,6 +14,8 @@ export type Room = Tables<"rooms">;
 export type RoomParticipant = Tables<"room_participants">;
 export type Message = Tables<"messages">;
 export type PushToken = Tables<"push_tokens">;
+export type SavedMessage = Tables<"saved_messages">;
+export type ScheduledMessage = Tables<"scheduled_messages">;
 
 export interface RoomWithLastMessage {
   room_id: string;
@@ -29,3 +31,16 @@ export interface RoomWithLastMessage {
 export interface MessageWithSender extends Message {
   sender?: Profile;
 }
+
+// Shape returned by savedMessageService.getSavedMessages (nested embeds)
+export interface SavedMessageItem {
+  id: string;
+  created_at: string | null;
+  message: Message & {
+    sender: Pick<Profile, "id" | "username" | "display_name" | "avatar_url"> | null;
+    room: Pick<Room, "id" | "name" | "type"> | null;
+  };
+}
+
+// Query lanes of the shared-media screen
+export type MediaKind = "media" | "file" | "link";

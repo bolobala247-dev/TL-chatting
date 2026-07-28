@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
-import { View, TextInput } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { View, Text, TextInput, Pressable } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useReanimatedKeyboardAnimation,
@@ -16,31 +16,51 @@ import { useMessages } from "@/src/hooks/useMessages";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { roomService } from "@/src/services/roomService";
 import { messageService } from "@/src/services/messageService";
+import { savedMessageService } from "@/src/services/savedMessageService";
+import { scheduledMessageService } from "@/src/services/scheduledMessageService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
 import { MessageList } from "@/src/components/chat/MessageList";
-import { MessageInput } from "@/src/components/chat/MessageInput";
+import {
+  MessageInput,
+  type MessageInputHandle,
+} from "@/src/components/chat/MessageInput";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
 import { ReplyPreview } from "@/src/components/chat/ReplyPreview";
+import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
+import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
+import { ScheduleSheet } from "@/src/components/chat/ScheduleSheet";
+import { ScheduledMessagesSheet } from "@/src/components/chat/ScheduledMessagesSheet";
+import { UndoSendBar } from "@/src/components/chat/UndoSendBar";
+import { Icon } from "@/src/components/ui/Icon";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Message, Profile } from "@/src/types";
+import type { Message, ScheduledMessage } from "@/src/types";
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
   const { roomId } = useLocalSearchParams<{ roomId: string }>();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-  const removeMessage = useChatStore((s) => s.removeMessage);
   const updateMessageInStore = useChatStore((s) => s.updateMessage);
-  const { messages, loading, hasMore, sendMessage, loadMore } =
-    useMessages(roomId!);
+  const {
+    messages,
+    loading,
+    hasMore,
+    sendMessage,
+    loadMore,
+    undoableMessage,
+    undoSend,
+  } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
+
+  const inputRef = useRef<MessageInputHandle>(null);
 
   const [roomName, setRoomName] = useState("");
   const [roomAvatar, setRoomAvatar] = useState<string | null>(null);
@@ -51,10 +71,18 @@ export default function ChatScreen() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [chatError, setChatError] = useState("");
 
-  const [deleteTarget, setDeleteTarget] = useState<Message | null>(null);
+  const [recallTarget, setRecallTarget] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [editContent, setEditContent] = useState("");
   const [editError, setEditError] = useState("");
+
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [showPinnedSheet, setShowPinnedSheet] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [scheduled, setScheduled] = useState<ScheduledMessage[]>([]);
+  const [showScheduledList, setShowScheduledList] = useState(false);
+  // Draft captured on long-press send; non-null while the schedule sheet is open
+  const [scheduleDraft, setScheduleDraft] = useState<string | null>(null);
 
   // Collapse the bottom safe-area padding in sync with the keyboard so the
   // composer sits flush above it (no double gap, no jump) — runs on UI thread
@@ -82,6 +110,54 @@ export default function ChatScreen() {
       }
     });
   }, [roomId, user]);
+
+  // Feature data: pinned list, saved bookmarks, pending scheduled sends
+  useEffect(() => {
+    if (!roomId || !user) return;
+
+    messageService
+      .getPinnedMessages(roomId)
+      .then(setPinnedMessages)
+      .catch((err) => console.error("[ChatScreen] load pinned", err));
+    savedMessageService
+      .getSavedIdsForRoom(roomId)
+      .then(setSavedIds)
+      .catch((err) => console.error("[ChatScreen] load saved ids", err));
+    scheduledMessageService
+      .getPendingForRoom(roomId)
+      .then(setScheduled)
+      .catch((err) => console.error("[ChatScreen] load scheduled", err));
+  }, [roomId, user]);
+
+  // Keep the pinned list in sync with realtime pin/unpin/recall updates
+  useEffect(() => {
+    setPinnedMessages((prev) => {
+      const byId = new Map(prev.map((m) => [m.id, m]));
+      let changed = false;
+
+      for (const m of messages) {
+        if (m.pinned_at && !m.deleted_at) {
+          const existing = byId.get(m.id);
+          if (
+            !existing ||
+            existing.pinned_at !== m.pinned_at ||
+            existing.content !== m.content
+          ) {
+            byId.set(m.id, m);
+            changed = true;
+          }
+        } else if (byId.has(m.id)) {
+          byId.delete(m.id);
+          changed = true;
+        }
+      }
+
+      if (!changed) return prev;
+      return [...byId.values()].sort((a, b) =>
+        (b.pinned_at ?? "").localeCompare(a.pinned_at ?? "")
+      );
+    });
+  }, [messages]);
 
   const handleLongPress = useCallback((message: Message) => {
     setSelectedMessage(message);
@@ -121,26 +197,134 @@ export default function ChatScreen() {
     }
   };
 
-  const handleDelete = useCallback((message: Message) => {
-    setDeleteTarget(message);
+  const handleRecall = useCallback((message: Message) => {
+    setRecallTarget(message);
   }, []);
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
+  const confirmRecall = async () => {
+    if (!recallTarget || !user) return;
 
-    const target = deleteTarget;
-    setDeleteTarget(null);
+    const target = recallTarget;
+    setRecallTarget(null);
 
     try {
-      await messageService.deleteMessage(target.id);
-      removeMessage(target.id, roomId!);
+      const updated = await messageService.deleteForEveryone(
+        target.id,
+        user.id
+      );
+      updateMessageInStore(updated);
     } catch (err: unknown) {
-      console.error("[ChatScreen] delete message", err);
+      console.error("[ChatScreen] recall message", err);
       const msg =
-        err instanceof Error ? err.message : t("message.deleteFailed");
+        err instanceof Error ? err.message : t("message.recallFailed");
       setChatError(msg);
     }
   };
+
+  const handlePin = useCallback(
+    async (message: Message, pinned: boolean) => {
+      try {
+        const updated = await messageService.setPinned(message.id, pinned);
+        updateMessageInStore(updated);
+        setPinnedMessages((prev) => {
+          const rest = prev.filter((m) => m.id !== updated.id);
+          if (!updated.pinned_at) return rest;
+          return [updated, ...rest].sort((a, b) =>
+            (b.pinned_at ?? "").localeCompare(a.pinned_at ?? "")
+          );
+        });
+      } catch (err: unknown) {
+        console.error("[ChatScreen] pin message", err);
+        setChatError(t("message.pinFailed"));
+      }
+    },
+    [updateMessageInStore, t]
+  );
+
+  const handleSave = useCallback(
+    async (message: Message, save: boolean) => {
+      if (!user) return;
+      try {
+        if (save) {
+          await savedMessageService.save(user.id, message.id);
+          setSavedIds((prev) => new Set(prev).add(message.id));
+        } else {
+          await savedMessageService.unsave(message.id);
+          setSavedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(message.id);
+            return next;
+          });
+        }
+      } catch (err: unknown) {
+        console.error("[ChatScreen] save message", err);
+        setChatError(t("message.saveFailed"));
+      }
+    },
+    [user, t]
+  );
+
+  const handleUndo = useCallback(async () => {
+    try {
+      const recalled = await undoSend();
+      if (recalled) inputRef.current?.setText(recalled);
+    } catch {
+      setChatError(t("undo.failed"));
+    }
+  }, [undoSend, t]);
+
+  const handleLongPressSend = useCallback((content: string) => {
+    setScheduleDraft(content);
+  }, []);
+
+  const handleSchedulePick = useCallback(
+    async (date: Date) => {
+      if (!user || !roomId || !scheduleDraft) return;
+
+      const draft = scheduleDraft;
+      setScheduleDraft(null);
+
+      try {
+        const created = await scheduledMessageService.schedule(
+          roomId,
+          user.id,
+          draft,
+          date,
+          replyTo?.id
+        );
+        setScheduled((prev) =>
+          [...prev, created].sort((a, b) =>
+            a.scheduled_at.localeCompare(b.scheduled_at)
+          )
+        );
+        setReplyTo(null);
+      } catch (err: unknown) {
+        console.error("[ChatScreen] schedule message", err);
+        inputRef.current?.setText(draft);
+        setChatError(t("schedule.failed"));
+      }
+    },
+    [user, roomId, scheduleDraft, replyTo, t]
+  );
+
+  const handleScheduleClose = useCallback(() => {
+    // Dismissed without picking — hand the draft back to the composer
+    if (scheduleDraft) inputRef.current?.setText(scheduleDraft);
+    setScheduleDraft(null);
+  }, [scheduleDraft]);
+
+  const handleCancelScheduled = useCallback(
+    async (item: ScheduledMessage) => {
+      try {
+        await scheduledMessageService.cancel(item.id);
+        setScheduled((prev) => prev.filter((s) => s.id !== item.id));
+      } catch (err: unknown) {
+        console.error("[ChatScreen] cancel scheduled", err);
+        setChatError(t("schedule.cancelFailed"));
+      }
+    },
+    [t]
+  );
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -218,6 +402,13 @@ export default function ChatScreen() {
           name={roomName || t("defaultRoomName")}
           avatarUrl={roomAvatar}
           participantCount={participantCount}
+          onPressMedia={() =>
+            router.push({ pathname: "/chat/media", params: { roomId } })
+          }
+        />
+        <PinnedBanner
+          pinnedMessages={pinnedMessages}
+          onPress={() => setShowPinnedSheet(true)}
         />
       </View>
 
@@ -232,12 +423,30 @@ export default function ChatScreen() {
       </View>
 
       <Animated.View style={composerInsetStyle}>
+        <UndoSendBar visible={!!undoableMessage} onUndo={handleUndo} />
         <TypingIndicator typingUsers={typingUsers} />
         {chatError ? (
           <View className="border-t border-divider bg-danger-bg px-4 py-2">
             <FormMessage>{chatError}</FormMessage>
           </View>
         ) : null}
+        {scheduled.length > 0 && (
+          <Pressable
+            className="flex-row items-center gap-2 border-t border-divider bg-surface px-4 py-2 active:bg-pressed"
+            onPress={() => setShowScheduledList(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t("schedule.listTitle")}
+          >
+            <Icon
+              name={{ ios: "clock", android: "schedule", web: "schedule" }}
+              tone="secondary"
+              size="sm"
+            />
+            <Text className="font-sans text-caption text-fg-secondary">
+              {t("schedule.pending", { count: scheduled.length })}
+            </Text>
+          </Pressable>
+        )}
         {replyTo && (
           <ReplyPreview
             message={replyTo}
@@ -245,8 +454,10 @@ export default function ChatScreen() {
           />
         )}
         <MessageInput
+          ref={inputRef}
           onSend={handleSend}
           onAttach={handleAttach}
+          onLongPressSend={handleLongPressSend}
           onTypingStart={startTyping}
           onTypingStop={stopTyping}
         />
@@ -255,21 +466,44 @@ export default function ChatScreen() {
       <MessageActions
         message={selectedMessage}
         visible={showActions}
+        isSaved={selectedMessage ? savedIds.has(selectedMessage.id) : false}
         onClose={() => setShowActions(false)}
         onReply={handleReply}
+        onPin={handlePin}
+        onSave={handleSave}
         onEdit={handleEdit}
-        onDelete={handleDelete}
+        onDelete={handleRecall}
       />
 
       <ConfirmDialog
-        visible={!!deleteTarget}
-        title={t("message.deleteTitle")}
-        message={t("message.deleteConfirm")}
-        confirmText={t("common:actions.delete")}
+        visible={!!recallTarget}
+        title={t("message.recallTitle")}
+        message={t("message.recallConfirm")}
+        confirmText={t("message.recallAction")}
         cancelText={t("common:actions.cancel")}
         destructive
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmRecall}
+        onCancel={() => setRecallTarget(null)}
+      />
+
+      <PinnedMessagesSheet
+        visible={showPinnedSheet}
+        pinnedMessages={pinnedMessages}
+        onClose={() => setShowPinnedSheet(false)}
+        onUnpin={(message) => handlePin(message, false)}
+      />
+
+      <ScheduleSheet
+        visible={scheduleDraft !== null}
+        onClose={handleScheduleClose}
+        onPick={handleSchedulePick}
+      />
+
+      <ScheduledMessagesSheet
+        visible={showScheduledList}
+        scheduledMessages={scheduled}
+        onClose={() => setShowScheduledList(false)}
+        onCancel={handleCancelScheduled}
       />
 
       <Dialog
