@@ -21,6 +21,3 @@ export function Spinner({ size = "large", color, fullScreen = false }: SpinnerPr
 
   return <ActivityIndicator size={size} color={tint} />;
 }
-
-/** @deprecated Use `Spinner` — alias kept until migration Phase 6. */
-export const LoadingSpinner = Spinner;
