@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,6 +14,9 @@ import { profileService } from "@/src/services/profileService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 import { PasswordInput } from "@/src/components/ui/PasswordInput";
+import { TextField } from "@/src/components/ui/TextField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
+import { StatusScreen } from "@/src/components/ui/StatusScreen";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9._-]{3,30}$/;
 
@@ -86,29 +88,29 @@ export default function RegisterScreen() {
 
   if (success) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-5xl">✉️</Text>
-        <Text className="mt-6 text-center text-xl font-bold text-gray-900">
-          {t("register.successTitle")}
-        </Text>
-        <Text className="mt-3 text-center text-base text-gray-500">
-          {t("register.successCheckEmail")}{"\n"}
-          <Text className="font-medium text-gray-700">{email}</Text>
-          {"\n"}{t("register.successVerify")}
-        </Text>
-        <View className="mt-8 w-full">
-          <Button
-            title={t("register.signIn")}
-            onPress={() => router.replace("/(auth)/login")}
-          />
-        </View>
-      </View>
+      <StatusScreen
+        icon={{ ios: "envelope", android: "mail", web: "mail" }}
+        tone="info"
+        title={t("register.successTitle")}
+        message={
+          <>
+            {t("register.successCheckEmail")}{"\n"}
+            <Text className="font-sans-medium text-fg">{email}</Text>
+            {"\n"}{t("register.successVerify")}
+          </>
+        }
+      >
+        <Button
+          title={t("register.signIn")}
+          onPress={() => router.replace("/(auth)/login")}
+        />
+      </StatusScreen>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
@@ -116,107 +118,72 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10 items-center">
-          <Text className="text-4xl font-bold text-primary-600">
+          <Text className="font-sans-bold text-display text-ink">
             {t("register.title")}
           </Text>
-          <Text className="mt-2 text-base text-gray-500">
+          <Text className="mt-2 font-sans text-body text-fg-tertiary">
             {t("register.subtitle")}
           </Text>
         </View>
 
         <View className="gap-4">
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.username.label")}
-            </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                formError || usernameError ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder={t("fields.username.placeholder")}
-              placeholderTextColor="#9CA3AF"
-              value={username}
-              onChangeText={(text) => {
-                setUsername(text);
-                if (formError) setFormError("");
-                if (usernameError) setUsernameError("");
-              }}
-              autoCapitalize="none"
-              textContentType="username"
-              autoComplete="username"
-            />
-            {usernameError ? (
-              <Text className="mt-1.5 text-sm text-red-600">{usernameError}</Text>
-            ) : null}
-          </View>
+          <TextField
+            label={t("fields.username.label")}
+            error={usernameError || !!formError}
+            placeholder={t("fields.username.placeholder")}
+            value={username}
+            onChangeText={(text) => {
+              setUsername(text);
+              if (formError) setFormError("");
+              if (usernameError) setUsernameError("");
+            }}
+            autoCapitalize="none"
+            textContentType="username"
+            autoComplete="username"
+          />
 
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.email.label")}
-            </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                formError ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder={t("fields.email.placeholder")}
-              placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (formError) setFormError("");
-              }}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
-            />
-          </View>
+          <TextField
+            label={t("fields.email.label")}
+            error={!!formError}
+            placeholder={t("fields.email.placeholder")}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (formError) setFormError("");
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+          />
 
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.password.label")}
-            </Text>
-            <PasswordInput
-              error={!!passwordError}
-              placeholder={t("fields.passwordHint")}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (passwordError) setPasswordError("");
-              }}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
-            {passwordError ? (
-              <Text className="mt-1.5 text-sm text-red-600">{passwordError}</Text>
-            ) : null}
-          </View>
+          <PasswordInput
+            label={t("fields.password.label")}
+            error={passwordError}
+            placeholder={t("fields.passwordHint")}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (passwordError) setPasswordError("");
+            }}
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
 
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.confirmPassword.label")}
-            </Text>
-            <PasswordInput
-              error={!!confirmPasswordError}
-              placeholder={t("fields.confirmPassword.placeholder")}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (confirmPasswordError) setConfirmPasswordError("");
-              }}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
-            {confirmPasswordError ? (
-              <Text className="mt-1.5 text-sm text-red-600">
-                {confirmPasswordError}
-              </Text>
-            ) : null}
-          </View>
+          <PasswordInput
+            label={t("fields.confirmPassword.label")}
+            error={confirmPasswordError}
+            placeholder={t("fields.confirmPassword.placeholder")}
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (confirmPasswordError) setConfirmPasswordError("");
+            }}
+            textContentType="newPassword"
+            autoComplete="new-password"
+          />
 
-          {formError ? (
-            <Text className="text-sm text-red-600">{formError}</Text>
-          ) : null}
+          {formError ? <FormMessage>{formError}</FormMessage> : null}
 
           <Button
             title={
@@ -230,11 +197,11 @@ export default function RegisterScreen() {
           />
 
           <View className="mt-4 flex-row items-center justify-center gap-1">
-            <Text className="text-sm text-gray-500">
+            <Text className="font-sans text-caption text-fg-tertiary">
               {t("register.haveAccount")}
             </Text>
             <Link href="/(auth)/login" asChild>
-              <Text className="text-sm font-semibold text-primary-600">
+              <Text className="font-sans-semibold text-caption text-ink">
                 {t("register.signIn")}
               </Text>
             </Link>

@@ -1,4 +1,5 @@
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
+import type { ColorValue } from "react-native";
 import { useThemeColors, iconSize } from "@/src/theme";
 
 export type IconName = SymbolViewProps["name"];
@@ -16,7 +17,7 @@ interface IconProps {
   size?: keyof typeof iconSize | number;
   tone?: IconTone;
   /** Escape hatch for non-token colors (e.g. tab bar tint callbacks). */
-  color?: string;
+  color?: ColorValue;
 }
 
 /**

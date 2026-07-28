@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,8 @@ import {
 import { useAuthStore } from "@/src/stores/authStore";
 import { Button } from "@/src/components/ui/Button";
 import { PasswordInput } from "@/src/components/ui/PasswordInput";
+import { TextField } from "@/src/components/ui/TextField";
+import { FormMessage } from "@/src/components/ui/FormMessage";
 
 // ISO 3166 country codes used by react-native-country-flag
 const LANGUAGE_FLAG_ISO: Record<AppLanguage, string> = {
@@ -60,12 +61,12 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Language toggle — reachable before signing in */}
       <Pressable
-        className="absolute right-6 z-10 flex-row items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 active:bg-gray-200"
+        className="absolute right-6 z-10 flex-row items-center gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 active:bg-pressed"
         style={{ top: insets.top + 12 }}
         onPress={() => void setAppLanguage(nextLanguage)}
       >
@@ -74,7 +75,7 @@ export default function LoginScreen() {
           size={14}
           style={{ borderRadius: 3 }}
         />
-        <Text className="text-xs font-semibold text-gray-700">
+        <Text className="font-sans-semibold text-label text-fg-secondary">
           {LANGUAGE_LABELS[currentLanguage]}
         </Text>
       </Pressable>
@@ -84,65 +85,52 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-10 items-center">
-          <Text className="text-4xl font-bold text-black">
+          <Text className="font-sans-bold text-display text-ink">
             {t("common:appName")}
           </Text>
-          <Text className="mt-2 text-base text-gray-500">
+          <Text className="mt-2 font-sans text-body text-fg-tertiary">
             {t("tagline")}
           </Text>
         </View>
 
         <View className="gap-4">
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.identifier.label")}
-            </Text>
-            <TextInput
-              className={`h-12 rounded-xl border bg-gray-50 px-4 text-base text-gray-900 ${
-                error ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder={t("fields.identifier.placeholder")}
-              placeholderTextColor="#9CA3AF"
-              value={identifier}
-              onChangeText={(text) => {
-                setIdentifier(text);
-                if (error) setError("");
-              }}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              textContentType="username"
-              autoComplete="username"
-            />
-          </View>
+          <TextField
+            label={t("fields.identifier.label")}
+            error={!!error}
+            placeholder={t("fields.identifier.placeholder")}
+            value={identifier}
+            onChangeText={(text) => {
+              setIdentifier(text);
+              if (error) setError("");
+            }}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            textContentType="username"
+            autoComplete="username"
+          />
 
-          <View>
-            <Text className="mb-1.5 text-sm font-medium text-gray-700">
-              {t("fields.password.label")}
-            </Text>
-            <PasswordInput
-              error={!!error}
-              placeholder={t("fields.password.placeholder")}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (error) setError("");
-              }}
-              textContentType="password"
-              autoComplete="password"
-            />
-          </View>
+          <PasswordInput
+            label={t("fields.password.label")}
+            error={!!error}
+            placeholder={t("fields.password.placeholder")}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError("");
+            }}
+            textContentType="password"
+            autoComplete="password"
+          />
 
           <View className="items-end">
             <Link href="/(auth)/forgot-password" asChild>
-              <Text className="text-sm font-medium text-primary-600">
+              <Text className="font-sans-medium text-caption text-ink">
                 {t("login.forgotPassword")}
               </Text>
             </Link>
           </View>
 
-          {error ? (
-            <Text className="text-sm text-red-600">{error}</Text>
-          ) : null}
+          {error ? <FormMessage>{error}</FormMessage> : null}
 
           <Button
             title={t("login.submit")}
@@ -151,11 +139,11 @@ export default function LoginScreen() {
           />
 
           <View className="mt-4 flex-row items-center justify-center gap-1">
-            <Text className="text-sm text-gray-500">
+            <Text className="font-sans text-caption text-fg-tertiary">
               {t("login.noAccount")}
             </Text>
             <Link href="/(auth)/register" asChild>
-              <Text className="text-sm font-semibold text-primary-600">
+              <Text className="font-sans-semibold text-caption text-ink">
                 {t("login.signUpNow")}
               </Text>
             </Link>

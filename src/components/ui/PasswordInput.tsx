@@ -5,15 +5,21 @@ import { TextField } from "./TextField";
 import { Icon } from "./Icon";
 
 interface PasswordInputProps extends TextInputProps {
-  error?: boolean;
+  label?: string;
+  error?: string | boolean;
 }
 
-export function PasswordInput({ error = false, ...props }: PasswordInputProps) {
+export function PasswordInput({
+  label,
+  error = false,
+  ...props
+}: PasswordInputProps) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   return (
     <TextField
+      label={label}
       error={error}
       secureTextEntry={!visible}
       rightSlot={

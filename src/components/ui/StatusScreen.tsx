@@ -7,7 +7,7 @@ interface StatusScreenProps {
   icon: IconName;
   tone?: "success" | "info";
   title: string;
-  message: string;
+  message: ReactNode;
   /** CTA area (usually one or two `Button`s). */
   children?: ReactNode;
 }

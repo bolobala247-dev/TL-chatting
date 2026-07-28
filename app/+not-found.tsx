@@ -7,13 +7,13 @@ export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: t("notFound.title") }} />
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-2xl font-bold text-gray-900">404</Text>
-        <Text className="mt-2 text-base text-gray-500">
+      <View className="flex-1 items-center justify-center bg-background px-6">
+        <Text className="font-sans-bold text-headline text-fg">404</Text>
+        <Text className="mt-2 font-sans text-body text-fg-tertiary">
           {t("notFound.message")}
         </Text>
         <Link href="/" className="mt-6">
-          <Text className="text-base font-semibold text-primary-600">
+          <Text className="font-sans-semibold text-body text-ink">
             {t("notFound.goHome")}
           </Text>
         </Link>

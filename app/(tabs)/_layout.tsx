@@ -1,25 +1,33 @@
 import { Tabs } from "expo-router";
-import { SymbolView } from "expo-symbols";
 import { useTranslation } from "react-i18next";
+import { Icon } from "@/src/components/ui/Icon";
+import { useThemeColors } from "@/src/theme";
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#2563EB",
-        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarActiveTintColor: colors.ink,
+        tabBarInactiveTintColor: colors.fgTertiary,
         tabBarStyle: {
+          backgroundColor: colors.surface,
           borderTopWidth: 1,
-          borderTopColor: "#F1F5F9",
+          borderTopColor: colors.divider,
+        },
+        tabBarLabelStyle: {
+          fontFamily: "Inter_500Medium",
+          fontSize: 11,
         },
         headerStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.surface,
         },
         headerShadowVisible: false,
         headerTitleStyle: {
-          fontWeight: "700",
-          fontSize: 18,
+          fontFamily: "Inter_600SemiBold",
+          fontSize: 17,
+          color: colors.fg,
         },
       }}
     >
@@ -28,10 +36,10 @@ export default function TabLayout() {
         options={{
           title: t("tabs.messages"),
           tabBarIcon: ({ color }) => (
-            <SymbolView
+            <Icon
               name={{ ios: "bubble.left.and.bubble.right", android: "chat", web: "chat" }}
-              tintColor={color}
-              size={24}
+              color={color}
+              size="lg"
             />
           ),
         }}
@@ -41,10 +49,10 @@ export default function TabLayout() {
         options={{
           title: t("tabs.contacts"),
           tabBarIcon: ({ color }) => (
-            <SymbolView
+            <Icon
               name={{ ios: "person.2", android: "group", web: "group" }}
-              tintColor={color}
-              size={24}
+              color={color}
+              size="lg"
             />
           ),
         }}
@@ -54,10 +62,10 @@ export default function TabLayout() {
         options={{
           title: t("tabs.settings"),
           tabBarIcon: ({ color }) => (
-            <SymbolView
+            <Icon
               name={{ ios: "gearshape", android: "settings", web: "settings" }}
-              tintColor={color}
-              size={24}
+              color={color}
+              size="lg"
             />
           ),
         }}
