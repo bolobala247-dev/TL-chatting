@@ -43,6 +43,7 @@ yarn-error.*
 !.cursor/rules/**
 .cursor/debug-*.log
 .cursor/plans/
+.qoder/
 .vscode/
 .idea/
 
