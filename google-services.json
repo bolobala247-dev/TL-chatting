@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "451404170272",
+    "project_id": "haruthao-tlchatting",
+    "storage_bucket": "haruthao-tlchatting.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451404170272:android:e2188eed6a9ee43a87a845",
+        "android_client_info": {
+          "package_name": "com.haruthao.tlchatting"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO5gc4bPaRBcoqtNcs6sW1k0H1rasyoAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,7 +8,7 @@ on:
 
 jobs:
   build_android:
-    name: Build Android app bundle
+    name: Build Android APK
     type: build
     params:
       platform: android

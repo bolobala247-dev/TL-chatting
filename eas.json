@@ -24,8 +24,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "distribution": "internal",
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://elevsuvbbittizjxrfll.supabase.co",
