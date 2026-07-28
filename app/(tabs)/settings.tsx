@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "@/src/stores/authStore";
 import { profileService } from "@/src/services/profileService";
+import {
+  getNotificationPermissionStatus,
+  registerPushNotificationsForUser,
+} from "@/src/services/notificationService";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Button } from "@/src/components/ui/Button";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
@@ -25,6 +29,45 @@ export default function SettingsScreen() {
   const [profileError, setProfileError] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [signOutError, setSignOutError] = useState("");
+  const [notificationStatus, setNotificationStatus] = useState("");
+  const [notificationError, setNotificationError] = useState("");
+  const [registeringNotifications, setRegisteringNotifications] =
+    useState(false);
+
+  const refreshNotificationStatus = useCallback(async () => {
+    const status = await getNotificationPermissionStatus();
+    if (status === "unsupported") {
+      setNotificationStatus("Thiết bị này không hỗ trợ push Android");
+      return;
+    }
+    if (status === "granted") {
+      setNotificationStatus("Đã bật quyền thông báo");
+      return;
+    }
+    setNotificationStatus("Chưa bật quyền thông báo");
+  }, []);
+
+  useEffect(() => {
+    void refreshNotificationStatus();
+  }, [refreshNotificationStatus]);
+
+  const handleEnableNotifications = async () => {
+    if (!user) return;
+
+    setRegisteringNotifications(true);
+    setNotificationError("");
+
+    const result = await registerPushNotificationsForUser(user.id);
+    await refreshNotificationStatus();
+
+    if (result.ok) {
+      setNotificationStatus("Đã đăng ký thông báo thành công");
+    } else {
+      setNotificationError(result.reason);
+    }
+
+    setRegisteringNotifications(false);
+  };
 
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -165,6 +208,27 @@ export default function SettingsScreen() {
             onPress={handleSaveProfile}
             loading={saving}
             variant="primary"
+          />
+        </View>
+      </View>
+
+      <View className="mt-8 px-4">
+        <Text className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
+          Thông báo
+        </Text>
+
+        <View className="gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <Text className="text-sm text-gray-600">{notificationStatus}</Text>
+
+          {notificationError ? (
+            <Text className="text-sm text-red-600">{notificationError}</Text>
+          ) : null}
+
+          <Button
+            title="Bật thông báo tin nhắn"
+            onPress={handleEnableNotifications}
+            loading={registeringNotifications}
+            variant="secondary"
           />
         </View>
       </View>

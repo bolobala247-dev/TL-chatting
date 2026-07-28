@@ -18,6 +18,22 @@ export const pushTokenService = {
     platform: InsertTables<"push_tokens">["platform"],
     deviceId?: string
   ): Promise<void> {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user || session.user.id !== userId) {
+      throw new Error("Phiên đăng nhập chưa sẵn sàng");
+    }
+
+    if (deviceId) {
+      await supabase
+        .from("push_tokens")
+        .delete()
+        .eq("user_id", userId)
+        .eq("device_id", deviceId);
+    }
+
     const row = {
       user_id: userId,
       token,
@@ -26,16 +42,16 @@ export const pushTokenService = {
       updated_at: new Date().toISOString(),
     };
 
-    const { error: upsertError } = await supabase
+    const { error: insertError } = await supabase
       .from("push_tokens")
-      .upsert(row, { onConflict: "user_id,token" });
+      .insert(row);
 
-    if (upsertError) {
-      const { error: insertError } = await supabase
+    if (insertError) {
+      const { error: upsertError } = await supabase
         .from("push_tokens")
-        .insert(row);
+        .upsert(row, { onConflict: "user_id,token" });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
     }
 
     currentToken = token;
