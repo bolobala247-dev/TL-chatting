@@ -4,6 +4,7 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -16,16 +17,19 @@ import { SearchField } from "@/src/components/ui/SearchField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { useTabBarSpace } from "@/src/components/ui/TabBar";
+import { useThemeColors } from "@/src/theme";
 import type { ProfileSearchResult } from "@/src/types";
 
 export default function ContactsScreen() {
   const { t } = useTranslation("chat");
   const router = useRouter();
+  const colors = useThemeColors();
   const tabBarSpace = useTabBarSpace();
   const user = useAuthStore((s) => s.user);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProfileSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [chatError, setChatError] = useState("");
 
   const handleSearch = useCallback(
@@ -48,6 +52,20 @@ export default function ContactsScreen() {
     },
     [user]
   );
+
+  // Pull-to-refresh re-runs the current search without the field spinner
+  const handleRefresh = useCallback(async () => {
+    if (!query.trim() || !user) return;
+    setRefreshing(true);
+    try {
+      const data = await profileService.searchUsers(query.trim(), user.id);
+      setResults(data);
+    } catch {
+      // keep the previous results on a failed refresh
+    } finally {
+      setRefreshing(false);
+    }
+  }, [query, user]);
 
   const handleStartChat = useCallback(
     async (profile: ProfileSearchResult) => {
@@ -122,6 +140,13 @@ export default function ContactsScreen() {
         // Single tap opens a chat even while the keyboard is up
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.fgTertiary}
+          />
+        }
         // Bottom padding keeps rows clear of the floating tab bar
         contentContainerStyle={
           results.length === 0

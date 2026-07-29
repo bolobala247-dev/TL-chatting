@@ -11,7 +11,9 @@ import { useTranslation } from "react-i18next";
 import { useRooms } from "@/src/hooks/useRooms";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useRoomStore } from "@/src/stores/roomStore";
+import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { RoomListItem } from "@/src/components/rooms/RoomListItem";
+import { RoomActionsSheet } from "@/src/components/rooms/RoomActionsSheet";
 import { CreateRoomModal } from "@/src/components/rooms/CreateRoomModal";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { Icon } from "@/src/components/ui/Icon";
@@ -28,6 +30,8 @@ export default function ChatsScreen() {
   const toggleBookmark = useRoomStore((s) => s.toggleBookmark);
   const { rooms, loading, refresh } = useRooms();
   const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [actionRoom, setActionRoom] = useState<RoomWithLastMessage | null>(null);
+  const [showRoomActions, setShowRoomActions] = useState(false);
 
   const handleRoomPress = useCallback(
     (roomId: string) => {
@@ -36,10 +40,19 @@ export default function ChatsScreen() {
     [router]
   );
 
-  // Long-press pins/unpins the conversation (optimistic in the store)
-  const handleRoomLongPress = useCallback(
+  // Long-press opens the conversation menu (pin/unpin) with haptic feedback
+  const handleRoomLongPress = useCallback((room: RoomWithLastMessage) => {
+    hapticImpact();
+    setActionRoom(room);
+    setShowRoomActions(true);
+  }, []);
+
+  // Pins/unpins the conversation (optimistic in the store)
+  const handleTogglePin = useCallback(
     (room: RoomWithLastMessage) => {
-      if (user) void toggleBookmark(room.room_id, user.id);
+      if (!user) return;
+      hapticSelection();
+      void toggleBookmark(room.room_id, user.id);
     },
     [user, toggleBookmark]
   );
@@ -50,9 +63,10 @@ export default function ChatsScreen() {
         room={item}
         onPress={handleRoomPress}
         onLongPress={handleRoomLongPress}
+        onTogglePin={handleTogglePin}
       />
     ),
-    [handleRoomPress, handleRoomLongPress]
+    [handleRoomPress, handleRoomLongPress, handleTogglePin]
   );
 
   const renderEmpty = useCallback(() => {
@@ -124,6 +138,13 @@ export default function ChatsScreen() {
           size="md"
         />
       </Pressable>
+
+      <RoomActionsSheet
+        room={actionRoom}
+        visible={showRoomActions}
+        onClose={() => setShowRoomActions(false)}
+        onTogglePin={handleTogglePin}
+      />
 
       <CreateRoomModal
         visible={showCreateRoom}

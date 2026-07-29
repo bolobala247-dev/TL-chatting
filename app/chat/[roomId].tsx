@@ -576,6 +576,7 @@ export default function ChatScreen() {
           showPollVoters={isGroup}
           onLoadMore={loadMore}
           onMessageLongPress={handleLongPress}
+          onSwipeReply={handleReply}
           onToggleReaction={toggleReaction}
           onShowReactions={handleShowReactions}
           onOpenAlbum={handleOpenAlbum}

@@ -1,5 +1,19 @@
-import { memo } from "react";
-import { View, Text, Pressable, Linking } from "react-native";
+import { memo, useCallback } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  Linking,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -7,6 +21,7 @@ import { useChatStore } from "@/src/stores/chatStore";
 import { hasSeen } from "@/src/lib/receipts";
 import { getAttachments } from "@/src/lib/messageMeta";
 import { getMentions, splitByMentions } from "@/src/lib/mentions";
+import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { Icon } from "@/src/components/ui/Icon";
 import { ReactionBar } from "./ReactionBar";
 import { AlbumGrid } from "./AlbumGrid";
@@ -19,6 +34,8 @@ interface MessageBubbleProps {
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
   onLongPress?: (message: MessageWithMeta) => void;
+  /** Swipe the bubble toward the center to quote-reply (native only). */
+  onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
   onShowReactions?: (message: MessageWithMeta) => void;
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
@@ -26,6 +43,13 @@ interface MessageBubbleProps {
   onViewVoters?: (message: MessageWithMeta) => void;
   onOpenThread?: (message: MessageWithMeta) => void;
 }
+
+/** Drag distance that arms the swipe-to-reply on release. */
+const REPLY_TRIGGER_DISTANCE = 56;
+/** Maximum bubble drag — soft stop just past the trigger point. */
+const REPLY_MAX_DRAG = 88;
+/** Bubbles stop growing past this width on tablets. */
+const BUBBLE_MAX_WIDTH = 560;
 
 function formatTime(dateStr: string, locale: string): string {
   const date = new Date(dateStr);
@@ -102,6 +126,7 @@ export const MessageBubble = memo(function MessageBubble({
   participants,
   showPollVoters,
   onLongPress,
+  onSwipeReply,
   onToggleReaction,
   onShowReactions,
   onOpenAlbum,
@@ -111,9 +136,50 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
+  const { width: screenWidth } = useWindowDimensions();
   const isMine = message.sender_id === userId;
   const isDeleted = !!message.deleted_at;
   const isPoll = message.type === "poll";
+
+  // Swipe-to-reply: drag the bubble toward the center, release past the
+  // threshold to quote — a touch idiom, so web keeps taps only
+  const dragX = useSharedValue(0);
+  const canSwipeReply =
+    Platform.OS !== "web" &&
+    !!onSwipeReply &&
+    !isDeleted &&
+    !message.id.startsWith("temp-");
+
+  const triggerReply = useCallback(() => {
+    hapticSelection();
+    onSwipeReply?.(message);
+  }, [onSwipeReply, message]);
+
+  // Incoming bubbles swipe right, own bubbles swipe left (toward center)
+  const dir = isMine ? -1 : 1;
+  const replyPan = Gesture.Pan()
+    .enabled(canSwipeReply)
+    .activeOffsetX(isMine ? [-16, 10000] : [-10000, 16])
+    .failOffsetY([-12, 12])
+    .onChange((e) => {
+      const progress = Math.min(Math.max(e.translationX * dir, 0), REPLY_MAX_DRAG);
+      dragX.value = progress * dir;
+    })
+    .onEnd(() => {
+      if (Math.abs(dragX.value) >= REPLY_TRIGGER_DISTANCE) {
+        runOnJS(triggerReply)();
+      }
+      dragX.value = withSpring(0, { damping: 22, stiffness: 320 });
+    });
+
+  const bubbleDragStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: dragX.value }],
+  }));
+
+  const replyHintStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(Math.abs(dragX.value) / REPLY_TRIGGER_DISTANCE, 1),
+  }));
+
   const albumImages =
     !isDeleted && message.type === "image" ? getAttachments(message) : [];
   const mentions = isDeleted ? [] : getMentions(message);
@@ -135,12 +201,52 @@ export const MessageBubble = memo(function MessageBubble({
     );
   }
 
+  // Tablets: 80% of a large screen is too wide for comfortable reading
+  const bubbleMaxWidth =
+    Platform.OS !== "web" && screenWidth >= 768 ? BUBBLE_MAX_WIDTH : undefined;
+
   return (
     <Pressable
       className={`my-0.5 max-w-[80%] px-3 ${isMine ? "self-end" : "self-start"}`}
-      onLongPress={isDeleted ? undefined : () => onLongPress?.(message)}
+      style={bubbleMaxWidth != null ? { maxWidth: bubbleMaxWidth } : undefined}
+      onLongPress={
+        isDeleted
+          ? undefined
+          : () => {
+              hapticImpact();
+              onLongPress?.(message);
+            }
+      }
       delayLongPress={300}
     >
+      {canSwipeReply && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            replyHintStyle,
+            {
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              justifyContent: "center",
+              ...(isMine ? { right: 12 } : { left: 12 }),
+            },
+          ]}
+        >
+          <Icon
+            name={{
+              ios: "arrowshape.turn.up.left",
+              android: "reply",
+              web: "reply",
+            }}
+            tone="tertiary"
+            size="sm"
+          />
+        </Animated.View>
+      )}
+
+      <GestureDetector gesture={replyPan}>
+        <Animated.View style={bubbleDragStyle}>
       <View
         className={`rounded-2xl px-3.5 py-2.5 ${
           isMine
@@ -308,6 +414,8 @@ export const MessageBubble = memo(function MessageBubble({
           onOpenDetails={() => onShowReactions?.(message)}
         />
       )}
+        </Animated.View>
+      </GestureDetector>
     </Pressable>
   );
 });

@@ -5,7 +5,11 @@
     "emptySubtitle": "Tap the + button to start chatting with friends",
     "noMessages": "No messages yet",
     "unread_one": "{{count}} unread message",
-    "unread_other": "{{count}} unread messages"
+    "unread_other": "{{count}} unread messages",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinConversation": "Pin conversation",
+    "unpinConversation": "Unpin conversation"
   },
   "create": {
     "title": "New conversation",

@@ -16,6 +16,8 @@ interface MessageListProps {
   showPollVoters?: boolean;
   onLoadMore: () => void;
   onMessageLongPress?: (message: MessageWithMeta) => void;
+  /** Swipe-to-reply on a bubble (native only). */
+  onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
   onShowReactions?: (message: MessageWithMeta) => void;
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
@@ -32,6 +34,7 @@ export function MessageList({
   showPollVoters,
   onLoadMore,
   onMessageLongPress,
+  onSwipeReply,
   onToggleReaction,
   onShowReactions,
   onOpenAlbum,
@@ -56,6 +59,7 @@ export function MessageList({
         participants={participants}
         showPollVoters={showPollVoters}
         onLongPress={onMessageLongPress}
+        onSwipeReply={onSwipeReply}
         onToggleReaction={onToggleReaction}
         onShowReactions={onShowReactions}
         onOpenAlbum={onOpenAlbum}
@@ -68,6 +72,7 @@ export function MessageList({
       participants,
       showPollVoters,
       onMessageLongPress,
+      onSwipeReply,
       onToggleReaction,
       onShowReactions,
       onOpenAlbum,

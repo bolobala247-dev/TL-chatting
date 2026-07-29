@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
 import {
   Inter_400Regular,
@@ -11,7 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initI18n } from "@/src/i18n";
-import { ThemeProvider, useTheme, useThemeBootstrap } from "@/src/theme";
+import { ThemeProvider, useTheme, useThemeBootstrap, useThemeColors } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import { usePresenceHeartbeat } from "@/src/hooks/usePresence";
@@ -29,6 +30,7 @@ function AuthGate() {
   const { session, initialized } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const colors = useThemeColors();
 
   useNotifications(!!session && initialized);
   // Own presence heartbeat + privacy settings bootstrap (owner-only writes)
@@ -54,7 +56,18 @@ function AuthGate() {
     return <Spinner fullScreen />;
   }
 
-  return <Slot />;
+  // Native stack so detail screens (chat, search, settings...) get platform
+  // slide transitions and edge/full-screen swipe-back on mobile
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true,
+      }}
+    />
+  );
 }
 
 // StatusBar must follow the resolved theme, so it lives under ThemeProvider
@@ -102,11 +115,13 @@ export default function RootLayout() {
   }
 
   return (
-    <KeyboardProvider>
-      <ThemeProvider>
-        <ThemedApp />
-      </ThemeProvider>
-      <VercelInsights />
-    </KeyboardProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
+        <ThemeProvider>
+          <ThemedApp />
+        </ThemeProvider>
+        <VercelInsights />
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

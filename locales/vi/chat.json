@@ -4,7 +4,11 @@
     "emptyTitle": "Chưa có cuộc trò chuyện nào",
     "emptySubtitle": "Nhấn nút + để bắt đầu trò chuyện với bạn bè",
     "noMessages": "Chưa có tin nhắn",
-    "unread_other": "{{count}} tin nhắn chưa đọc"
+    "unread_other": "{{count}} tin nhắn chưa đọc",
+    "pin": "Ghim",
+    "unpin": "Bỏ ghim",
+    "pinConversation": "Ghim hội thoại",
+    "unpinConversation": "Bỏ ghim hội thoại"
   },
   "create": {
     "title": "Cuộc trò chuyện mới",
