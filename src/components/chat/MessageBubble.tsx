@@ -1,11 +1,27 @@
-import { memo } from "react";
-import { View, Text, Pressable, Linking } from "react-native";
+import { memo, useCallback } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  Linking,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { hasSeen } from "@/src/lib/receipts";
 import { getAttachments } from "@/src/lib/messageMeta";
+import { getMentions, splitByMentions } from "@/src/lib/mentions";
+import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { Icon } from "@/src/components/ui/Icon";
 import { ReactionBar } from "./ReactionBar";
 import { AlbumGrid } from "./AlbumGrid";
@@ -18,12 +34,22 @@ interface MessageBubbleProps {
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
   onLongPress?: (message: MessageWithMeta) => void;
+  /** Swipe the bubble toward the center to quote-reply (native only). */
+  onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
   onShowReactions?: (message: MessageWithMeta) => void;
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  onOpenThread?: (message: MessageWithMeta) => void;
 }
+
+/** Drag distance that arms the swipe-to-reply on release. */
+const REPLY_TRIGGER_DISTANCE = 56;
+/** Maximum bubble drag — soft stop just past the trigger point. */
+const REPLY_MAX_DRAG = 88;
+/** Bubbles stop growing past this width on tablets. */
+const BUBBLE_MAX_WIDTH = 560;
 
 function formatTime(dateStr: string, locale: string): string {
   const date = new Date(dateStr);
@@ -50,6 +76,49 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   );
 }
 
+// Reply-count chip: counts loaded thread replies in the store (cheap,
+// no extra query) — the thread screen fetches the full list.
+function ThreadChip({
+  message,
+  isMine,
+  onPress,
+}: {
+  message: MessageWithMeta;
+  isMine: boolean;
+  onPress?: () => void;
+}) {
+  const { t } = useTranslation("chat");
+  const messages = useChatStore((s) => s.messages[message.room_id] ?? []);
+  const replyCount = messages.filter((m) => m.thread_id === message.id).length;
+
+  if (replyCount === 0) return null;
+
+  return (
+    <Pressable
+      className="mt-1 flex-row items-center gap-1 self-start active:opacity-60"
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Icon
+        name={{
+          ios: "bubble.left.and.bubble.right",
+          android: "forum",
+          web: "forum",
+        }}
+        tone={isMine ? "inverse" : "tertiary"}
+        size={12}
+      />
+      <Text
+        className={`font-sans-medium text-label ${
+          isMine ? "text-ink-inverse/80" : "text-fg-secondary"
+        }`}
+      >
+        {t("thread.replyCount", { count: replyCount })}
+      </Text>
+    </Pressable>
+  );
+}
+
 // Memoized: message object identity changes on any patch, so memo keeps
 // FlashList re-renders cheap while reactions/votes/receipts update live
 export const MessageBubble = memo(function MessageBubble({
@@ -57,19 +126,63 @@ export const MessageBubble = memo(function MessageBubble({
   participants,
   showPollVoters,
   onLongPress,
+  onSwipeReply,
   onToggleReaction,
   onShowReactions,
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onOpenThread,
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
+  const { width: screenWidth } = useWindowDimensions();
   const isMine = message.sender_id === userId;
   const isDeleted = !!message.deleted_at;
   const isPoll = message.type === "poll";
+
+  // Swipe-to-reply: drag the bubble toward the center, release past the
+  // threshold to quote — a touch idiom, so web keeps taps only
+  const dragX = useSharedValue(0);
+  const canSwipeReply =
+    Platform.OS !== "web" &&
+    !!onSwipeReply &&
+    !isDeleted &&
+    !message.id.startsWith("temp-");
+
+  const triggerReply = useCallback(() => {
+    hapticSelection();
+    onSwipeReply?.(message);
+  }, [onSwipeReply, message]);
+
+  // Incoming bubbles swipe right, own bubbles swipe left (toward center)
+  const dir = isMine ? -1 : 1;
+  const replyPan = Gesture.Pan()
+    .enabled(canSwipeReply)
+    .activeOffsetX(isMine ? [-16, 10000] : [-10000, 16])
+    .failOffsetY([-12, 12])
+    .onChange((e) => {
+      const progress = Math.min(Math.max(e.translationX * dir, 0), REPLY_MAX_DRAG);
+      dragX.value = progress * dir;
+    })
+    .onEnd(() => {
+      if (Math.abs(dragX.value) >= REPLY_TRIGGER_DISTANCE) {
+        runOnJS(triggerReply)();
+      }
+      dragX.value = withSpring(0, { damping: 22, stiffness: 320 });
+    });
+
+  const bubbleDragStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: dragX.value }],
+  }));
+
+  const replyHintStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(Math.abs(dragX.value) / REPLY_TRIGGER_DISTANCE, 1),
+  }));
+
   const albumImages =
     !isDeleted && message.type === "image" ? getAttachments(message) : [];
+  const mentions = isDeleted ? [] : getMentions(message);
 
   // Receipt ticks: one check = sent, two = seen by every other participant
   const showReceipt =
@@ -88,12 +201,52 @@ export const MessageBubble = memo(function MessageBubble({
     );
   }
 
+  // Tablets: 80% of a large screen is too wide for comfortable reading
+  const bubbleMaxWidth =
+    Platform.OS !== "web" && screenWidth >= 768 ? BUBBLE_MAX_WIDTH : undefined;
+
   return (
     <Pressable
       className={`my-0.5 max-w-[80%] px-3 ${isMine ? "self-end" : "self-start"}`}
-      onLongPress={isDeleted ? undefined : () => onLongPress?.(message)}
+      style={bubbleMaxWidth != null ? { maxWidth: bubbleMaxWidth } : undefined}
+      onLongPress={
+        isDeleted
+          ? undefined
+          : () => {
+              hapticImpact();
+              onLongPress?.(message);
+            }
+      }
       delayLongPress={300}
     >
+      {canSwipeReply && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            replyHintStyle,
+            {
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              justifyContent: "center",
+              ...(isMine ? { right: 12 } : { left: 12 }),
+            },
+          ]}
+        >
+          <Icon
+            name={{
+              ios: "arrowshape.turn.up.left",
+              android: "reply",
+              web: "reply",
+            }}
+            tone="tertiary"
+            size="sm"
+          />
+        </Animated.View>
+      )}
+
+      <GestureDetector gesture={replyPan}>
+        <Animated.View style={bubbleDragStyle}>
       <View
         className={`rounded-2xl px-3.5 py-2.5 ${
           isMine
@@ -170,7 +323,23 @@ export const MessageBubble = memo(function MessageBubble({
                   isMine ? "text-ink-inverse" : "text-fg"
                 }`}
               >
-                {message.content}
+                {mentions.length > 0
+                  ? splitByMentions(message.content, mentions).map(
+                      (seg, i) =>
+                        seg.isMention ? (
+                          <Text
+                            key={i}
+                            className={`font-sans-semibold ${
+                              isMine ? "text-ink-inverse" : "text-fg"
+                            }`}
+                          >
+                            {seg.text}
+                          </Text>
+                        ) : (
+                          seg.text
+                        )
+                    )
+                  : message.content}
               </Text>
             )}
           </>
@@ -226,6 +395,14 @@ export const MessageBubble = memo(function MessageBubble({
             </View>
           )}
         </View>
+
+        {!isDeleted && !message.thread_id && (
+          <ThreadChip
+            message={message}
+            isMine={isMine}
+            onPress={() => onOpenThread?.(message)}
+          />
+        )}
       </View>
 
       {!isDeleted && (message.message_reactions?.length ?? 0) > 0 && (
@@ -237,6 +414,8 @@ export const MessageBubble = memo(function MessageBubble({
           onOpenDetails={() => onShowReactions?.(message)}
         />
       )}
+        </Animated.View>
+      </GestureDetector>
     </Pressable>
   );
 });

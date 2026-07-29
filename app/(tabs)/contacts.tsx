@@ -4,6 +4,7 @@ import {
   Text,
   FlatList,
   Pressable,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -14,15 +15,21 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Icon } from "@/src/components/ui/Icon";
 import { SearchField } from "@/src/components/ui/SearchField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
+import { EmptyState } from "@/src/components/ui/EmptyState";
+import { useTabBarSpace } from "@/src/components/ui/TabBar";
+import { useThemeColors } from "@/src/theme";
 import type { ProfileSearchResult } from "@/src/types";
 
 export default function ContactsScreen() {
   const { t } = useTranslation("chat");
   const router = useRouter();
+  const colors = useThemeColors();
+  const tabBarSpace = useTabBarSpace();
   const user = useAuthStore((s) => s.user);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProfileSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [chatError, setChatError] = useState("");
 
   const handleSearch = useCallback(
@@ -46,6 +53,20 @@ export default function ContactsScreen() {
     [user]
   );
 
+  // Pull-to-refresh re-runs the current search without the field spinner
+  const handleRefresh = useCallback(async () => {
+    if (!query.trim() || !user) return;
+    setRefreshing(true);
+    try {
+      const data = await profileService.searchUsers(query.trim(), user.id);
+      setResults(data);
+    } catch {
+      // keep the previous results on a failed refresh
+    } finally {
+      setRefreshing(false);
+    }
+  }, [query, user]);
+
   const handleStartChat = useCallback(
     async (profile: ProfileSearchResult) => {
       if (!user) return;
@@ -68,7 +89,7 @@ export default function ContactsScreen() {
   const renderItem = useCallback(
     ({ item }: { item: ProfileSearchResult }) => (
       <Pressable
-        className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
+        className="mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 active:bg-pressed"
         onPress={() => handleStartChat(item)}
         accessibilityRole="button"
       >
@@ -81,7 +102,7 @@ export default function ContactsScreen() {
           <Text className="font-sans-medium text-body text-fg">
             {item.display_name || item.username}
           </Text>
-          <Text className="font-sans text-caption text-fg-tertiary">@{item.username}</Text>
+          <Text className="mt-0.5 font-sans text-caption text-fg-tertiary">@{item.username}</Text>
         </View>
         <Icon
           name={{
@@ -99,7 +120,7 @@ export default function ContactsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <View className="border-b border-divider px-4 py-3">
+      <View className="px-4 pb-3 pt-1">
         <SearchField
           placeholder={t("search.placeholder")}
           value={query}
@@ -119,21 +140,30 @@ export default function ContactsScreen() {
         // Single tap opens a chat even while the keyboard is up
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.fgTertiary}
+          />
+        }
+        // Bottom padding keeps rows clear of the floating tab bar
+        contentContainerStyle={
+          results.length === 0
+            ? { flexGrow: 1, paddingBottom: tabBarSpace }
+            : { paddingBottom: tabBarSpace }
+        }
         ListEmptyComponent={
-          <View className="items-center pt-20">
-            <Icon
-              name={{ ios: "person.2", android: "group", web: "group" }}
-              tone="tertiary"
-              size="empty"
-            />
-            <Text className="mt-4 font-sans text-caption text-fg-tertiary">
-              {query
+          <EmptyState
+            icon={{ ios: "person.2", android: "group", web: "group" }}
+            title={
+              query
                 ? searching
                   ? t("search.searching")
                   : t("search.noResults")
-                : t("search.prompt")}
-            </Text>
-          </View>
+                : t("search.prompt")
+            }
+          />
         }
       />
     </View>

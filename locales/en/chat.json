@@ -5,7 +5,11 @@
     "emptySubtitle": "Tap the + button to start chatting with friends",
     "noMessages": "No messages yet",
     "unread_one": "{{count}} unread message",
-    "unread_other": "{{count}} unread messages"
+    "unread_other": "{{count}} unread messages",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinConversation": "Pin conversation",
+    "unpinConversation": "Unpin conversation"
   },
   "create": {
     "title": "New conversation",
@@ -21,6 +25,22 @@
     "searching": "Searching...",
     "noResults": "No users found",
     "prompt": "Enter a name or username to search"
+  },
+  "globalSearch": {
+    "placeholder": "Search...",
+    "tabs": {
+      "all": "All",
+      "messages": "Messages",
+      "users": "Users",
+      "images": "Photos",
+      "files": "Files",
+      "links": "Links"
+    },
+    "sectionMessages": "Messages",
+    "sectionUsers": "Users",
+    "prompt": "Search messages, users, photos, files and links",
+    "noResults": "No results found",
+    "failed": "Couldn't search, please try again"
   },
   "header": {
     "online": "Active now",
@@ -47,7 +67,8 @@
     "unpin": "Unpin",
     "save": "Save message",
     "unsave": "Unsave",
-    "recall": "Delete for everyone"
+    "recall": "Delete for everyone",
+    "viewThread": "View thread"
   },
   "message": {
     "imagePlaceholder": "[Photo]",
@@ -81,6 +102,20 @@
     "count_one": "{{count}} pinned message",
     "count_other": "{{count}} pinned messages",
     "unpin": "Unpin"
+  },
+  "thread": {
+    "title": "Thread",
+    "replyCount_one": "{{count}} reply",
+    "replyCount_other": "{{count}} replies",
+    "empty": "No replies in this thread yet",
+    "inputPlaceholder": "Reply in thread...",
+    "loadFailed": "Couldn't load the thread",
+    "sendFailed": "Couldn't send the reply"
+  },
+  "bookmark": {
+    "add": "Pin conversation",
+    "remove": "Unpin conversation",
+    "failed": "Couldn't pin the conversation"
   },
   "undo": {
     "sent": "Sent",

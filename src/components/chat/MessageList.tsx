@@ -16,11 +16,14 @@ interface MessageListProps {
   showPollVoters?: boolean;
   onLoadMore: () => void;
   onMessageLongPress?: (message: MessageWithMeta) => void;
+  /** Swipe-to-reply on a bubble (native only). */
+  onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
   onShowReactions?: (message: MessageWithMeta) => void;
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 export function MessageList({
@@ -31,11 +34,13 @@ export function MessageList({
   showPollVoters,
   onLoadMore,
   onMessageLongPress,
+  onSwipeReply,
   onToggleReaction,
   onShowReactions,
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onOpenThread,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
@@ -54,22 +59,26 @@ export function MessageList({
         participants={participants}
         showPollVoters={showPollVoters}
         onLongPress={onMessageLongPress}
+        onSwipeReply={onSwipeReply}
         onToggleReaction={onToggleReaction}
         onShowReactions={onShowReactions}
         onOpenAlbum={onOpenAlbum}
         onVote={onVote}
         onViewVoters={onViewVoters}
+        onOpenThread={onOpenThread}
       />
     ),
     [
       participants,
       showPollVoters,
       onMessageLongPress,
+      onSwipeReply,
       onToggleReaction,
       onShowReactions,
       onOpenAlbum,
       onVote,
       onViewVoters,
+      onOpenThread,
     ]
   );
 

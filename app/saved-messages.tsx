@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlashList } from "@shopify/flash-list";
@@ -10,16 +10,19 @@ import { Icon } from "@/src/components/ui/Icon";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { FormMessage } from "@/src/components/ui/FormMessage";
+import { useThemeColors } from "@/src/theme";
 import { MESSAGES_PER_PAGE } from "@/src/lib/constants";
 import type { SavedMessageItem } from "@/src/types";
 
 export default function SavedMessagesScreen() {
   const { t, i18n } = useTranslation(["chat", "common"]);
   const router = useRouter();
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
 
   const [items, setItems] = useState<SavedMessageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState("");
 
@@ -49,6 +52,16 @@ export default function SavedMessagesScreen() {
     if (loading || !hasMore || items.length === 0) return;
     fetchSaved(items[items.length - 1].created_at ?? undefined);
   }, [loading, hasMore, items, fetchSaved]);
+
+  // Pull-to-refresh reloads the first page
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchSaved();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchSaved]);
 
   const handleUnsave = useCallback(
     async (item: SavedMessageItem) => {
@@ -186,6 +199,13 @@ export default function SavedMessagesScreen() {
           renderItem={renderItem}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.fgTertiary}
+            />
+          }
           contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
         />
       )}
