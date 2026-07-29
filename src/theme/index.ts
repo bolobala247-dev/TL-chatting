@@ -10,6 +10,7 @@ export {
   darkColors,
   motion,
   elevationOverlay,
+  elevationFloat,
   iconSize,
   avatarSize,
   type ThemeColors,

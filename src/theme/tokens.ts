@@ -104,7 +104,7 @@ export const motion = {
 } as const;
 
 /**
- * elevation-overlay (DESIGN_SYSTEM.md §7) — the only shadow in the app.
+ * elevation-overlay (DESIGN_SYSTEM.md §7) — the strongest shadow in the app.
  * Applied to dialogs/sheets/menus; combined with a hairline border in dark.
  */
 export const elevationOverlay = {
@@ -113,6 +113,18 @@ export const elevationOverlay = {
   shadowOpacity: 0.08,
   shadowRadius: 24,
   elevation: 4,
+} as const;
+
+/**
+ * elevation-float — softer, smaller shadow reserved for floating chrome
+ * (floating tab bar, FABs). Anything else stays flat.
+ */
+export const elevationFloat = {
+  shadowColor: "#000000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.06,
+  shadowRadius: 12,
+  elevation: 3,
 } as const;
 
 /** Icon size tokens (DESIGN_SYSTEM.md §10). */

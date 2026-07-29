@@ -15,13 +15,15 @@ import { RoomListItem } from "@/src/components/rooms/RoomListItem";
 import { CreateRoomModal } from "@/src/components/rooms/CreateRoomModal";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { Icon } from "@/src/components/ui/Icon";
-import { useThemeColors, elevationOverlay } from "@/src/theme";
+import { useTabBarSpace } from "@/src/components/ui/TabBar";
+import { useThemeColors, elevationFloat } from "@/src/theme";
 import type { RoomWithLastMessage } from "@/src/types";
 
 export default function ChatsScreen() {
   const { t } = useTranslation("chat");
   const router = useRouter();
   const colors = useThemeColors();
+  const tabBarSpace = useTabBarSpace();
   const user = useAuthStore((s) => s.user);
   const toggleBookmark = useRoomStore((s) => s.toggleBookmark);
   const { rooms, loading, refresh } = useRooms();
@@ -71,9 +73,9 @@ export default function ChatsScreen() {
   return (
     <View className="flex-1 bg-background">
       {/* Fake search field: tapping opens the global search screen */}
-      <View className="px-4 py-2">
+      <View className="px-4 pb-3 pt-1">
         <Pressable
-          className="h-10 flex-row items-center gap-2 rounded-full bg-surface-secondary px-3 active:bg-pressed"
+          className="h-11 flex-row items-center gap-2.5 rounded-full bg-surface-secondary px-3.5 active:bg-pressed"
           onPress={() => router.push("/search" as any)}
           accessibilityRole="button"
           accessibilityLabel={t("globalSearch.placeholder")}
@@ -101,16 +103,18 @@ export default function ChatsScreen() {
           />
         }
         ListEmptyComponent={renderEmpty}
-        // Bottom padding keeps the FAB from covering the last room row
+        // Bottom padding keeps the floating tab bar and FAB off the last row
         contentContainerStyle={
-          rooms.length === 0 ? { flex: 1 } : { paddingBottom: 96 }
+          rooms.length === 0
+            ? { flexGrow: 1, paddingBottom: tabBarSpace }
+            : { paddingBottom: tabBarSpace + 72 }
         }
       />
 
       <Pressable
-        className="absolute bottom-6 right-5 h-14 w-14 items-center justify-center rounded-full bg-ink active:opacity-80"
+        className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-ink active:opacity-80"
         onPress={() => setShowCreateRoom(true)}
-        style={elevationOverlay}
+        style={[{ bottom: tabBarSpace }, elevationFloat]}
         accessibilityRole="button"
         accessibilityLabel={t("create.title")}
       >

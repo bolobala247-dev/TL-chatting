@@ -60,7 +60,7 @@ export function RoomListItem({ room, onPress, onLongPress }: RoomListItemProps) 
 
   return (
     <Pressable
-      className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
+      className="mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 active:bg-pressed"
       onPress={() => onPress(room.room_id)}
       onLongPress={onLongPress ? () => onLongPress(room) : undefined}
       accessibilityRole="button"
@@ -68,7 +68,7 @@ export function RoomListItem({ room, onPress, onLongPress }: RoomListItemProps) 
       <Avatar
         uri={room.room_avatar}
         name={room.room_name || t("defaultRoomName")}
-        size={52}
+        size={48}
       />
 
       <View className="flex-1">
@@ -91,7 +91,7 @@ export function RoomListItem({ room, onPress, onLongPress }: RoomListItemProps) 
           </Text>
         </View>
 
-        <View className="mt-0.5 flex-row items-center justify-between">
+        <View className="mt-1 flex-row items-center justify-between">
           {draft ? (
             <Text
               className="flex-1 font-sans text-caption italic text-fg-tertiary"

@@ -29,6 +29,7 @@ import { TextField } from "@/src/components/ui/TextField";
 import { FormMessage } from "@/src/components/ui/FormMessage";
 import { SectionHeader } from "@/src/components/ui/SectionHeader";
 import { Card, ListGroup } from "@/src/components/ui/Card";
+import { useTabBarSpace } from "@/src/components/ui/TabBar";
 import { useTheme, type ThemePreference } from "@/src/theme";
 
 // Static keys so the notification status stays translated after a language switch
@@ -46,6 +47,7 @@ const THEME_OPTIONS: ThemePreference[] = ["light", "dark", "system"];
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation(["settings", "profile", "common", "errors"]);
   const router = useRouter();
+  const tabBarSpace = useTabBarSpace();
   const { profile, user, signOut, fetchProfile } = useAuthStore();
   const { preference, colors, setPreference } = useTheme();
   const [displayName, setDisplayName] = useState(
@@ -195,6 +197,8 @@ export default function SettingsScreen() {
       bottomOffset={24}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      // Content must clear the floating tab bar
+      contentContainerStyle={{ paddingBottom: tabBarSpace + 16 }}
     >
       <View className="items-center px-4 pt-6">
         <Pressable
@@ -206,7 +210,7 @@ export default function SettingsScreen() {
           <Avatar
             uri={profile?.avatar_url}
             name={profile?.display_name || profile?.username}
-            size={90}
+            size={88}
           />
           <View className="absolute -bottom-1 -right-1 h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-ink">
             {uploadingAvatar ? (
@@ -225,7 +229,10 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
 
-        <Text className="mt-3 font-sans text-caption text-fg-tertiary">
+        <Text className="mt-4 font-sans-semibold text-title text-fg">
+          {profile?.display_name || profile?.username || ""}
+        </Text>
+        <Text className="mt-1 font-sans text-caption text-fg-tertiary">
           @{profile?.username || "unknown"}
         </Text>
 
@@ -234,10 +241,10 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      <View className="mt-6 px-4">
-        <SectionHeader title={t("profile:sectionTitle")} className="mb-4" />
+      <View className="mt-8 px-4">
+        <SectionHeader title={t("profile:sectionTitle")} className="mb-2.5 px-1" />
 
-        <View className="gap-4">
+        <Card className="gap-4 p-4">
           <TextField
             label={t("profile:displayName.label")}
             value={displayName}
@@ -262,11 +269,11 @@ export default function SettingsScreen() {
             loading={saving}
             variant="primary"
           />
-        </View>
+        </Card>
       </View>
 
       <View className="mt-8 px-4">
-        <SectionHeader title={t("archive.sectionTitle")} className="mb-4" />
+        <SectionHeader title={t("archive.sectionTitle")} className="mb-2.5 px-1" />
 
         <ListGroup>
           <Pressable
@@ -296,7 +303,7 @@ export default function SettingsScreen() {
       </View>
 
       <View className="mt-8 px-4">
-        <SectionHeader title={t("privacy.title")} className="mb-4" />
+        <SectionHeader title={t("privacy.title")} className="mb-2.5 px-1" />
 
         <ListGroup>
           <Pressable
@@ -330,7 +337,7 @@ export default function SettingsScreen() {
       </View>
 
       <View className="mt-8 px-4">
-        <SectionHeader title={t("appearance.sectionTitle")} className="mb-4" />
+        <SectionHeader title={t("appearance.sectionTitle")} className="mb-2.5 px-1" />
 
         <ListGroup>
           {THEME_OPTIONS.map((option) => (
@@ -357,7 +364,7 @@ export default function SettingsScreen() {
       </View>
 
       <View className="mt-8 px-4">
-        <SectionHeader title={t("language.sectionTitle")} className="mb-4" />
+        <SectionHeader title={t("language.sectionTitle")} className="mb-2.5 px-1" />
 
         <ListGroup>
           {SUPPORTED_LANGUAGES.map((language) => (
@@ -386,7 +393,7 @@ export default function SettingsScreen() {
       <View className="mt-8 px-4">
         <SectionHeader
           title={t("notifications.sectionTitle")}
-          className="mb-4"
+          className="mb-2.5 px-1"
         />
 
         <Card className="gap-3 p-4">
@@ -409,8 +416,8 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
-      <View className="mt-8 px-4 pb-10">
-        <SectionHeader title={t("account.sectionTitle")} className="mb-4" />
+      <View className="mt-8 px-4">
+        <SectionHeader title={t("account.sectionTitle")} className="mb-2.5 px-1" />
 
         <Card className="p-4">
           <View className="flex-row items-center justify-between">
