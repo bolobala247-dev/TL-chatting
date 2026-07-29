@@ -80,6 +80,7 @@ export type Database = {
           reply_to: string | null
           room_id: string
           sender_id: string
+          thread_id: string | null
           type: string | null
           updated_at: string | null
         }
@@ -99,6 +100,7 @@ export type Database = {
           reply_to?: string | null
           room_id: string
           sender_id: string
+          thread_id?: string | null
           type?: string | null
           updated_at?: string | null
         }
@@ -118,6 +120,7 @@ export type Database = {
           reply_to?: string | null
           room_id?: string
           sender_id?: string
+          thread_id?: string | null
           type?: string | null
           updated_at?: string | null
         }
@@ -155,6 +158,13 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -317,6 +327,7 @@ export type Database = {
       }
       room_participants: {
         Row: {
+          bookmarked_at: string | null
           id: string
           joined_at: string | null
           last_read_at: string | null
@@ -325,6 +336,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bookmarked_at?: string | null
           id?: string
           joined_at?: string | null
           last_read_at?: string | null
@@ -333,6 +345,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bookmarked_at?: string | null
           id?: string
           joined_at?: string | null
           last_read_at?: string | null
@@ -686,6 +699,7 @@ export type Database = {
       get_user_rooms: {
         Args: { p_user_id: string }
         Returns: {
+          bookmarked_at: string
           last_message_at: string
           last_message_content: string
           last_message_sender: string
@@ -708,6 +722,29 @@ export type Database = {
       is_username_available: { Args: { p_username: string }; Returns: boolean }
       mark_room_read: { Args: { p_room_id: string }; Returns: undefined }
       process_scheduled_messages: { Args: never; Returns: undefined }
+      search_messages: {
+        Args: {
+          p_before?: string
+          p_kind?: string
+          p_limit?: number
+          p_query: string
+          p_room_id?: string
+        }
+        Returns: {
+          attachments: Json
+          content: string
+          created_at: string
+          id: string
+          media_url: string
+          room_id: string
+          room_name: string
+          room_type: string
+          sender_avatar: string
+          sender_id: string
+          sender_name: string
+          type: string
+        }[]
+      }
       search_profiles: {
         Args: { p_query: string }
         Returns: {
@@ -735,6 +772,7 @@ export type Database = {
           reply_to: string | null
           room_id: string
           sender_id: string
+          thread_id: string | null
           type: string | null
           updated_at: string | null
         }
@@ -746,6 +784,8 @@ export type Database = {
         }
       }
       shares_room_with: { Args: { p_user_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       submit_report: {
         Args: {
           p_details?: string

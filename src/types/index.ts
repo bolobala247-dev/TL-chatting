@@ -62,6 +62,33 @@ export interface ProfileSearchResult {
   avatar_url: string | null;
 }
 
+// Message lanes accepted by the search_messages RPC
+export type MessageSearchKind = "message" | "image" | "file" | "link";
+
+// Shape returned by search_messages RPC.
+// Generated Functions types lose nullability for RETURNS TABLE, so kept explicit.
+export interface MessageSearchResult {
+  id: string;
+  room_id: string;
+  sender_id: string | null;
+  content: string | null;
+  type: string;
+  media_url: string | null;
+  attachments: Message["attachments"];
+  created_at: string;
+  sender_name: string | null;
+  sender_avatar: string | null;
+  room_name: string | null;
+  room_type: string;
+}
+
+// One user tagged in a message, stored on messages.metadata.mentions.
+export interface MessageMention {
+  id: string;
+  username: string;
+  display_name: string;
+}
+
 // One image inside a multi-attachment (album) message.
 export interface MessageAttachment {
   url: string;
@@ -92,6 +119,7 @@ export interface RoomWithLastMessage {
   last_message_sender: string | null;
   last_message_type: string | null;
   unread_count: number;
+  bookmarked_at: string | null;
 }
 
 export interface MessageWithSender extends Message {

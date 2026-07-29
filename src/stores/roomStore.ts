@@ -17,7 +17,19 @@ interface RoomState {
   ) => void;
   incrementUnread: (roomId: string) => void;
   clearUnread: (roomId: string) => void;
+  toggleBookmark: (roomId: string, userId: string) => Promise<void>;
   reset: () => void;
+}
+
+// Mirrors get_user_rooms ordering: bookmarked rooms first (newest bookmark
+// on top), then by last message time
+function sortRooms(rooms: RoomWithLastMessage[]): RoomWithLastMessage[] {
+  return [...rooms].sort((a, b) => {
+    if (a.bookmarked_at || b.bookmarked_at) {
+      return (b.bookmarked_at ?? "").localeCompare(a.bookmarked_at ?? "");
+    }
+    return (b.last_message_at ?? "").localeCompare(a.last_message_at ?? "");
+  });
 }
 
 export const useRoomStore = create<RoomState>((set, get) => ({
@@ -37,8 +49,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
   updateRoomLastMessage: (roomId, content, senderName, timestamp, type) => {
     set((state) => ({
-      rooms: state.rooms
-        .map((room) =>
+      rooms: sortRooms(
+        state.rooms.map((room) =>
           room.room_id === roomId
             ? {
                 ...room,
@@ -49,11 +61,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
               }
             : room
         )
-        .sort((a, b) => {
-          const aTime = a.last_message_at ?? "";
-          const bTime = b.last_message_at ?? "";
-          return bTime.localeCompare(aTime);
-        }),
+      ),
     }));
   },
 
@@ -73,6 +81,31 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         room.room_id === roomId ? { ...room, unread_count: 0 } : room
       ),
     }));
+  },
+
+  // Optimistic bookmark toggle: reorder immediately, roll back on error
+  toggleBookmark: async (roomId, userId) => {
+    const previous = get().rooms;
+    const room = previous.find((r) => r.room_id === roomId);
+    if (!room) return;
+
+    const next = !room.bookmarked_at;
+    const optimisticAt = next ? new Date().toISOString() : null;
+
+    set((state) => ({
+      rooms: sortRooms(
+        state.rooms.map((r) =>
+          r.room_id === roomId ? { ...r, bookmarked_at: optimisticAt } : r
+        )
+      ),
+    }));
+
+    try {
+      await roomService.setRoomBookmark(roomId, userId, next);
+    } catch (error) {
+      console.error("[roomStore] toggleBookmark", error);
+      set({ rooms: previous });
+    }
   },
 
   reset: () => set({ rooms: [], loading: false, error: null }),

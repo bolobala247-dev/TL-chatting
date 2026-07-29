@@ -6,6 +6,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { hasSeen } from "@/src/lib/receipts";
 import { getAttachments } from "@/src/lib/messageMeta";
+import { getMentions, splitByMentions } from "@/src/lib/mentions";
 import { Icon } from "@/src/components/ui/Icon";
 import { ReactionBar } from "./ReactionBar";
 import { AlbumGrid } from "./AlbumGrid";
@@ -23,6 +24,7 @@ interface MessageBubbleProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 function formatTime(dateStr: string, locale: string): string {
@@ -50,6 +52,49 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   );
 }
 
+// Reply-count chip: counts loaded thread replies in the store (cheap,
+// no extra query) — the thread screen fetches the full list.
+function ThreadChip({
+  message,
+  isMine,
+  onPress,
+}: {
+  message: MessageWithMeta;
+  isMine: boolean;
+  onPress?: () => void;
+}) {
+  const { t } = useTranslation("chat");
+  const messages = useChatStore((s) => s.messages[message.room_id] ?? []);
+  const replyCount = messages.filter((m) => m.thread_id === message.id).length;
+
+  if (replyCount === 0) return null;
+
+  return (
+    <Pressable
+      className="mt-1 flex-row items-center gap-1 self-start active:opacity-60"
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <Icon
+        name={{
+          ios: "bubble.left.and.bubble.right",
+          android: "forum",
+          web: "forum",
+        }}
+        tone={isMine ? "inverse" : "tertiary"}
+        size={12}
+      />
+      <Text
+        className={`font-sans-medium text-label ${
+          isMine ? "text-ink-inverse/80" : "text-fg-secondary"
+        }`}
+      >
+        {t("thread.replyCount", { count: replyCount })}
+      </Text>
+    </Pressable>
+  );
+}
+
 // Memoized: message object identity changes on any patch, so memo keeps
 // FlashList re-renders cheap while reactions/votes/receipts update live
 export const MessageBubble = memo(function MessageBubble({
@@ -62,6 +107,7 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onOpenThread,
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
@@ -70,6 +116,7 @@ export const MessageBubble = memo(function MessageBubble({
   const isPoll = message.type === "poll";
   const albumImages =
     !isDeleted && message.type === "image" ? getAttachments(message) : [];
+  const mentions = isDeleted ? [] : getMentions(message);
 
   // Receipt ticks: one check = sent, two = seen by every other participant
   const showReceipt =
@@ -170,7 +217,23 @@ export const MessageBubble = memo(function MessageBubble({
                   isMine ? "text-ink-inverse" : "text-fg"
                 }`}
               >
-                {message.content}
+                {mentions.length > 0
+                  ? splitByMentions(message.content, mentions).map(
+                      (seg, i) =>
+                        seg.isMention ? (
+                          <Text
+                            key={i}
+                            className={`font-sans-semibold ${
+                              isMine ? "text-ink-inverse" : "text-fg"
+                            }`}
+                          >
+                            {seg.text}
+                          </Text>
+                        ) : (
+                          seg.text
+                        )
+                    )
+                  : message.content}
               </Text>
             )}
           </>
@@ -226,6 +289,14 @@ export const MessageBubble = memo(function MessageBubble({
             </View>
           )}
         </View>
+
+        {!isDeleted && !message.thread_id && (
+          <ThreadChip
+            message={message}
+            isMine={isMine}
+            onPress={() => onOpenThread?.(message)}
+          />
+        )}
       </View>
 
       {!isDeleted && (message.message_reactions?.length ?? 0) > 0 && (

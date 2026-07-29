@@ -130,4 +130,23 @@ export const roomService = {
 
     if (error) throw error;
   },
+
+  // Conversation bookmark: per-user pin on the own participant row
+  // (participants_update RLS: auth.uid() = user_id)
+  async setRoomBookmark(
+    roomId: string,
+    userId: string,
+    bookmarked: boolean
+  ): Promise<string | null> {
+    const bookmarkedAt = bookmarked ? new Date().toISOString() : null;
+
+    const { error } = await supabase
+      .from("room_participants")
+      .update({ bookmarked_at: bookmarkedAt })
+      .eq("room_id", roomId)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return bookmarkedAt;
+  },
 };

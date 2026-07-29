@@ -15,6 +15,10 @@ export const MAX_POLL_OPTIONS = 10;
 export const PRESENCE_HEARTBEAT_MS = 45000;
 export const PEER_PRESENCE_POLL_MS = 30000;
 
+// Global search: debounce before hitting search_messages / search_profiles
+export const SEARCH_DEBOUNCE_MS = 300;
+export const SEARCH_PAGE_SIZE = 20;
+
 // Local app lock: failed-attempt lockout (brute-force slowdown)
 export const APP_LOCK_MAX_ATTEMPTS = 5;
 export const APP_LOCK_COOLDOWN_SECONDS = 30;

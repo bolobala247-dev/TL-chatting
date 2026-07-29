@@ -3,12 +3,15 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/src/i18n";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { Badge } from "@/src/components/ui/Badge";
+import { Icon } from "@/src/components/ui/Icon";
 import { useDraftStore } from "@/src/stores/draftStore";
 import type { RoomWithLastMessage } from "@/src/types";
 
 interface RoomListItemProps {
   room: RoomWithLastMessage;
   onPress: (roomId: string) => void;
+  /** Long-press toggles the conversation bookmark (pin). */
+  onLongPress?: (room: RoomWithLastMessage) => void;
 }
 
 function formatRelativeTime(dateStr: string | null): string {
@@ -31,10 +34,11 @@ function formatRelativeTime(dateStr: string | null): string {
   });
 }
 
-export function RoomListItem({ room, onPress }: RoomListItemProps) {
+export function RoomListItem({ room, onPress, onLongPress }: RoomListItemProps) {
   const { t } = useTranslation("chat");
   const draft = useDraftStore((s) => s.drafts[room.room_id]?.text);
   const hasUnread = room.unread_count > 0;
+  const isBookmarked = !!room.bookmarked_at;
 
   // Media/poll messages have no (or non-representative) text content:
   // fall back to a bracketed placeholder by type
@@ -58,6 +62,7 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
     <Pressable
       className="flex-row items-center gap-3 px-4 py-3 active:bg-pressed"
       onPress={() => onPress(room.room_id)}
+      onLongPress={onLongPress ? () => onLongPress(room) : undefined}
       accessibilityRole="button"
     >
       <Avatar
@@ -74,6 +79,13 @@ export function RoomListItem({ room, onPress }: RoomListItemProps) {
           >
             {room.room_name || t("defaultRoomName")}
           </Text>
+          {isBookmarked && (
+            <Icon
+              name={{ ios: "pin.fill", android: "keep", web: "keep" }}
+              tone="tertiary"
+              size={14}
+            />
+          )}
           <Text className="ml-2 font-sans text-label text-fg-tertiary">
             {formatRelativeTime(room.last_message_at)}
           </Text>

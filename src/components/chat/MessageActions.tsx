@@ -24,6 +24,8 @@ interface MessageActionsProps {
   onViewReceipts: (message: MessageWithMeta) => void;
   /** Report someone else's message (evidence snapshotted server-side). */
   onReport: (message: MessageWithMeta) => void;
+  /** Open the thread rooted at this message. */
+  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 interface ActionItem {
@@ -46,6 +48,7 @@ export function MessageActions({
   onReact,
   onViewReceipts,
   onReport,
+  onOpenThread,
 }: MessageActionsProps) {
   const { t } = useTranslation(["common", "chat"]);
   const userId = useAuthStore((s) => s.user?.id);
@@ -63,6 +66,25 @@ export function MessageActions({
         onClose();
       },
     },
+  ];
+
+  // Thread replies open their root; root messages start their own thread
+  if (onOpenThread) {
+    actions.push({
+      label: t("chat:actions.viewThread"),
+      icon: {
+        ios: "bubble.left.and.bubble.right",
+        android: "forum",
+        web: "forum",
+      },
+      onPress: () => {
+        onOpenThread(message);
+        onClose();
+      },
+    });
+  }
+
+  actions.push(
     {
       label: isPinned ? t("chat:actions.unpin") : t("chat:actions.pin"),
       icon: isPinned
@@ -86,8 +108,8 @@ export function MessageActions({
         onSave(message, !isSaved);
         onClose();
       },
-    },
-  ];
+    }
+  );
 
   if (isMine && message.type === "text") {
     actions.push({

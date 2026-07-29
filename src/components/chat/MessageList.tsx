@@ -21,6 +21,7 @@ interface MessageListProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 export function MessageList({
@@ -36,6 +37,7 @@ export function MessageList({
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onOpenThread,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
@@ -59,6 +61,7 @@ export function MessageList({
         onOpenAlbum={onOpenAlbum}
         onVote={onVote}
         onViewVoters={onViewVoters}
+        onOpenThread={onOpenThread}
       />
     ),
     [
@@ -70,6 +73,7 @@ export function MessageList({
       onOpenAlbum,
       onVote,
       onViewVoters,
+      onOpenThread,
     ]
   );
 

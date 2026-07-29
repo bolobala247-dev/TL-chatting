@@ -8,7 +8,7 @@ import { pollService } from "@/src/services/pollService";
 import { roomService } from "@/src/services/roomService";
 import { UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
-import type { Message, MessageWithMeta } from "@/src/types";
+import type { Message, MessageMention, MessageWithMeta } from "@/src/types";
 
 const EMPTY_MESSAGES: MessageWithMeta[] = [];
 
@@ -64,8 +64,11 @@ export function useMessages(roomId: string) {
   }, [roomId, user?.id]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, mentions?: MessageMention[]) => {
       if (!user || !content.trim()) return;
+
+      // Tagged users ride along in metadata (no schema change)
+      const metadata = mentions?.length ? { mentions } : null;
 
       const tempId = `temp-${Date.now()}`;
       const optimistic: Message = {
@@ -76,6 +79,7 @@ export function useMessages(roomId: string) {
         type: "text",
         media_url: null,
         reply_to: null,
+        thread_id: null,
         is_edited: false,
         pinned_at: null,
         pinned_by: null,
@@ -83,7 +87,7 @@ export function useMessages(roomId: string) {
         deleted_by: null,
         has_link: null,
         attachments: null,
-        metadata: null,
+        metadata: metadata as any,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -96,6 +100,7 @@ export function useMessages(roomId: string) {
           sender_id: user.id,
           content: content.trim(),
           type: "text",
+          metadata: metadata as any,
         });
         replaceOptimisticMessage(tempId, sent);
 
@@ -145,6 +150,7 @@ export function useMessages(roomId: string) {
         type: "image",
         media_url: imageUris[0],
         reply_to: null,
+        thread_id: null,
         is_edited: false,
         pinned_at: null,
         pinned_by: null,
@@ -188,6 +194,7 @@ export function useMessages(roomId: string) {
         type: "poll",
         media_url: null,
         reply_to: null,
+        thread_id: null,
         is_edited: false,
         pinned_at: null,
         pinned_by: null,

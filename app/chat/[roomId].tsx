@@ -25,9 +25,15 @@ import { useDraftStore } from "@/src/stores/draftStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES } from "@/src/lib/constants";
 import { getAttachments } from "@/src/lib/messageMeta";
+import {
+  getMentionQuery,
+  insertMention,
+  extractMentions,
+} from "@/src/lib/mentions";
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
 import { MessageList } from "@/src/components/chat/MessageList";
 import { MessageInput } from "@/src/components/chat/MessageInput";
+import { MentionAutocomplete } from "@/src/components/chat/MentionAutocomplete";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
 import { ReactionsSheet } from "@/src/components/chat/ReactionBar";
@@ -50,7 +56,7 @@ import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Message, MessageWithMeta, MessageAttachment, ScheduledMessage } from "@/src/types";
+import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage } from "@/src/types";
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
@@ -111,6 +117,9 @@ export default function ChatScreen() {
   } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [chatError, setChatError] = useState("");
+  // Users picked from the @ autocomplete; pruned against the text on send
+  const [trackedMentions, setTrackedMentions] = useState<MessageMention[]>([]);
+  const mentionQuery = getMentionQuery(inputText);
   const [showContactInfo, setShowContactInfo] = useState(false);
   // Report target: DM peer (from contact sheet) or a message sender
   const [reportTarget, setReportTarget] = useState<{
@@ -258,6 +267,27 @@ export default function ChatScreen() {
   const handleReply = useCallback((message: Message) => {
     setReplyTo(message);
   }, []);
+
+  const handleSelectMention = useCallback(
+    (mention: MessageMention) => {
+      updateInputText(insertMention(inputTextRef.current, mention.username));
+      setTrackedMentions((prev) =>
+        prev.some((m) => m.id === mention.id) ? prev : [...prev, mention]
+      );
+    },
+    [updateInputText]
+  );
+
+  // Replies open their root's thread; roots open their own
+  const handleOpenThread = useCallback(
+    (message: MessageWithMeta) => {
+      router.push({
+        pathname: "/chat/thread" as any,
+        params: { roomId: roomId!, rootId: message.thread_id ?? message.id },
+      });
+    },
+    [router, roomId]
+  );
 
   const handleEdit = useCallback((message: Message) => {
     setEditingMessage(message);
@@ -425,6 +455,10 @@ export default function ChatScreen() {
     async (content: string) => {
       if (chatError) setChatError("");
 
+      // Only mentions whose @username survived edits are persisted
+      const mentions = extractMentions(content, trackedMentions);
+      setTrackedMentions([]);
+
       // Composer + persisted draft clear as soon as the send is issued
       updateInputText("");
       clearTimeout(draftTimerRef.current);
@@ -439,6 +473,9 @@ export default function ChatScreen() {
             content: content.trim(),
             type: "text",
             reply_to: replyTo.id,
+            // Replies join the parent's thread (or start one at the parent)
+            thread_id: replyTo.thread_id ?? replyTo.id,
+            metadata: mentions.length ? ({ mentions } as any) : null,
           });
         } catch (err: unknown) {
           console.error("[ChatScreen] send reply", err);
@@ -448,10 +485,10 @@ export default function ChatScreen() {
         }
         setReplyTo(null);
       } else {
-        sendMessage(content);
+        sendMessage(content, mentions);
       }
     },
-    [replyTo, sendMessage, roomId, user, chatError, updateInputText]
+    [replyTo, sendMessage, roomId, user, chatError, updateInputText, trackedMentions]
   );
 
   // "+" opens the attachment sheet; the picker/composer follow from there
@@ -544,6 +581,7 @@ export default function ChatScreen() {
           onOpenAlbum={handleOpenAlbum}
           onVote={votePoll}
           onViewVoters={handleViewVoters}
+          onOpenThread={handleOpenThread}
         />
       </View>
 
@@ -576,6 +614,14 @@ export default function ChatScreen() {
           <ReplyPreview
             message={replyTo}
             onDismiss={() => setReplyTo(null)}
+          />
+        )}
+        {mentionQuery !== null && !isDmBlocked && (
+          <MentionAutocomplete
+            participants={participants}
+            query={mentionQuery}
+            excludeUserId={user?.id}
+            onSelect={handleSelectMention}
           />
         )}
         {isDmBlocked ? (
@@ -620,6 +666,7 @@ export default function ChatScreen() {
         onReact={toggleReaction}
         onViewReceipts={handleViewReceipts}
         onReport={handleReportMessage}
+        onOpenThread={handleOpenThread}
       />
 
       <ReactionsSheet

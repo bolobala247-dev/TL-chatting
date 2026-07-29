@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import {
   View,
+  Text,
   FlatList,
   Pressable,
   RefreshControl,
@@ -8,6 +9,8 @@ import {
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useRooms } from "@/src/hooks/useRooms";
+import { useAuthStore } from "@/src/stores/authStore";
+import { useRoomStore } from "@/src/stores/roomStore";
 import { RoomListItem } from "@/src/components/rooms/RoomListItem";
 import { CreateRoomModal } from "@/src/components/rooms/CreateRoomModal";
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -19,6 +22,8 @@ export default function ChatsScreen() {
   const { t } = useTranslation("chat");
   const router = useRouter();
   const colors = useThemeColors();
+  const user = useAuthStore((s) => s.user);
+  const toggleBookmark = useRoomStore((s) => s.toggleBookmark);
   const { rooms, loading, refresh } = useRooms();
   const [showCreateRoom, setShowCreateRoom] = useState(false);
 
@@ -29,11 +34,23 @@ export default function ChatsScreen() {
     [router]
   );
 
+  // Long-press pins/unpins the conversation (optimistic in the store)
+  const handleRoomLongPress = useCallback(
+    (room: RoomWithLastMessage) => {
+      if (user) void toggleBookmark(room.room_id, user.id);
+    },
+    [user, toggleBookmark]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: RoomWithLastMessage }) => (
-      <RoomListItem room={item} onPress={handleRoomPress} />
+      <RoomListItem
+        room={item}
+        onPress={handleRoomPress}
+        onLongPress={handleRoomLongPress}
+      />
     ),
-    [handleRoomPress]
+    [handleRoomPress, handleRoomLongPress]
   );
 
   const renderEmpty = useCallback(() => {
@@ -53,6 +70,25 @@ export default function ChatsScreen() {
 
   return (
     <View className="flex-1 bg-background">
+      {/* Fake search field: tapping opens the global search screen */}
+      <View className="px-4 py-2">
+        <Pressable
+          className="h-10 flex-row items-center gap-2 rounded-full bg-surface-secondary px-3 active:bg-pressed"
+          onPress={() => router.push("/search" as any)}
+          accessibilityRole="button"
+          accessibilityLabel={t("globalSearch.placeholder")}
+        >
+          <Icon
+            name={{ ios: "magnifyingglass", android: "search", web: "search" }}
+            size="sm"
+            tone="tertiary"
+          />
+          <Text className="font-sans text-body text-placeholder">
+            {t("globalSearch.placeholder")}
+          </Text>
+        </Pressable>
+      </View>
+
       <FlatList
         data={rooms}
         renderItem={renderItem}

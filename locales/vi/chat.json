@@ -21,6 +21,22 @@
     "noResults": "Không tìm thấy người dùng",
     "prompt": "Nhập tên hoặc username để tìm kiếm"
   },
+  "globalSearch": {
+    "placeholder": "Tìm kiếm...",
+    "tabs": {
+      "all": "Tất cả",
+      "messages": "Tin nhắn",
+      "users": "Người dùng",
+      "images": "Ảnh",
+      "files": "Tệp",
+      "links": "Liên kết"
+    },
+    "sectionMessages": "Tin nhắn",
+    "sectionUsers": "Người dùng",
+    "prompt": "Tìm tin nhắn, người dùng, ảnh, tệp và liên kết",
+    "noResults": "Không tìm thấy kết quả",
+    "failed": "Không thể tìm kiếm, vui lòng thử lại"
+  },
   "header": {
     "online": "Đang hoạt động",
     "offline": "Không hoạt động",
@@ -42,7 +58,8 @@
     "unpin": "Bỏ ghim",
     "save": "Lưu tin nhắn",
     "unsave": "Bỏ lưu",
-    "recall": "Thu hồi tin nhắn"
+    "recall": "Thu hồi tin nhắn",
+    "viewThread": "Xem chủ đề"
   },
   "message": {
     "imagePlaceholder": "[Hình ảnh]",
@@ -75,6 +92,19 @@
     "title": "Tin nhắn đã ghim",
     "count_other": "{{count}} tin nhắn đã ghim",
     "unpin": "Bỏ ghim"
+  },
+  "thread": {
+    "title": "Chủ đề",
+    "replyCount_other": "{{count}} trả lời",
+    "empty": "Chưa có trả lời nào trong chủ đề này",
+    "inputPlaceholder": "Trả lời trong chủ đề...",
+    "loadFailed": "Không thể tải chủ đề",
+    "sendFailed": "Không thể gửi trả lời"
+  },
+  "bookmark": {
+    "add": "Ghim cuộc trò chuyện",
+    "remove": "Bỏ ghim cuộc trò chuyện",
+    "failed": "Không thể ghim cuộc trò chuyện"
   },
   "undo": {
     "sent": "Đã gửi",
