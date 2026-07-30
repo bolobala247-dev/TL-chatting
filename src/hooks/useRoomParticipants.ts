@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { InteractionManager } from "react-native";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import { roomService } from "@/src/services/roomService";
@@ -18,14 +19,20 @@ export function useRoomParticipants(roomId: string) {
   useEffect(() => {
     if (!roomId) return;
 
-    roomService
-      .getRoomParticipants(roomId)
-      .then((rows) => {
-        useChatStore.getState().setRoomParticipants(roomId, rows);
-      })
-      .catch((err) =>
-        console.error("[useRoomParticipants] fetch", err)
-      );
+    // Deferred past the navigation transition: participants only feed the
+    // header subtitle + read receipts, not first paint. Peer presence chains
+    // off this fetch (otherProfile → usePeerPresence), so it defers too.
+    const task = InteractionManager.runAfterInteractions(() => {
+      roomService
+        .getRoomParticipants(roomId)
+        .then((rows) => {
+          useChatStore.getState().setRoomParticipants(roomId, rows);
+        })
+        .catch((err) =>
+          console.error("[useRoomParticipants] fetch", err)
+        );
+    });
+    return () => task.cancel();
   }, [roomId]);
 
   const otherProfile =

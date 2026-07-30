@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import { View, Text, TextInput, Pressable, InteractionManager } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -252,22 +252,27 @@ export default function ChatScreen() {
     [roomId]
   );
 
-  // Feature data: pinned list, saved bookmarks, pending scheduled sends
+  // Feature data: pinned list, saved bookmarks, pending scheduled sends.
+  // Deferred past the navigation transition (InteractionManager) — none of it
+  // is needed for first paint, so the message list becomes interactive first.
   useEffect(() => {
     if (!roomId || !user) return;
 
-    messageService
-      .getPinnedMessages(roomId)
-      .then(setPinnedMessages)
-      .catch((err) => console.error("[ChatScreen] load pinned", err));
-    savedMessageService
-      .getSavedIdsForRoom(roomId)
-      .then(setSavedIds)
-      .catch((err) => console.error("[ChatScreen] load saved ids", err));
-    scheduledMessageService
-      .getPendingForRoom(roomId)
-      .then(setScheduled)
-      .catch((err) => console.error("[ChatScreen] load scheduled", err));
+    const task = InteractionManager.runAfterInteractions(() => {
+      messageService
+        .getPinnedMessages(roomId)
+        .then(setPinnedMessages)
+        .catch((err) => console.error("[ChatScreen] load pinned", err));
+      savedMessageService
+        .getSavedIdsForRoom(roomId)
+        .then(setSavedIds)
+        .catch((err) => console.error("[ChatScreen] load saved ids", err));
+      scheduledMessageService
+        .getPendingForRoom(roomId)
+        .then(setScheduled)
+        .catch((err) => console.error("[ChatScreen] load scheduled", err));
+    });
+    return () => task.cancel();
   }, [roomId, user]);
 
   // Keep the pinned list in sync with realtime pin/unpin/recall updates
