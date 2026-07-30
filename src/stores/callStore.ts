@@ -12,6 +12,7 @@ import {
   type CallMediaStream,
 } from "@/src/lib/webrtc";
 import { callAudio } from "@/src/lib/callAudio";
+import { supabase } from "@/src/lib/supabase";
 import { callService } from "@/src/services/callService";
 import { useAuthStore } from "@/src/stores/authStore";
 import {
@@ -268,7 +269,9 @@ export const useCallStore = create<CallStoreState>((set, get) => {
     session.pc = null;
 
     if (session.channel) {
-      session.channel.unsubscribe();
+      // removeChannel (not bare unsubscribe) also drops the instance from
+      // the client's channel list — otherwise every call leaks a dead channel
+      void supabase.removeChannel(session.channel);
       session.channel = null;
     }
     session.pendingCandidates = [];

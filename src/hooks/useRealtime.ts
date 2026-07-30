@@ -15,7 +15,9 @@ import type {
 
 const RESUBSCRIBE_DELAY_MS = 3000;
 
-// Cache sender names for room list previews (audit P14)
+// Cache sender names for room list previews (audit P14).
+// LRU-capped so the map cannot grow unbounded over a long session.
+const SENDER_NAME_CACHE_MAX = 200;
 const senderNameCache = new Map<string, string>();
 
 async function resolveSenderName(
@@ -28,7 +30,12 @@ async function resolveSenderName(
   }
 
   const cached = senderNameCache.get(senderId);
-  if (cached) return cached;
+  if (cached) {
+    // Refresh recency (Map preserves insertion order)
+    senderNameCache.delete(senderId);
+    senderNameCache.set(senderId, cached);
+    return cached;
+  }
 
   const { data } = await supabase
     .from("profiles")
@@ -37,7 +44,14 @@ async function resolveSenderName(
     .maybeSingle();
 
   const name = data?.display_name || data?.username || null;
-  if (name) senderNameCache.set(senderId, name);
+  if (name) {
+    if (senderNameCache.size >= SENDER_NAME_CACHE_MAX) {
+      // Evict the least recently used entry
+      const oldest = senderNameCache.keys().next().value;
+      if (oldest !== undefined) senderNameCache.delete(oldest);
+    }
+    senderNameCache.set(senderId, name);
+  }
   return name;
 }
 

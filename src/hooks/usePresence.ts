@@ -77,6 +77,7 @@ export function usePeerPresence(peerId: string | null | undefined) {
     }
 
     let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     const fetchPeer = () => {
       privacyService
@@ -87,12 +88,33 @@ export function usePeerPresence(peerId: string | null | undefined) {
         .catch((err) => console.error("[usePeerPresence]", err));
     };
 
-    fetchPeer();
-    const interval = setInterval(fetchPeer, PEER_PRESENCE_POLL_MS);
+    const start = () => {
+      if (cancelled || interval) return;
+      fetchPeer();
+      interval = setInterval(fetchPeer, PEER_PRESENCE_POLL_MS);
+    };
+
+    const stop = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    start();
+
+    // Pause polling in background (same gating as the own heartbeat) —
+    // otherwise every open chat keeps hitting get_peer_profile while
+    // the app is suspended
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") start();
+      else stop();
+    });
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stop();
+      sub.remove();
     };
   }, [peerId, refreshKey]);
 
