@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import ReanimatedSwipeable, {
   type SwipeableMethods,
@@ -40,7 +40,10 @@ function formatRelativeTime(dateStr: string | null): string {
   });
 }
 
-export function RoomListItem({
+// Memoized: the rooms screen re-renders when its local UI state changes
+// (create modal, actions sheet) — stable room objects + useCallback handlers
+// let untouched rows skip those renders entirely
+export const RoomListItem = memo(function RoomListItem({
   room,
   onPress,
   onLongPress,
@@ -180,4 +183,4 @@ export function RoomListItem({
       {row}
     </ReanimatedSwipeable>
   );
-}
+});
