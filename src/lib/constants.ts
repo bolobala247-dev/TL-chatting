@@ -59,6 +59,26 @@ export const USER_STATUS = {
 export const EAS_PROJECT_ID = "5ff3ce97-1320-44a7-b7f5-167bbfd02b6f";
 
 // ============================================
+// Incremental synchronization (Phase 4)
+// ============================================
+
+// Master flag. false ⇒ syncService.syncNow delegates to the legacy full
+// fetch (reconnect → fetchMessages, foreground → fetchRooms), so behavior is
+// byte-identical to today. Rollback is flipping this back to false.
+export const FEATURE_DELTA_SYNC = true;
+// A delta that returns this many rows is treated as "history diverged": we
+// stop stitching and fall back to a fresh page-1 fetch (gap-overflow guard).
+export const DELTA_SYNC_LIMIT = 200;
+// Disk-history cap per room (prune older cached rows beyond this).
+export const MAX_PERSISTED_PER_ROOM = 1000;
+// Bounded exponential backoff for a failing delta sync (per scope).
+export const DELTA_RETRY_BASE_MS = 2000;
+export const DELTA_RETRY_MAX_MS = 30000;
+export const DELTA_MAX_ATTEMPTS = 4;
+// Reserved sync_state scope id for the room-list cursor (not a real room id).
+export const ROOMS_SYNC_SCOPE = "@rooms";
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 

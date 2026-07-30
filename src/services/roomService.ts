@@ -15,6 +15,26 @@ export const roomService = {
     return data ?? [];
   },
 
+  // Incremental room-list delta (Phase 4): get_user_rooms restricted to rooms
+  // changed since a server high-water-mark (00017). Same RoomWithLastMessage
+  // shape as getUserRooms, so callers upsert the returned rows into the list.
+  // Membership REMOVAL can't be a returned row → that case keeps the full
+  // resync path (design R4); this covers the additive/changed case only.
+  // Cast: get_rooms_delta is not in the generated types yet (applied manually,
+  // types regenerated separately) — remove the cast after `gen types`.
+  async getRoomsDelta(
+    userId: string,
+    since: string
+  ): Promise<RoomWithLastMessage[]> {
+    const { data, error } = await supabase.rpc("get_rooms_delta", {
+      p_user_id: userId,
+      p_since: since,
+    });
+
+    if (error) throw error;
+    return data ?? [];
+  },
+
   async createDirectRoom(
     currentUserId: string,
     otherUserId: string

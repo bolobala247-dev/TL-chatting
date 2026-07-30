@@ -5,6 +5,7 @@ import type {
   MessageWithMeta,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SyncState,
 } from "@/src/types";
 import type {
   AttachmentRepository,
@@ -12,6 +13,7 @@ import type {
   ParticipantRepository,
   Repositories,
   RoomRepository,
+  SyncStateRepository,
 } from "./types";
 
 /**
@@ -438,6 +440,79 @@ function createAttachmentRepository(
 }
 
 // ---------------------------------------------------------------------------
+// sync_state (Phase 4 — incremental-sync cursors)
+// ---------------------------------------------------------------------------
+
+interface SyncStateRow {
+  scope_id: string;
+  last_synced_at: string | null;
+  has_full_history: number | null;
+  stale: number | null;
+}
+
+function rowToSyncState(row: SyncStateRow): SyncState {
+  return {
+    scope_id: row.scope_id,
+    last_synced_at: row.last_synced_at,
+    has_full_history: row.has_full_history === 1,
+    stale: row.stale === 1,
+  };
+}
+
+function createSyncStateRepository(db: SQLiteDatabase): SyncStateRepository {
+  return {
+    async get(scopeId) {
+      const row = await db.getFirstAsync<SyncStateRow>(
+        "SELECT scope_id, last_synced_at, has_full_history, stale FROM sync_state WHERE scope_id = ?",
+        [scopeId]
+      );
+      return row ? rowToSyncState(row) : null;
+    },
+
+    // Read-modify-write in one transaction: partial patches keep untouched
+    // fields, and last_synced_at only ever moves forward (ISO-8601 strings
+    // sort chronologically, so a lexical `>` is a chronological compare).
+    async set(scopeId, patch) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        const row = await txn.getFirstAsync<SyncStateRow>(
+          "SELECT scope_id, last_synced_at, has_full_history, stale FROM sync_state WHERE scope_id = ?",
+          [scopeId]
+        );
+        const current = row ? rowToSyncState(row) : null;
+
+        let lastSyncedAt = current?.last_synced_at ?? null;
+        if (patch.last_synced_at != null) {
+          lastSyncedAt =
+            lastSyncedAt == null || patch.last_synced_at > lastSyncedAt
+              ? patch.last_synced_at
+              : lastSyncedAt;
+        }
+        const hasFullHistory =
+          patch.has_full_history ?? current?.has_full_history ?? false;
+        const stale = patch.stale ?? current?.stale ?? false;
+
+        await txn.runAsync(
+          `INSERT OR REPLACE INTO sync_state
+             (scope_id, last_synced_at, has_full_history, stale, updated_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            scopeId,
+            lastSyncedAt,
+            hasFullHistory ? 1 : 0,
+            stale ? 1 : 0,
+            new Date().toISOString(),
+          ]
+        );
+      });
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM sync_state");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Builds the full repository bundle over one open connection. */
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -446,5 +521,6 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     rooms: createRoomRepository(db),
     participants: createParticipantRepository(db),
     attachments: createAttachmentRepository(db),
+    syncState: createSyncStateRepository(db),
   };
 }

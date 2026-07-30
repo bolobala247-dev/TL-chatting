@@ -6,6 +6,7 @@ import { messageService } from "@/src/services/messageService";
 import { reactionService } from "@/src/services/reactionService";
 import { pollService } from "@/src/services/pollService";
 import { roomService } from "@/src/services/roomService";
+import { syncService } from "@/src/services/syncService";
 import { UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
 import type { Message, MessageMention, MessageWithMeta } from "@/src/types";
@@ -18,7 +19,6 @@ export function useMessages(roomId: string) {
   const messages = useChatStore((s) => s.messages[roomId] ?? EMPTY_MESSAGES);
   const loading = useChatStore((s) => s.loadingByRoom[roomId] ?? false);
   const hasMore = useChatStore((s) => s.hasMore[roomId] !== undefined ? s.hasMore[roomId] : true);
-  const fetchMessages = useChatStore((s) => s.fetchMessages);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
   const addOptimisticMessage = useChatStore((s) => s.addOptimisticMessage);
   const replaceOptimisticMessage = useChatStore(
@@ -37,7 +37,10 @@ export function useMessages(roomId: string) {
 
   useEffect(() => {
     setActiveRoom(roomId);
-    fetchMessages(roomId);
+    // Room-open recovery: syncService picks the delta lane for a resident
+    // (same-session revisit) room and the page fetch for a cold first open
+    // (§17 C6); flag-off delegates to the exact page-1 fetch used before.
+    void syncService.syncNow({ room: roomId });
     clearUnread(roomId);
 
     const userId = user?.id;

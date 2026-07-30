@@ -9,6 +9,9 @@ interface RoomState {
   error: string | null;
 
   fetchRooms: (userId: string) => Promise<void>;
+  // Incremental room-list sync (Phase 4): upsert the changed rows from
+  // get_rooms_delta into the list without a full replace.
+  applyRoomsDelta: (rows: RoomWithLastMessage[]) => void;
   updateRoomLastMessage: (
     roomId: string,
     content: string | null,
@@ -61,6 +64,21 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }
+  },
+
+  // Merge the delta rows into the list: existing rooms are replaced by their
+  // fresher server row, brand-new rooms are appended, then the list is
+  // re-sorted into room-list order. Membership removals aren't expressed here
+  // (see roomService.getRoomsDelta) — those keep the full-resync path.
+  applyRoomsDelta: (rows) => {
+    if (rows.length === 0) return;
+    set((state) => {
+      const byId = new Map(state.rooms.map((r) => [r.room_id, r]));
+      for (const row of rows) byId.set(row.room_id, row);
+      return { rooms: sortRooms(Array.from(byId.values())) };
+    });
+    // Write-through: persist the merged snapshot (async, never blocks UI)
+    cacheService.saveRooms(get().rooms);
   },
 
   updateRoomLastMessage: (roomId, content, senderName, timestamp, type) => {

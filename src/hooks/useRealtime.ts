@@ -4,6 +4,7 @@ import { supabase } from "@/src/lib/supabase";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
+import { syncService } from "@/src/services/syncService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type {
   Message,
@@ -237,9 +238,12 @@ export function useRealtimeMessages(roomId: string) {
 
           if (status === "SUBSCRIBED") {
             if (hadDrop) {
-              // Refetch latest page to recover messages missed while offline
+              // Recover messages missed while offline. The room is resident
+              // (the user is viewing it) → syncService takes the delta lane
+              // when the flag is on; with the flag off this delegates to the
+              // exact page-1 fetch used before (§10.4).
               hadDrop = false;
-              void useChatStore.getState().fetchMessages(roomId);
+              void syncService.syncNow({ room: roomId });
             }
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             hadDrop = true;
@@ -271,6 +275,15 @@ export function useRealtimeRooms() {
 
     const resync = () => {
       void useRoomStore.getState().fetchRooms(userId);
+    };
+
+    // Reconnect / foreground recovery: syncService takes the room-list delta
+    // lane when the flag is on (payload ≪ full get_user_rooms); with the flag
+    // off it delegates to the exact fetchRooms above (§10.4). Membership
+    // add/remove events keep the full resync() — a delta can't express
+    // "you were removed from room X" (§12 R4).
+    const deltaResync = () => {
+      void syncService.syncNow("rooms");
     };
 
     const handleNewMessage = (message: Message) => {
@@ -403,7 +416,7 @@ export function useRealtimeRooms() {
             if (hadDrop) {
               // Recover unread counts / last messages missed while offline
               hadDrop = false;
-              resync();
+              deltaResync();
             }
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             hadDrop = true;
@@ -418,7 +431,7 @@ export function useRealtimeRooms() {
     const appStateSub = AppState.addEventListener("change", (state) => {
       if (disposed || state !== "active") return;
 
-      resync();
+      deltaResync();
       if (channel?.state !== "joined") {
         hadDrop = false;
         scheduleReconnect();

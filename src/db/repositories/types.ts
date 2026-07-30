@@ -3,6 +3,7 @@ import type {
   MessageWithMeta,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SyncState,
 } from "@/src/types";
 
 /**
@@ -86,10 +87,26 @@ export interface AttachmentRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * Incremental-sync cursors (Phase 4). Stores one high-water-mark timestamp
+ * per scope; knows nothing about deltas or merging — that logic lives above
+ * (syncService) and in the pure merge helper (./merge.ts, Invariant #3).
+ */
+export interface SyncStateRepository {
+  get(scopeId: string): Promise<SyncState | null>;
+  /**
+   * Upsert a scope's cursor. `last_synced_at` advances forward-only
+   * (max of stored vs incoming) so an out-of-order batch never regresses it.
+   */
+  set(scopeId: string, patch: Partial<Omit<SyncState, "scope_id">>): Promise<void>;
+  clear(): Promise<void>;
+}
+
 /** Everything the application layer can reach — one bundle per connection. */
 export interface Repositories {
   messages: MessageRepository;
   rooms: RoomRepository;
   participants: ParticipantRepository;
   attachments: AttachmentRepository;
+  syncState: SyncStateRepository;
 }
