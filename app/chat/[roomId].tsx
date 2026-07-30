@@ -350,7 +350,7 @@ export default function ChatScreen() {
 
     try {
       const updated = await messageService.deleteForEveryone(
-        target.id,
+        target,
         user.id
       );
       updateMessageInStore(updated);

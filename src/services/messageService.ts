@@ -16,6 +16,39 @@ import type {
 const MESSAGE_WITH_META_SELECT =
   "*, message_reactions(user_id, emoji), poll_votes(user_id, option_index)";
 
+// Public URL → object path inside the chat-media bucket (for storage.remove)
+const CHAT_MEDIA_URL_MARKER = "/object/public/chat-media/";
+
+function collectChatMediaPaths(
+  message: Pick<Message, "media_url" | "attachments">
+): string[] {
+  const urls = new Set<string>();
+  if (message.media_url) urls.add(message.media_url);
+  const attachments =
+    (message.attachments as MessageAttachment[] | null) ?? [];
+  for (const att of attachments) {
+    if (att?.url) urls.add(att.url);
+  }
+
+  const paths: string[] = [];
+  for (const url of urls) {
+    const idx = url.indexOf(CHAT_MEDIA_URL_MARKER);
+    if (idx !== -1) {
+      paths.push(
+        decodeURIComponent(url.slice(idx + CHAT_MEDIA_URL_MARKER.length))
+      );
+    }
+  }
+  return paths;
+}
+
+// Best effort — an orphaned file only wastes storage, never block the UX flow
+async function removeChatMediaObjects(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from("chat-media").remove(paths);
+  if (error) console.error("[messageService] remove chat-media", error);
+}
+
 export const messageService = {
   async getMessages(
     roomId: string,
@@ -78,9 +111,10 @@ export const messageService = {
     if (error) throw error;
   },
 
-  // Soft delete (recall): everyone sees a tombstone, content is wiped server-side
+  // Soft delete (recall): everyone sees a tombstone, content is wiped server-side.
+  // Takes the full message so the underlying chat-media files can be cleaned up.
   async deleteForEveryone(
-    messageId: string,
+    message: Message,
     userId: string
   ): Promise<Message> {
     const { data, error } = await supabase
@@ -88,16 +122,21 @@ export const messageService = {
       .update({
         content: null,
         media_url: null,
+        attachments: null,
         deleted_at: new Date().toISOString(),
         deleted_by: userId,
         pinned_at: null,
         pinned_by: null,
       })
-      .eq("id", messageId)
+      .eq("id", message.id)
       .select()
       .single();
 
     if (error) throw error;
+
+    // Free the storage objects the tombstone no longer references
+    void removeChatMediaObjects(collectChatMediaPaths(message));
+
     return data;
   },
 

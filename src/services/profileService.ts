@@ -84,6 +84,22 @@ export const profileService = {
       .update({ avatar_url: publicUrl })
       .eq("id", userId);
 
+    // Each upload is a new timestamped file — sweep the old ones so the
+    // avatars bucket doesn't grow unbounded (best effort, never block)
+    try {
+      const { data: existing } = await supabase.storage
+        .from("avatars")
+        .list(userId);
+      const stale = (existing ?? [])
+        .filter((f) => `${userId}/${f.name}` !== fileName)
+        .map((f) => `${userId}/${f.name}`);
+      if (stale.length > 0) {
+        await supabase.storage.from("avatars").remove(stale);
+      }
+    } catch (err) {
+      console.error("[profileService] cleanup old avatars", err);
+    }
+
     return publicUrl;
   },
 };
