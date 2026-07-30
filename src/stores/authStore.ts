@@ -16,6 +16,7 @@ import { OUTBOX_LOGOUT_DRAIN_MS } from "@/src/lib/constants";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
+import { useJumpStore } from "@/src/stores/jumpStore";
 import type { Profile } from "@/src/types";
 
 interface AuthState {
@@ -171,6 +172,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useChatStore.getState().reset();
     useRoomStore.getState().reset();
     usePrivacyStore.getState().reset();
+    useJumpStore.getState().reset();
     // Cached plaintext must not survive an account switch: close + delete
     // the SQLite file, then reopen an empty one (cacheService never throws).
     // First, best-effort drain the outbox (§8.3) so a logout doesn't silently

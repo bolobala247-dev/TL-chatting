@@ -175,7 +175,8 @@
   "scroll": {
     "newMessages_one": "{{count}} tin nhắn mới",
     "newMessages_other": "{{count}} tin nhắn mới",
-    "toLatest": "Đến tin mới nhất"
+    "toLatest": "Đến tin mới nhất",
+    "return": "Quay lại"
   },
   "reactions": {
     "title": "Cảm xúc"

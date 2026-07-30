@@ -6,6 +6,7 @@ import { startPushTokenSync } from "@/src/services/notificationService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { prefetchService } from "@/src/services/prefetchService";
+import { FEATURE_SCROLL_TO_MESSAGE } from "@/src/lib/constants";
 
 const ANDROID_CHANNEL_ID = "messages";
 
@@ -73,7 +74,19 @@ export function useNotifications(enabled: boolean) {
       // Highest-value predictor: warm the target room before navigation so the
       // chat screen mounts against a warm cache (no-op when the flag is off).
       prefetchService.warmRoom(roomId, { tier: "CRITICAL", scope: "notif" });
-      router.push(`/chat/${roomId}`);
+      // Phase 11 §2: when the payload carries the message coordinates, deep-link
+      // straight to it via the Phase 9 ?focus=&at= contract (which the Scroll
+      // Manager turns into a centered jump + highlight). Otherwise open at bottom.
+      const data = lastResponse.notification.request.content.data;
+      const messageId = data?.messageId as string | undefined;
+      const createdAt = data?.createdAt as string | undefined;
+      if (FEATURE_SCROLL_TO_MESSAGE && messageId && createdAt) {
+        router.push(
+          `/chat/${roomId}?focus=${messageId}&at=${encodeURIComponent(createdAt)}`
+        );
+      } else {
+        router.push(`/chat/${roomId}`);
+      }
     }
   }, [enabled, lastResponse, router]);
 }

@@ -30,6 +30,7 @@ import { useDraftStore } from "@/src/stores/draftStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { usePresenceStore } from "@/src/stores/presenceStore";
 import { prefetchService } from "@/src/services/prefetchService";
+import { jumpBus } from "@/src/lib/jumpBus";
 import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES, FEATURE_PUSH_PRESENCE } from "@/src/lib/constants";
 import { getAttachments } from "@/src/lib/messageMeta";
 import {
@@ -40,6 +41,7 @@ import {
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
 import { MessageList } from "@/src/components/chat/MessageList";
 import { NewMessagesPill } from "@/src/components/chat/NewMessagesPill";
+import { JumpReturnChip } from "@/src/components/chat/JumpReturnChip";
 import { MessageInput } from "@/src/components/chat/MessageInput";
 import { MentionAutocomplete } from "@/src/components/chat/MentionAutocomplete";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
@@ -151,6 +153,7 @@ export default function ChatScreen() {
     viewabilityConfig,
     showPill,
     scrollToBottom,
+    returnToPrevious,
   } = useScrollManager(roomId!, messages, focusTarget);
 
   // Single participants fetch: header + read receipts share it
@@ -395,6 +398,21 @@ export default function ChatScreen() {
   const handleReply = useCallback((message: Message) => {
     setReplyTo(message);
   }, []);
+
+  // Phase 11 §2: jump from the pinned sheet to a message in the conversation
+  // (close the sheet first, then dispatch through the shared jump pipeline).
+  const handleJumpToMessage = useCallback(
+    (message: Message) => {
+      setShowPinnedSheet(false);
+      jumpBus.request({
+        roomId: roomId!,
+        messageId: message.id,
+        createdAt: message.created_at ?? undefined,
+        source: "pinned",
+      });
+    },
+    [roomId]
+  );
 
   const handleSelectMention = useCallback(
     (mention: MessageMention) => {
@@ -724,6 +742,7 @@ export default function ChatScreen() {
           roomId={roomId!}
           onPress={scrollToBottom}
         />
+        <JumpReturnChip roomId={roomId!} onPress={returnToPrevious} />
       </View>
 
       <Animated.View style={composerInsetStyle}>
@@ -883,6 +902,7 @@ export default function ChatScreen() {
           pinnedMessages={pinnedMessages}
           onClose={() => setShowPinnedSheet(false)}
           onUnpin={(message) => handlePin(message, false)}
+          onJump={handleJumpToMessage}
         />
 
         <ScheduleSheet

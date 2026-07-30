@@ -9,6 +9,9 @@ interface PinnedMessagesSheetProps {
   pinnedMessages: Message[];
   onClose: () => void;
   onUnpin: (message: Message) => void;
+  // Phase 11 §2: tap a pinned row to jump to it in the conversation. Optional
+  // (undefined when scroll-to-message is off) ⇒ rows stay non-interactive.
+  onJump?: (message: Message) => void;
 }
 
 function formatPinTime(dateStr: string | null, locale: string): string {
@@ -26,6 +29,7 @@ export function PinnedMessagesSheet({
   pinnedMessages,
   onClose,
   onUnpin,
+  onJump,
 }: PinnedMessagesSheetProps) {
   const { t, i18n } = useTranslation("chat");
 
@@ -43,7 +47,12 @@ export function PinnedMessagesSheet({
             key={message.id}
             className="flex-row items-center gap-3 border-b border-divider px-4 py-3"
           >
-            <View className="flex-1">
+            <Pressable
+              className="flex-1"
+              onPress={onJump ? () => onJump(message) : undefined}
+              disabled={!onJump}
+              accessibilityRole={onJump ? "button" : undefined}
+            >
               <Text className="font-sans text-body text-fg" numberOfLines={2}>
                 {message.content ||
                   (message.type === "image"
@@ -55,7 +64,7 @@ export function PinnedMessagesSheet({
               <Text className="mt-0.5 font-sans text-label text-fg-tertiary">
                 {formatPinTime(message.created_at, i18n.language)}
               </Text>
-            </View>
+            </Pressable>
             <Pressable
               className="h-9 w-9 items-center justify-center rounded-full active:bg-pressed"
               onPress={() => onUnpin(message)}
