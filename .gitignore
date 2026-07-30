@@ -55,3 +55,7 @@ yarn-error.*
 /android
 .vercel
 .env*
+
+# Local build artifacts
+build-*.apk
+*.aab
