@@ -28,7 +28,9 @@ import { useCallStore } from "@/src/stores/callStore";
 import { WEBRTC_SUPPORTED } from "@/src/lib/webrtc";
 import { useDraftStore } from "@/src/stores/draftStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
-import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES } from "@/src/lib/constants";
+import { usePresenceStore } from "@/src/stores/presenceStore";
+import { prefetchService } from "@/src/services/prefetchService";
+import { DRAFT_SAVE_DEBOUNCE_MS, MAX_ALBUM_IMAGES, FEATURE_PUSH_PRESENCE } from "@/src/lib/constants";
 import { getAttachments } from "@/src/lib/messageMeta";
 import {
   getMentionQuery,
@@ -192,6 +194,27 @@ export default function ChatScreen() {
   const peerId = !isGroup ? otherProfile?.id ?? null : null;
   const { peer, refresh: refreshPeer } = usePeerPresence(peerId);
   const isDmBlocked = !!peer?.is_blocked_by_me;
+
+  // Phase 10 §9: when push presence is on, prefer the live read model fed by the
+  // room presence channel; otherwise fall back to the durable, privacy-gated
+  // last-seen from get_peer_profile. Flag-off ⇒ selector is always undefined,
+  // so this is byte-identical to the poll-only path.
+  const livePresence = usePresenceStore((s) =>
+    FEATURE_PUSH_PRESENCE && peerId ? s.byUser[peerId] : undefined
+  );
+  const isPeerOnline = livePresence
+    ? livePresence.status === "online"
+    : peer?.is_online;
+  const peerLastSeenAt = livePresence
+    ? livePresence.lastActiveAt
+    : peer?.last_seen_at;
+
+  // Phase 10 §5: a search jump wants the window AROUND the target, not just the
+  // newest page — warm it as soon as the deep-link params resolve. No-op when
+  // FEATURE_INTELLIGENT_PREFETCH is off; cancelled with the room scope on leave.
+  useEffect(() => {
+    if (roomId && at) prefetchService.warmSearchAround(roomId, at);
+  }, [roomId, at]);
 
   // Composer text lives here so drafts can persist per room
   const [inputText, setInputText] = useState("");
@@ -651,8 +674,8 @@ export default function ChatScreen() {
         <ChatHeader
           name={roomName || t("defaultRoomName")}
           avatarUrl={roomAvatar}
-          isOnline={!isGroup ? peer?.is_online : undefined}
-          lastSeenAt={!isGroup ? peer?.last_seen_at : undefined}
+          isOnline={!isGroup ? isPeerOnline : undefined}
+          lastSeenAt={!isGroup ? peerLastSeenAt : undefined}
           participantCount={isGroup ? participantCount : undefined}
           onPressInfo={
             isGroup && room

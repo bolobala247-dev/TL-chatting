@@ -16,6 +16,7 @@ import { databaseService } from "@/src/services/databaseService";
 import { outboxService } from "@/src/services/outboxService";
 import { mediaService } from "@/src/services/mediaService";
 import { searchIndexer } from "@/src/services/searchIndexer";
+import { prefetchService } from "@/src/services/prefetchService";
 import { ThemeProvider, useTheme, useThemeBootstrap, useThemeColors } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
@@ -71,6 +72,10 @@ function AuthGate() {
     // heal any drift and fill the derived index from the cache. No-op when the
     // search flag is off; bounded, chunked, and never blocks first paint.
     void searchIndexer.repair();
+    // App-launch warm batch (Phase 10 §2.1): warm the recency/frequency/bookmark
+    // set so the most-likely-next rooms mount against a warm cache. No-op when
+    // FEATURE_INTELLIGENT_PREFETCH is off; fully cancellable, never load-bearing.
+    prefetchService.poke("launch");
   }, [session, initialized]);
 
   if (!initialized) {

@@ -6,6 +6,7 @@ import { privacyService } from "@/src/services/privacyService";
 import {
   PRESENCE_HEARTBEAT_MS,
   PEER_PRESENCE_POLL_MS,
+  FEATURE_PUSH_PRESENCE,
 } from "@/src/lib/constants";
 import type { PeerProfile } from "@/src/types";
 
@@ -33,6 +34,10 @@ export function usePresenceHeartbeat(enabled: boolean) {
     const start = () => {
       if (!active || interval) return;
       beat();
+      // Push presence (Phase 10 §9): user_presence is written on state
+      // transitions via presenceService, so the 45s heartbeat interval retires
+      // when the flag is on. The initial beat still seeds a fresh last_active.
+      if (FEATURE_PUSH_PRESENCE) return;
       interval = setInterval(beat, PRESENCE_HEARTBEAT_MS);
     };
 
@@ -91,6 +96,10 @@ export function usePeerPresence(peerId: string | null | undefined) {
     const start = () => {
       if (cancelled || interval) return;
       fetchPeer();
+      // Push presence (Phase 10 §9): live online/away arrives via presenceStore
+      // (fed by the room presence channel), so the 30s poll retires when the
+      // flag is on. The initial fetch still seeds block state + last-seen.
+      if (FEATURE_PUSH_PRESENCE) return;
       interval = setInterval(fetchPeer, PEER_PRESENCE_POLL_MS);
     };
 

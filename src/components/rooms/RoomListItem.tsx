@@ -9,6 +9,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { Badge } from "@/src/components/ui/Badge";
 import { Icon } from "@/src/components/ui/Icon";
 import { useDraftStore } from "@/src/stores/draftStore";
+import { prefetchService } from "@/src/services/prefetchService";
 import type { RoomWithLastMessage } from "@/src/types";
 
 interface RoomListItemProps {
@@ -108,6 +109,19 @@ export const RoomListItem = memo(function RoomListItem({
     <Pressable
       className="mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 active:bg-pressed"
       onPress={() => onPress(room.room_id)}
+      // Press-in fires ~150ms before the release + navigation — the single best
+      // late predictor: warm the room window + its newest images so the chat
+      // screen mounts against a warm cache. No-op when the flag is off (§2.6).
+      onPressIn={() => {
+        prefetchService.warmRoom(room.room_id, {
+          tier: "CRITICAL",
+          scope: "press",
+        });
+        prefetchService.warmRoomMedia(room.room_id, {
+          tier: "NORMAL",
+          scope: "press",
+        });
+      }}
       onLongPress={onLongPress ? () => onLongPress(room) : undefined}
       accessibilityRole="button"
     >

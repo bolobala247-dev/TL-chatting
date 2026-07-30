@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { startPushTokenSync } from "@/src/services/notificationService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
+import { prefetchService } from "@/src/services/prefetchService";
 
 const ANDROID_CHANNEL_ID = "messages";
 
@@ -69,6 +70,9 @@ export function useNotifications(enabled: boolean) {
       | undefined;
 
     if (roomId) {
+      // Highest-value predictor: warm the target room before navigation so the
+      // chat screen mounts against a warm cache (no-op when the flag is off).
+      prefetchService.warmRoom(roomId, { tier: "CRITICAL", scope: "notif" });
       router.push(`/chat/${roomId}`);
     }
   }, [enabled, lastResponse, router]);
