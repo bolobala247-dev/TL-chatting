@@ -73,6 +73,58 @@ export const roomService = {
     return room;
   },
 
+  // Room row: type ("direct"/"group") + group name/avatar for the header
+  async getRoom(roomId: string): Promise<Room> {
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("id", roomId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Group info edit — RLS only allows group admins
+  async updateGroupRoom(
+    roomId: string,
+    updates: { name?: string; avatar_url?: string }
+  ): Promise<Room> {
+    const { data, error } = await supabase
+      .from("rooms")
+      .update(updates)
+      .eq("id", roomId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Group avatar lives in chat-media under the room's folder
+  // (storage RLS: only participants may write to {roomId}/)
+  async uploadGroupAvatar(roomId: string, uri: string): Promise<string> {
+    const fileName = `${roomId}/avatar_${Date.now()}.jpg`;
+    // RN không hỗ trợ tạo Blob từ ArrayBuffer — upload ArrayBuffer trực tiếp
+    const response = await fetch(uri);
+    const arrayBuffer = await response.arrayBuffer();
+
+    const { error: uploadError } = await supabase.storage
+      .from("chat-media")
+      .upload(fileName, arrayBuffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("chat-media").getPublicUrl(fileName);
+
+    return publicUrl;
+  },
+
   async findDirectRoom(
     userId1: string,
     userId2: string

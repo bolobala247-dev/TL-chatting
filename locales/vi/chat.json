@@ -221,6 +221,11 @@
     "title": "Thông tin liên hệ",
     "phone": "Số điện thoại"
   },
+  "group": {
+    "changeAvatar": "Đổi ảnh nhóm",
+    "adminRole": "Quản trị viên",
+    "updateFailed": "Không thể cập nhật thông tin nhóm"
+  },
   "call": {
     "audio": "Cuộc gọi thoại",
     "video": "Cuộc gọi video",

@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/src/stores/chatStore";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { Emoji } from "@/src/components/ui/Emoji";
 import { Sheet } from "@/src/components/ui/Sheet";
 import type { MessageWithMeta } from "@/src/types";
 
@@ -64,7 +65,7 @@ export function ReactionBar({
             accessibilityRole="button"
             accessibilityLabel={group.emoji}
           >
-            <Text className="text-caption">{group.emoji}</Text>
+            <Emoji emoji={group.emoji} size={13} />
             <Text
               className={`font-sans-medium text-label ${
                 reacted ? "text-ink-inverse" : "text-fg-secondary"
@@ -115,9 +116,12 @@ export function ReactionsSheet({
       <ScrollView className="max-h-96">
         {groups.map((group) => (
           <View key={group.emoji} className="px-4 pt-3">
-            <Text className="mb-1 font-sans text-caption text-fg-tertiary">
-              {group.emoji} · {group.userIds.length}
-            </Text>
+            <View className="mb-1 flex-row items-center gap-1.5">
+              <Emoji emoji={group.emoji} size={14} />
+              <Text className="font-sans text-caption text-fg-tertiary">
+                {group.userIds.length}
+              </Text>
+            </View>
             {group.userIds.map((userId) => {
               const profile = profileOf(userId);
               const name =

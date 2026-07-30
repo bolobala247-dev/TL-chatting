@@ -4,6 +4,7 @@ import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { QUICK_REACTIONS, EDIT_MESSAGE_WINDOW_MS } from "@/src/lib/constants";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
+import { Emoji } from "@/src/components/ui/Emoji";
 import { Sheet } from "@/src/components/ui/Sheet";
 
 interface MessageActionsProps {
@@ -190,7 +191,7 @@ export function MessageActions({
               accessibilityRole="button"
               accessibilityLabel={emoji}
             >
-              <Text className="text-[22px]">{emoji}</Text>
+              <Emoji emoji={emoji} size={22} />
             </Pressable>
           );
         })}
