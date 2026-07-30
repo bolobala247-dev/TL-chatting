@@ -60,7 +60,25 @@
   "input": {
     "placeholder": "Type a message...",
     "attach": "Attach",
-    "send": "Send"
+    "send": "Send",
+    "emoji": "Emoji"
+  },
+  "emoji": {
+    "searchPlaceholder": "Search emoji...",
+    "recent": "Recently used",
+    "recentEmpty": "Emojis you use will appear here",
+    "noResults": "No emoji found",
+    "categories": {
+      "smileys_emotion": "Smileys & emotion",
+      "people_body": "People",
+      "animals_nature": "Animals & nature",
+      "food_drink": "Food & drink",
+      "travel_places": "Travel & places",
+      "activities": "Activities",
+      "objects": "Objects",
+      "symbols": "Symbols",
+      "flags": "Flags"
+    }
   },
   "actions": {
     "pin": "Pin message",

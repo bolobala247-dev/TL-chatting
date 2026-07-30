@@ -55,7 +55,25 @@
   "input": {
     "placeholder": "Nhập tin nhắn...",
     "attach": "Đính kèm",
-    "send": "Gửi"
+    "send": "Gửi",
+    "emoji": "Biểu tượng cảm xúc"
+  },
+  "emoji": {
+    "searchPlaceholder": "Tìm emoji...",
+    "recent": "Dùng gần đây",
+    "recentEmpty": "Emoji bạn dùng sẽ xuất hiện ở đây",
+    "noResults": "Không tìm thấy emoji",
+    "categories": {
+      "smileys_emotion": "Mặt cười & cảm xúc",
+      "people_body": "Con người",
+      "animals_nature": "Động vật & thiên nhiên",
+      "food_drink": "Đồ ăn & thức uống",
+      "travel_places": "Du lịch & địa điểm",
+      "activities": "Hoạt động",
+      "objects": "Đồ vật",
+      "symbols": "Ký hiệu",
+      "flags": "Cờ"
+    }
   },
   "actions": {
     "pin": "Ghim tin nhắn",
