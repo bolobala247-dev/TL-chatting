@@ -129,8 +129,14 @@ export default function GlobalSearchScreen() {
   }, [loading, hasMore, messages, tab, isMediaTab, trimmed]);
 
   const openRoom = useCallback(
-    (roomId: string) => {
-      router.push(`/chat/${roomId}` as any);
+    (roomId: string, focus?: string, at?: string) => {
+      // Phase 9 §8: a message hit deep-links to that message (?focus=&at=); a
+      // plain room tap omits them and opens at the bottom as before.
+      router.push(
+        (focus && at
+          ? `/chat/${roomId}?focus=${focus}&at=${encodeURIComponent(at)}`
+          : `/chat/${roomId}`) as any
+      );
     },
     [router]
   );
@@ -221,7 +227,7 @@ export default function GlobalSearchScreen() {
       return (
         <Pressable
           className="flex-row items-center gap-3 border-b border-divider px-4 py-3 active:bg-pressed"
-          onPress={() => openRoom(m.room_id)}
+          onPress={() => openRoom(m.room_id, m.id, m.created_at)}
           accessibilityRole="button"
         >
           <Avatar uri={m.sender_avatar} name={m.sender_name ?? "?"} size={44} />
@@ -256,7 +262,7 @@ export default function GlobalSearchScreen() {
     ({ item }: { item: MessageSearchResult }) => (
       <Pressable
         className="p-px active:opacity-70"
-        onPress={() => openRoom(item.room_id)}
+        onPress={() => openRoom(item.room_id, item.id, item.created_at)}
         accessibilityRole="imagebutton"
       >
         <View

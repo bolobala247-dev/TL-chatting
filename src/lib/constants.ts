@@ -191,6 +191,34 @@ export const SEARCH_REPAIR_BATCH = 500;
 export const SEARCH_SCHEMA_VERSION = "fts5:unicode61-rd2:cols=text,media_text:v1";
 
 // ============================================
+// Scroll restoration (Phase 9)
+// ============================================
+
+// Master flag. false ⇒ the chat list behaves byte-for-byte like today: it
+// always mounts at the bottom (newest message) via FlashList v2
+// maintainVisibleContentPosition.startRenderingFromBottom, no anchor is ever
+// read/written, no pill renders. true ⇒ per-room reading position is recorded
+// (device-local, offline, never synced) and restored on re-open, with a
+// Telegram-style "N tin nhắn mới" pill. INDEPENDENT of every other feature
+// flag — toggling it can never change delivery, sync, media, or search.
+// Rollback = flip false (anchors on disk are simply never read).
+export const FEATURE_SCROLL_RESTORE = false;
+// A reading position older than this is treated as stale and ignored on restore
+// (also bounds AsyncStorage growth). 7 days — a generous ceiling.
+export const ANCHOR_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Keep at most this many per-room anchors (LRU by updatedAt); pruned on boot.
+export const ANCHOR_MAX_ROOMS = 50;
+// Trailing-throttle window for durable anchor flushes while scrolling (~2/sec).
+export const ANCHOR_FLUSH_MS = 500;
+// Persisted-blob schema version; a mismatch discards all anchors (disposable).
+export const ANCHOR_SCHEMA_VERSION = 1;
+// Bounded in-session jump trail (search → message → back). RAM only.
+export const JUMP_STACK_MAX = 10;
+// Distance-from-bottom (px) beyond which the viewport counts as "reading
+// history" (pill shows, new messages stop auto-scrolling).
+export const SCROLL_BOTTOM_THRESHOLD_PX = 120;
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 

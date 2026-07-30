@@ -93,6 +93,26 @@ export const cacheService = {
     }
   },
 
+  /**
+   * A cached window centered on a message time (Phase 9 §3.3): up to `radius`
+   * rows each side of `around`, newest-first. Lets scroll restore / search-jump
+   * bring a deep target into the resident window in one read. [] when unavailable.
+   */
+  async getRoomMessagesAround(
+    roomId: string,
+    around: string,
+    radius: number
+  ): Promise<MessageWithMeta[]> {
+    const repos = databaseService.repositories;
+    if (!repos) return [];
+    try {
+      return await repos.messages.getWindowAround(roomId, around, radius);
+    } catch (err) {
+      console.error("[cacheService] getRoomMessagesAround", err);
+      return [];
+    }
+  },
+
   // -------------------------------------------------------------------------
   // Writes (write-through, fire-and-forget)
   // -------------------------------------------------------------------------

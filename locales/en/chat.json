@@ -179,6 +179,11 @@
   "draft": {
     "prefix": "Draft"
   },
+  "scroll": {
+    "newMessages_one": "{{count}} new message",
+    "newMessages_other": "{{count}} new messages",
+    "toLatest": "Scroll to latest"
+  },
   "reactions": {
     "title": "Reactions"
   },
