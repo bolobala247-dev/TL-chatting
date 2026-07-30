@@ -129,6 +129,7 @@ export function MessageList({
       onStartReachedThreshold={0.2}
       ListHeaderComponent={renderHeader}
       contentContainerStyle={{ paddingVertical: 8 }}
+      showsVerticalScrollIndicator={false}
       // iOS: drag the keyboard down interactively; Android: dismiss on scroll
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
