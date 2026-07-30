@@ -13,9 +13,8 @@ import type { Repositories } from "@/src/db/repositories/types";
  * point the rest of the app may use (layering: UI → service → repository →
  * SQLite). Screens, hooks, and stores must never import from `src/db/*`.
  *
- * Phase 2 (foundation): the database is opened and migrated at startup, but
- * no feature reads or writes yet — `repositories` exists so Phase 3
- * (hydration) can consume it without any further wiring.
+ * Phase 3 (hydration): stores consume the cache exclusively through
+ * `cacheService`, which wraps the `repositories` bundle exposed here.
  *
  * Failure policy: the cache is strictly optional. Every failure path logs
  * and leaves the service unavailable — app behavior is then identical to
@@ -75,9 +74,9 @@ export const databaseService = {
   },
 
   /**
-   * Deletes the database file entirely (future logout hook — cached
-   * plaintext must not survive an account switch). Next init() recreates
-   * the schema from scratch via the migration chain.
+   * Deletes the database file entirely (logout — cached plaintext must not
+   * survive an account switch). Next init() recreates the schema from
+   * scratch via the migration chain.
    */
   async wipe(): Promise<void> {
     this._repositories = null;
