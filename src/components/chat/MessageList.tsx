@@ -132,6 +132,9 @@ export const MessageList = memo(function MessageList({
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,
+        // Keyboard open shrinks the list; an animated auto-scroll on top of
+        // the keyboard animation reads as lag — snap to bottom instantly
+        animateAutoScrollToBottom: false,
       }}
       onStartReached={hasMore ? onLoadMore : undefined}
       onStartReachedThreshold={0.2}

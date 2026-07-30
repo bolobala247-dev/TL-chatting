@@ -44,6 +44,7 @@ Chạy đúng pipeline EAS ngay trên máy:
 - ✅ Tự tăng versionCode (appVersionSource: remote)
 
 ```bash
+source ~/.zshrc   # đảm bảo ANDROID_HOME có hiệu lực
 eas build --platform android --profile production --local
 ```
 

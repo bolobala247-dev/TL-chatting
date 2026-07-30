@@ -122,6 +122,25 @@ export const roomService = {
       data: { publicUrl },
     } = supabase.storage.from("chat-media").getPublicUrl(fileName);
 
+    // Old avatar_* files pile up next to chat media — sweep only that prefix
+    // so message attachments are untouched (best effort, never block)
+    try {
+      const { data: existing } = await supabase.storage
+        .from("chat-media")
+        .list(roomId);
+      const stale = (existing ?? [])
+        .filter(
+          (f) =>
+            f.name.startsWith("avatar_") && `${roomId}/${f.name}` !== fileName
+        )
+        .map((f) => `${roomId}/${f.name}`);
+      if (stale.length > 0) {
+        await supabase.storage.from("chat-media").remove(stale);
+      }
+    } catch (err) {
+      console.error("[roomService] cleanup old group avatars", err);
+    }
+
     return publicUrl;
   },
 
