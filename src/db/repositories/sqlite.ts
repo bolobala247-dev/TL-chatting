@@ -210,6 +210,32 @@ function createMessageRepository(db: SQLiteDatabase): MessageRepository {
       return rows.map(rowToMessage);
     },
 
+    async getWindowAround(roomId, around, radius) {
+      // Two halves around the anchor time: the newest `radius` rows at-or-before
+      // it (includes the anchor) and the oldest `radius` rows after it.
+      const [olderOrEqual, newer] = await Promise.all([
+        db.getAllAsync<MessageRow>(
+          `SELECT * FROM messages
+              WHERE room_id = ? AND created_at <= ?
+              ORDER BY created_at DESC LIMIT ?`,
+          [roomId, around, radius]
+        ),
+        db.getAllAsync<MessageRow>(
+          `SELECT * FROM messages
+              WHERE room_id = ? AND created_at > ?
+              ORDER BY created_at ASC LIMIT ?`,
+          [roomId, around, radius]
+        ),
+      ]);
+      // Merge to one newest-first array, de-duped by id (chatStore ordering).
+      const byId = new Map<string, MessageWithMeta>();
+      for (const r of olderOrEqual) byId.set(r.id, rowToMessage(r));
+      for (const r of newer) byId.set(r.id, rowToMessage(r));
+      return Array.from(byId.values()).sort((a, b) =>
+        (b.created_at ?? "").localeCompare(a.created_at ?? "")
+      );
+    },
+
     async deleteById(messageId) {
       await db.runAsync("DELETE FROM messages WHERE id = ?", [messageId]);
     },

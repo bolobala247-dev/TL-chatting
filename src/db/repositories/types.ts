@@ -49,6 +49,18 @@ export interface MessageRepository {
     limit: number,
     before?: string
   ): Promise<MessageWithMeta[]>;
+  /**
+   * A window centered on a message time (Phase 9 §3.3): up to `radius` rows
+   * at-or-before `around` (includes the anchor) plus up to `radius` rows after
+   * it, merged newest-first (chatStore ordering). Pure read — lets scroll
+   * restore / search-jump bring a deep target into the resident window without
+   * paging one call at a time. [] when the room isn't cached.
+   */
+  getWindowAround(
+    roomId: string,
+    around: string,
+    radius: number
+  ): Promise<MessageWithMeta[]>;
   deleteById(messageId: string): Promise<void>;
   deleteByRoom(roomId: string): Promise<void>;
   /** Keep only the newest `keep` rows of a room (cache pruning). */

@@ -172,6 +172,11 @@
   "draft": {
     "prefix": "Nháp"
   },
+  "scroll": {
+    "newMessages_one": "{{count}} tin nhắn mới",
+    "newMessages_other": "{{count}} tin nhắn mới",
+    "toLatest": "Đến tin mới nhất"
+  },
   "reactions": {
     "title": "Cảm xúc"
   },

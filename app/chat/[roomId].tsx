@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { View, Text, TextInput, Pressable, InteractionManager } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { useMessages } from "@/src/hooks/useMessages";
+import { useScrollManager, type ScrollFocusTarget } from "@/src/hooks/useScrollManager";
 import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { useRoomParticipants } from "@/src/hooks/useRoomParticipants";
 import { usePeerPresence } from "@/src/hooks/usePresence";
@@ -36,6 +37,7 @@ import {
 } from "@/src/lib/mentions";
 import { ChatHeader } from "@/src/components/chat/ChatHeader";
 import { MessageList } from "@/src/components/chat/MessageList";
+import { NewMessagesPill } from "@/src/components/chat/NewMessagesPill";
 import { MessageInput } from "@/src/components/chat/MessageInput";
 import { MentionAutocomplete } from "@/src/components/chat/MentionAutocomplete";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
@@ -108,7 +110,12 @@ const ReportUserSheet = lazy(() =>
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
-  const { roomId } = useLocalSearchParams<{ roomId: string }>();
+  const { roomId, focus, at } = useLocalSearchParams<{
+    roomId: string;
+    // Phase 9 §8: optional deep-link to a specific message (from search).
+    focus?: string;
+    at?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
@@ -127,6 +134,22 @@ export default function ChatScreen() {
     discardMessage,
   } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
+
+  // Phase 9 §8: a search result opens the room focused on one message. Freeze
+  // the target from the launch params so re-renders never re-trigger the jump.
+  const focusTarget = useMemo<ScrollFocusTarget | null>(
+    () => (focus && at ? { messageId: focus, createdAt: at } : null),
+    [focus, at]
+  );
+  const {
+    listRef,
+    initialScrollIndex,
+    onScroll,
+    onViewableItemsChanged,
+    viewabilityConfig,
+    showPill,
+    scrollToBottom,
+  } = useScrollManager(roomId!, messages, focusTarget);
 
   // Single participants fetch: header + read receipts share it
   const { participants, otherProfile } = useRoomParticipants(roomId!);
@@ -667,6 +690,16 @@ export default function ChatScreen() {
           onViewVoters={handleViewVoters}
           onRetryMessage={retryMessage}
           onDiscardMessage={discardMessage}
+          listRef={listRef}
+          initialScrollIndex={initialScrollIndex}
+          onScroll={onScroll}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+        />
+        <NewMessagesPill
+          visible={showPill}
+          roomId={roomId!}
+          onPress={scrollToBottom}
         />
       </View>
 

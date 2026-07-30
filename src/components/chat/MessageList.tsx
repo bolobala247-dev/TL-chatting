@@ -1,7 +1,15 @@
 import { memo, useCallback, useMemo } from "react";
-import { View, Text, ActivityIndicator, Platform } from "react-native";
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  Platform,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ViewabilityConfig,
+} from "react-native";
 import { useTranslation } from "react-i18next";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type FlashListRef, type ViewToken } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getSeenWatermark } from "@/src/lib/receipts";
@@ -29,6 +37,19 @@ interface MessageListProps {
   onRetryMessage?: (message: MessageWithMeta) => void;
   /** Discard a pending/failed send (Phase 5A outbox). */
   onDiscardMessage?: (message: MessageWithMeta) => void;
+  // --- Phase 9 scroll restoration (all optional; undefined ⇒ today's behavior) ---
+  /** Imperative handle for scroll-to-index/end from the scroll manager. */
+  listRef?: React.Ref<FlashListRef<MessageWithMeta>>;
+  /** Rendered index to open at (restore / focus jump); undefined ⇒ bottom. */
+  initialScrollIndex?: number;
+  /** Scroll position sampler (drives the pill + durable anchor flush). */
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  /** Records the topmost visible message as the anchor candidate. */
+  onViewableItemsChanged?: (info: {
+    viewableItems: ViewToken<MessageWithMeta>[];
+  }) => void;
+  /** Viewability thresholds (stable identity required by FlashList). */
+  viewabilityConfig?: ViewabilityConfig;
 }
 
 // Memoized: the chat screen re-renders on every composer keystroke; stable
@@ -49,6 +70,11 @@ export const MessageList = memo(function MessageList({
   onViewVoters,
   onRetryMessage,
   onDiscardMessage,
+  listRef,
+  initialScrollIndex,
+  onScroll,
+  onViewableItemsChanged,
+  viewabilityConfig,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
@@ -142,11 +168,17 @@ export const MessageList = memo(function MessageList({
 
   return (
     <FlashList
+      ref={listRef}
       data={orderedMessages}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       getItemType={getItemType}
       extraData={seenWatermark}
+      initialScrollIndex={initialScrollIndex}
+      onScroll={onScroll}
+      scrollEventThrottle={onScroll ? 16 : undefined}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,
