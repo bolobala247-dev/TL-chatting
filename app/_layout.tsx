@@ -12,6 +12,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initI18n } from "@/src/i18n";
+import { databaseService } from "@/src/services/databaseService";
 import { ThemeProvider, useTheme, useThemeBootstrap, useThemeColors } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
@@ -104,6 +105,10 @@ export default function RootLayout() {
 
   useEffect(() => {
     initI18n().finally(() => setI18nReady(true));
+    // Local SQLite cache (Phase 2 foundation): open + migrate in the
+    // background. Fire-and-forget — nothing renders from it yet, startup is
+    // never gated on it, and failure just disables the cache tier.
+    void databaseService.init();
   }, []);
 
   useEffect(() => {
