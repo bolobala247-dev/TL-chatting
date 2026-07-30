@@ -2,7 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
-import { QUICK_REACTIONS } from "@/src/lib/constants";
+import { QUICK_REACTIONS, EDIT_MESSAGE_WINDOW_MS } from "@/src/lib/constants";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { Sheet } from "@/src/components/ui/Sheet";
 
@@ -111,7 +111,12 @@ export function MessageActions({
     }
   );
 
-  if (isMine && message.type === "text") {
+  // Edit is only offered within the edit window after sending
+  const isEditable =
+    !!message.created_at &&
+    Date.now() - new Date(message.created_at).getTime() <= EDIT_MESSAGE_WINDOW_MS;
+
+  if (isMine && message.type === "text" && isEditable) {
     actions.push({
       label: t("actions.edit"),
       icon: { ios: "pencil", android: "edit", web: "edit" },
