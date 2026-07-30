@@ -156,19 +156,6 @@ export const messageService = {
     return data ?? [];
   },
 
-  // Thread = root message + all replies carrying its thread_id
-  // (flat, index-backed by idx_messages_thread). Oldest first.
-  async getThreadMessages(rootId: string): Promise<MessageWithMeta[]> {
-    const { data, error } = await supabase
-      .from("messages")
-      .select(MESSAGE_WITH_META_SELECT)
-      .or(`id.eq.${rootId},thread_id.eq.${rootId}`)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-    return data ?? [];
-  },
-
   async sendImageMessage(
     roomId: string,
     senderId: string,

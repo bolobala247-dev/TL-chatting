@@ -41,7 +41,6 @@ interface MessageBubbleProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
-  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 /** Drag distance that arms the swipe-to-reply on release. */
@@ -79,58 +78,6 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   );
 }
 
-// Reply-count chip: counts loaded thread replies in the store (cheap,
-// no extra query) — the thread screen fetches the full list.
-function ThreadChip({
-  message,
-  isMine,
-  onPress,
-}: {
-  message: MessageWithMeta;
-  isMine: boolean;
-  onPress?: () => void;
-}) {
-  const { t } = useTranslation("chat");
-  // Select the count (a primitive): store updates that don't change this
-  // message's reply count skip the re-render entirely
-  const replyCount = useChatStore((s) => {
-    const roomMessages = s.messages[message.room_id];
-    if (!roomMessages) return 0;
-    let count = 0;
-    for (const m of roomMessages) {
-      if (m.thread_id === message.id) count++;
-    }
-    return count;
-  });
-
-  if (replyCount === 0) return null;
-
-  return (
-    <Pressable
-      className="mt-1 flex-row items-center gap-1 self-start active:opacity-60"
-      onPress={onPress}
-      accessibilityRole="button"
-    >
-      <Icon
-        name={{
-          ios: "bubble.left.and.bubble.right",
-          android: "forum",
-          web: "forum",
-        }}
-        tone={isMine ? "inverse" : "tertiary"}
-        size={12}
-      />
-      <Text
-        className={`font-sans-medium text-label ${
-          isMine ? "text-ink-inverse/80" : "text-fg-secondary"
-        }`}
-      >
-        {t("thread.replyCount", { count: replyCount })}
-      </Text>
-    </Pressable>
-  );
-}
-
 // Memoized: message object identity changes on any patch, so memo keeps
 // FlashList re-renders cheap while reactions/votes/receipts update live
 export const MessageBubble = memo(function MessageBubble({
@@ -144,7 +91,6 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenAlbum,
   onVote,
   onViewVoters,
-  onOpenThread,
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
@@ -447,14 +393,6 @@ export const MessageBubble = memo(function MessageBubble({
             </View>
           )}
         </View>
-
-        {!isDeleted && !message.thread_id && (
-          <ThreadChip
-            message={message}
-            isMine={isMine}
-            onPress={() => onOpenThread?.(message)}
-          />
-        )}
       </View>
 
       {!isDeleted && (message.message_reactions?.length ?? 0) > 0 && (
