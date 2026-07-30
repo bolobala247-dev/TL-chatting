@@ -830,6 +830,43 @@ export type Database = {
           username: string
         }[]
       }
+      send_message_idempotent: {
+        Args: {
+          p_content: string
+          p_created_at?: string
+          p_id: string
+          p_metadata?: Json
+          p_reply_to?: string
+          p_room_id: string
+          p_type: string
+        }
+        Returns: {
+          attachments: Json | null
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          has_link: boolean | null
+          id: string
+          is_edited: boolean | null
+          media_url: string | null
+          metadata: Json | null
+          pinned_at: string | null
+          pinned_by: string | null
+          reply_to: string | null
+          room_id: string
+          sender_id: string
+          thread_id: string | null
+          type: string | null
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "messages"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       set_message_pin: {
         Args: { p_message_id: string; p_pinned: boolean }
         Returns: {

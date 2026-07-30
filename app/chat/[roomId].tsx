@@ -123,6 +123,8 @@ export default function ChatScreen() {
     toggleReaction,
     votePoll,
     loadMore,
+    retryMessage,
+    discardMessage,
   } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
 
@@ -663,6 +665,8 @@ export default function ChatScreen() {
           onOpenAlbum={handleOpenAlbum}
           onVote={votePoll}
           onViewVoters={handleViewVoters}
+          onRetryMessage={retryMessage}
+          onDiscardMessage={discardMessage}
         />
       </View>
 

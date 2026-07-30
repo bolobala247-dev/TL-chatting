@@ -5,6 +5,7 @@ import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import { syncService } from "@/src/services/syncService";
+import { outboxService } from "@/src/services/outboxService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type {
   Message,
@@ -284,6 +285,10 @@ export function useRealtimeRooms() {
     // "you were removed from room X" (§12 R4).
     const deltaResync = () => {
       void syncService.syncNow("rooms");
+      // Connectivity/foreground regained is also an outbox wakeup (§3.4 #2/#3):
+      // drain any queued sends that were waiting for the network. No-op when
+      // FEATURE_OFFLINE_OUTBOX is off.
+      outboxService.poke();
     };
 
     const handleNewMessage = (message: Message) => {

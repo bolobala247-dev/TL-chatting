@@ -113,7 +113,11 @@
     "sendFailed": "Couldn't send the message",
     "sendImageFailed": "Couldn't send the photo",
     "sendImageFailedDetail": "Couldn't send the photo: {{message}}",
-    "replyingTo": "Replying to message"
+    "replyingTo": "Replying to message",
+    "sending": "Sending",
+    "sendError": "Failed to send",
+    "retry": "Retry",
+    "discard": "Delete"
   },
   "pinned": {
     "title": "Pinned messages",

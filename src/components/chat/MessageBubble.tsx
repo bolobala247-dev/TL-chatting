@@ -41,6 +41,10 @@ interface MessageBubbleProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  /** Re-attempt a failed send (Phase 5A outbox). */
+  onRetry?: (message: MessageWithMeta) => void;
+  /** Discard a pending/failed send without sending (Phase 5A outbox). */
+  onDiscard?: (message: MessageWithMeta) => void;
 }
 
 /** Drag distance that arms the swipe-to-reply on release. */
@@ -91,6 +95,8 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onRetry,
+  onDiscard,
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
@@ -98,6 +104,9 @@ export const MessageBubble = memo(function MessageBubble({
   const isMine = message.sender_id === userId;
   const isDeleted = !!message.deleted_at;
   const isPoll = message.type === "poll";
+  // Phase 5A send state (own messages only; undefined = normal sent message)
+  const isPending = message.outbox_status === "pending";
+  const isFailed = message.outbox_status === "failed";
 
   // Swipe-to-reply: drag the bubble toward the center, release past the
   // threshold to quote — a touch idiom, so web keeps taps only
@@ -106,6 +115,8 @@ export const MessageBubble = memo(function MessageBubble({
     Platform.OS !== "web" &&
     !!onSwipeReply &&
     !isDeleted &&
+    !isPending &&
+    !isFailed &&
     !message.id.startsWith("temp-");
 
   const triggerReply = useCallback(() => {
@@ -142,9 +153,14 @@ export const MessageBubble = memo(function MessageBubble({
     !isDeleted && message.type === "image" ? getAttachments(message) : [];
   const mentions = isDeleted ? [] : getMentions(message);
 
-  // Receipt ticks: one check = sent, two = seen by every other participant
+  // Receipt ticks: one check = sent, two = seen by every other participant.
+  // Suppressed while a send is pending/failed — the status affordance shows instead.
   const showReceipt =
-    isMine && !isDeleted && !message.id.startsWith("temp-");
+    isMine &&
+    !isDeleted &&
+    !isPending &&
+    !isFailed &&
+    !message.id.startsWith("temp-");
   const seenByAll =
     showReceipt && seenByAllAt(seenWatermark, message.created_at);
 
@@ -390,6 +406,45 @@ export const MessageBubble = memo(function MessageBubble({
                   />
                 </View>
               )}
+            </View>
+          )}
+          {isPending && (
+            <View className="flex-row items-center gap-1">
+              <Icon
+                name={{ ios: "clock", android: "schedule", web: "schedule" }}
+                tone="inverse"
+                size={11}
+              />
+              <Text className="font-sans text-micro text-ink-inverse/60">
+                {t("message.sending")}
+              </Text>
+            </View>
+          )}
+          {isFailed && (
+            <View className="flex-row items-center gap-1.5">
+              <Text className="font-sans text-micro text-ink-inverse/80">
+                {t("message.sendError")}
+              </Text>
+              <Text className="text-micro text-ink-inverse/60">·</Text>
+              <Pressable
+                onPress={() => onRetry?.(message)}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
+                <Text className="font-sans-medium text-micro text-ink-inverse underline">
+                  {t("message.retry")}
+                </Text>
+              </Pressable>
+              <Text className="text-micro text-ink-inverse/60">·</Text>
+              <Pressable
+                onPress={() => onDiscard?.(message)}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
+                <Text className="font-sans-medium text-micro text-ink-inverse underline">
+                  {t("message.discard")}
+                </Text>
+              </Pressable>
             </View>
           )}
         </View>

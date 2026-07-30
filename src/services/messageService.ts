@@ -106,6 +106,38 @@ export const messageService = {
     return data;
   },
 
+  // Idempotent send (Phase 5A, §4.1): insert-or-return keyed on the CLIENT-minted
+  // message id (a v4 UUID = the idempotency key). A retried send of the same id
+  // returns the existing row instead of duplicating it (server PK + ON CONFLICT
+  // DO NOTHING), so missed-ACK re-drives are safe (Invariants #6/#7). sender_id is
+  // forced to auth.uid() inside the RPC — the client can never spoof a sender.
+  // Additive: coexists with the plain-insert sendMessage used by the flag-off path.
+  async sendMessageIdempotent(payload: {
+    id: string;
+    room_id: string;
+    content: string;
+    type: string;
+    metadata?: Message["metadata"];
+    reply_to?: string | null;
+    created_at: string;
+  }): Promise<Message> {
+    const { data, error } = await supabase.rpc("send_message_idempotent", {
+      p_id: payload.id,
+      p_room_id: payload.room_id,
+      p_content: payload.content,
+      p_type: payload.type,
+      p_metadata: payload.metadata ?? undefined,
+      p_reply_to: payload.reply_to ?? undefined,
+      p_created_at: payload.created_at,
+    });
+
+    if (error) throw error;
+    // SETOF messages → always returns the (new or pre-existing) row.
+    const row = data?.[0];
+    if (!row) throw new Error("send_message_idempotent returned no row");
+    return row;
+  },
+
   async updateMessage(
     messageId: string,
     content: string

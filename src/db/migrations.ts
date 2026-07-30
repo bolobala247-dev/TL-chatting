@@ -135,10 +135,44 @@ const MIGRATION_002_SYNC_STATE: Migration = {
   ],
 };
 
+/**
+ * v3 — offline outbox (Phase 5A, design §3.1, §9.1).
+ *
+ * A thin queue index keyed 1:1 by message id (the client-minted UUID = the
+ * idempotency key). The pending message itself is a real `messages` row
+ * (status='pending'), so it hydrates & renders after restart with zero
+ * special-casing; this table holds only queue bookkeeping the worker reads:
+ *  - created_at → FIFO ordering key (per room)
+ *  - attempts / next_attempt_at → persisted backoff (survives restart)
+ *  - state → 'pending' (auto-retried) | 'failed' (parked, manual retry)
+ * Same droppable-cache lifecycle as everything else (wiped on logout with the
+ * DB file — but logout drains first, design §8.3). No destructive change; the
+ * `messages.status` column already exists since v1, only now written/read.
+ */
+const MIGRATION_003_OUTBOX: Migration = {
+  toVersion: 3,
+  name: "outbox",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS outbox (
+      id              TEXT PRIMARY KEY NOT NULL,
+      room_id         TEXT NOT NULL,
+      attempts        INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT,
+      last_error      TEXT,
+      state           TEXT NOT NULL DEFAULT 'pending',
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT
+    );`,
+    // Due-set scan: pending rows in FIFO (room_id, created_at) order
+    `CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox (room_id, created_at);`,
+  ],
+};
+
 // Append-only, ordered by toVersion
 const MIGRATIONS: Migration[] = [
   MIGRATION_001_INITIAL_SCHEMA,
   MIGRATION_002_SYNC_STATE,
+  MIGRATION_003_OUTBOX,
 ];
 
 export const LATEST_SCHEMA_VERSION =

@@ -120,7 +120,21 @@ export interface PollMetadata {
 export type MessageWithMeta = Message & {
   message_reactions?: Pick<MessageReaction, "user_id" | "emoji">[];
   poll_votes?: Pick<PollVote, "user_id" | "option_index">[];
+  // Offline outbox (Phase 5A): client-only render annotation for an outgoing
+  // message's send state — absent = normal/sent. Never sent to the server,
+  // never in database.ts; maps to/from the SQLite messages.status column.
+  outbox_status?: "pending" | "failed";
 };
+
+// One queued outgoing message + its outbox bookkeeping (Phase 5A). The
+// message itself is a real `messages` row (status='pending'|'failed'); the
+// outbox row is the thin queue index the worker enumerates.
+export interface OutboxItem {
+  message: MessageWithMeta;
+  attempts: number;
+  next_attempt_at: string | null;
+  state: "pending" | "failed";
+}
 
 export interface RoomWithLastMessage {
   room_id: string;

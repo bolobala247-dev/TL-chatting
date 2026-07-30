@@ -79,6 +79,27 @@ export const DELTA_MAX_ATTEMPTS = 4;
 export const ROOMS_SYNC_SCOPE = "@rooms";
 
 // ============================================
+// Offline outbox (Phase 5A)
+// ============================================
+
+// Master flag. false ⇒ sending stays exactly today's temp-/RAM-only path
+// (optimistic in RAM, removed on error, no durability). true ⇒ outgoing
+// messages become durable, idempotent, ordered units of work (client-minted
+// UUID, persisted PENDING row + outbox queue, worker-driven delivery).
+// Rollback is flipping this back to false (kill switch).
+export const FEATURE_OFFLINE_OUTBOX = false;
+// Bounded exponential backoff for a failing send (per message, persisted in
+// outbox.next_attempt_at → survives restart): 2s,4s,8s,16s,30s,30s.
+export const OUTBOX_RETRY_BASE_MS = 2000;
+export const OUTBOX_RETRY_MAX_MS = 30000;
+// Transient failures beyond this cap park the message as FAILED (manual retry).
+export const OUTBOX_MAX_ATTEMPTS = 6;
+// Logout drains the outbox best-effort before wiping the DB (§8.3). Bounded so
+// a flaky network can never block sign-out; anything still pending is dropped
+// with the account's data (expected — you logged out).
+export const OUTBOX_LOGOUT_DRAIN_MS = 3000;
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 

@@ -1,6 +1,7 @@
 import type {
   MessageAttachment,
   MessageWithMeta,
+  OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
   SyncState,
@@ -102,6 +103,41 @@ export interface SyncStateRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * Durable outbox queue (Phase 5A, design §10.1, Invariant #3). Owns the
+ * queue's synchronization state: the FIFO read order, atomic state
+ * transitions, the monotonic per-room `created_at` guard, and dedup-by-id
+ * storage. It knows the queue — NOT networks, timers, or retry policy (that
+ * is `outboxService`), mirroring the Phase-4 mergeMessageWindow/syncService
+ * split. All mapping is row↔domain; the pending message itself lives in the
+ * `messages` table (status='pending'|'failed'), the outbox row is the index.
+ */
+export interface OutboxRepository {
+  /** Upsert the message row (status='pending') + insert its outbox row, one txn. */
+  enqueue(message: MessageWithMeta, createdAt: string): Promise<void>;
+  /**
+   * Every outbox row (pending + failed), JOINed to its message, FIFO by
+   * created_at. The single enumeration for both drain and resume(): the worker
+   * evaluates it head-first per room so the due-check preserves §6.2 FIFO — a
+   * row-level "due" filter cannot (design §3.2).
+   */
+  listAll(): Promise<OutboxItem[]>;
+  /** ACK: message.status=sent (+ adopt server fields) + delete outbox row, one txn. */
+  markSent(id: string, serverRow: MessageWithMeta): Promise<void>;
+  /** Park a message as FAILED (message.status=failed + outbox.state=failed). */
+  markFailed(id: string, error: string, permanent: boolean): Promise<void>;
+  /** Transient retry: bump attempts + persist next_attempt_at (stays pending). */
+  reschedule(
+    id: string,
+    attempts: number,
+    nextAttemptAt: string,
+    error: string
+  ): Promise<void>;
+  /** Discard: delete the message row + its outbox row, one txn. */
+  remove(id: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
 /** Everything the application layer can reach — one bundle per connection. */
 export interface Repositories {
   messages: MessageRepository;
@@ -109,4 +145,5 @@ export interface Repositories {
   participants: ParticipantRepository;
   attachments: AttachmentRepository;
   syncState: SyncStateRepository;
+  outbox: OutboxRepository;
 }

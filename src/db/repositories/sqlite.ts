@@ -3,6 +3,7 @@ import type {
   Message,
   MessageAttachment,
   MessageWithMeta,
+  OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
   SyncState,
@@ -10,6 +11,7 @@ import type {
 import type {
   AttachmentRepository,
   MessageRepository,
+  OutboxRepository,
   ParticipantRepository,
   Repositories,
   RoomRepository,
@@ -50,6 +52,7 @@ interface MessageRow {
   metadata: string | null;
   reactions: string | null;
   poll_votes: string | null;
+  status: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -83,6 +86,9 @@ function toMessageRowParams(m: MessageWithMeta) {
     m.metadata == null ? null : JSON.stringify(m.metadata),
     m.message_reactions == null ? null : JSON.stringify(m.message_reactions),
     m.poll_votes == null ? null : JSON.stringify(m.poll_votes),
+    // Outbox send state (Phase 5A): only pending/failed rows carry a non-'sent'
+    // status; every normal/ingested row persists as 'sent' (schema default).
+    m.outbox_status ?? "sent",
     m.created_at,
     m.updated_at,
   ];
@@ -111,6 +117,12 @@ function rowToMessage(row: MessageRow): MessageWithMeta {
       undefined,
     poll_votes:
       parseJson<MessageWithMeta["poll_votes"]>(row.poll_votes) ?? undefined,
+    // Only pending/failed hydrate a send-state annotation; 'sent' (and any
+    // legacy null) render as a normal message (Phase 5A §9.1).
+    outbox_status:
+      row.status === "pending" || row.status === "failed"
+        ? row.status
+        : undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -120,8 +132,8 @@ const UPSERT_MESSAGE_SQL = `
   INSERT OR REPLACE INTO messages (
     id, room_id, sender_id, content, type, media_url, reply_to, thread_id,
     has_link, is_edited, pinned_at, pinned_by, deleted_at, deleted_by,
-    attachments, metadata, reactions, poll_votes, created_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    attachments, metadata, reactions, poll_votes, status, created_at, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 function createMessageRepository(db: SQLiteDatabase): MessageRepository {
   async function upsertInTxn(
@@ -513,6 +525,139 @@ function createSyncStateRepository(db: SQLiteDatabase): SyncStateRepository {
 }
 
 // ---------------------------------------------------------------------------
+// outbox (Phase 5A — durable send queue; the message row IS the payload)
+// ---------------------------------------------------------------------------
+
+/**
+ * Monotonic per-room authoring clock (design §6.3): guards against a backward
+ * device-clock jump inverting two sends' created_at. The effective stamp is
+ * max(incoming, lastEnqueued + 1ms) per room, so intra-room FIFO stays stable
+ * regardless of wall-clock jitter. In-memory only (persisted created_at also
+ * anchors order); it resets on relaunch, which is harmless — a fresh process
+ * has no in-flight sends to keep monotonic against.
+ */
+const lastEnqueuedByRoom = new Map<string, number>();
+
+function monotonicCreatedAt(roomId: string, createdAt: string): string {
+  const incoming = new Date(createdAt).getTime();
+  const last = lastEnqueuedByRoom.get(roomId);
+  const effective = last != null && incoming <= last ? last + 1 : incoming;
+  lastEnqueuedByRoom.set(roomId, effective);
+  return new Date(effective).toISOString();
+}
+
+// The due/all query returns the whole message row (the send payload) plus the
+// three outbox bookkeeping fields the worker needs, aliased to avoid colliding
+// with the message's own id/room_id/created_at/updated_at columns.
+interface OutboxJoinRow extends MessageRow {
+  o_attempts: number;
+  o_next_attempt_at: string | null;
+  o_state: string;
+}
+
+function rowToOutboxItem(row: OutboxJoinRow): OutboxItem {
+  return {
+    message: rowToMessage(row),
+    attempts: row.o_attempts,
+    next_attempt_at: row.o_next_attempt_at,
+    state: row.o_state === "failed" ? "failed" : "pending",
+  };
+}
+
+const OUTBOX_SELECT_SQL = `
+  SELECT m.*, o.attempts AS o_attempts,
+         o.next_attempt_at AS o_next_attempt_at, o.state AS o_state
+    FROM outbox o JOIN messages m ON m.id = o.id`;
+
+function createOutboxRepository(db: SQLiteDatabase): OutboxRepository {
+  return {
+    async enqueue(message, createdAt) {
+      const stampedAt = monotonicCreatedAt(message.room_id, createdAt);
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        // The pending message is a real messages row (status='pending') so it
+        // hydrates & renders after restart with zero special-casing (§3.1).
+        await txn.runAsync(
+          UPSERT_MESSAGE_SQL,
+          toMessageRowParams({
+            ...message,
+            created_at: stampedAt,
+            outbox_status: "pending",
+          })
+        );
+        // The outbox row is the thin queue index (bookkeeping only, §3.1).
+        await txn.runAsync(
+          `INSERT OR REPLACE INTO outbox
+             (id, room_id, attempts, next_attempt_at, last_error, state, created_at, updated_at)
+           VALUES (?, ?, 0, NULL, NULL, 'pending', ?, ?)`,
+          [message.id, message.room_id, stampedAt, now]
+        );
+      });
+    },
+
+    // The single ordered enumeration for both drain and resume() (pending +
+    // failed). The worker evaluates this head-first per room (design §3.2) so
+    // the due-check preserves §6.2 FIFO — a row-level "due" filter would let a
+    // follower jump ahead of a transiently-rescheduled head.
+    async listAll() {
+      const rows = await db.getAllAsync<OutboxJoinRow>(
+        `${OUTBOX_SELECT_SQL} ORDER BY o.created_at ASC`
+      );
+      return rows.map(rowToOutboxItem);
+    },
+
+    async markSent(id, serverRow) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        // Adopt the server row: outbox_status undefined maps to status='sent',
+        // so a sent message is indistinguishable from a normally-received one.
+        await txn.runAsync(
+          UPSERT_MESSAGE_SQL,
+          toMessageRowParams({ ...serverRow, outbox_status: undefined })
+        );
+        await txn.runAsync("DELETE FROM outbox WHERE id = ?", [id]);
+      });
+    },
+
+    // Park terminally as FAILED. Both a permanent error and an attempts-cap
+    // exhaustion land here; the repository stores the same parked state either
+    // way, so `_permanent` is not needed for the write (kept for interface parity).
+    async markFailed(id, error, _permanent) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync("UPDATE messages SET status = 'failed' WHERE id = ?", [
+          id,
+        ]);
+        await txn.runAsync(
+          `UPDATE outbox SET state = 'failed', last_error = ?, updated_at = ?
+            WHERE id = ?`,
+          [error, now, id]
+        );
+      });
+    },
+
+    async reschedule(id, attempts, nextAttemptAt, error) {
+      await db.runAsync(
+        `UPDATE outbox
+            SET attempts = ?, next_attempt_at = ?, last_error = ?, updated_at = ?
+          WHERE id = ?`,
+        [attempts, nextAttemptAt, error, new Date().toISOString(), id]
+      );
+    },
+
+    async remove(id) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync("DELETE FROM messages WHERE id = ?", [id]);
+        await txn.runAsync("DELETE FROM outbox WHERE id = ?", [id]);
+      });
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM outbox");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Builds the full repository bundle over one open connection. */
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -522,5 +667,6 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     participants: createParticipantRepository(db),
     attachments: createAttachmentRepository(db),
     syncState: createSyncStateRepository(db),
+    outbox: createOutboxRepository(db),
   };
 }

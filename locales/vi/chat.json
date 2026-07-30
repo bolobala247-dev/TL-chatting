@@ -108,7 +108,11 @@
     "sendFailed": "Không thể gửi tin nhắn",
     "sendImageFailed": "Không thể gửi ảnh",
     "sendImageFailedDetail": "Không thể gửi ảnh: {{message}}",
-    "replyingTo": "Trả lời tin nhắn"
+    "replyingTo": "Trả lời tin nhắn",
+    "sending": "Đang gửi",
+    "sendError": "Gửi lỗi",
+    "retry": "Thử lại",
+    "discard": "Xóa"
   },
   "pinned": {
     "title": "Tin nhắn đã ghim",
