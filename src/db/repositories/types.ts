@@ -17,13 +17,23 @@ import type {
  * `RoomWithLastMessage`, …) — row ↔ domain mapping is an implementation
  * detail that must never leak upward.
  *
- * Phase 2 note: nothing calls the read/write methods yet. They define the
- * surface Phase 3 (hydration) builds on.
+ * Consumed since Phase 3 by `cacheService` (hydration + write-through) —
+ * still never directly by stores, hooks, or UI.
  */
 
 export interface MessageRepository {
   /** Insert-or-replace by message id (idempotent batch write). */
   upsertMany(messages: MessageWithMeta[]): Promise<void>;
+  /**
+   * Replace the newest cached window with a fresh page-1 result: drops
+   * cached rows at/after the batch's oldest created_at (so server-side
+   * deletions in that range don't linger), then upserts the batch. An
+   * empty batch means the room has no messages left → clears its cache.
+   */
+  replaceNewestWindow(
+    roomId: string,
+    messages: MessageWithMeta[]
+  ): Promise<void>;
   /**
    * Newest-first page for one room (matches chatStore ordering).
    * `before` = created_at cursor, same semantics as messageService.getMessages.
@@ -43,6 +53,11 @@ export interface MessageRepository {
 export interface RoomRepository {
   /** Insert-or-replace the room-list payloads (get_user_rooms shape). */
   upsertMany(rooms: RoomWithLastMessage[]): Promise<void>;
+  /**
+   * Replace the entire cached list with a fresh get_user_rooms result
+   * (rooms the user left must not linger in the cache).
+   */
+  replaceAll(rooms: RoomWithLastMessage[]): Promise<void>;
   /** All cached rooms, most recent activity first (room-list order). */
   getAll(): Promise<RoomWithLastMessage[]>;
   deleteById(roomId: string): Promise<void>;

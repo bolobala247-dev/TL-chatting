@@ -122,18 +122,53 @@ const UPSERT_MESSAGE_SQL = `
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 function createMessageRepository(db: SQLiteDatabase): MessageRepository {
+  async function upsertInTxn(
+    txn: Parameters<Parameters<SQLiteDatabase["withExclusiveTransactionAsync"]>[0]>[0],
+    messages: MessageWithMeta[]
+  ) {
+    const stmt = await txn.prepareAsync(UPSERT_MESSAGE_SQL);
+    try {
+      for (const m of messages) {
+        await stmt.executeAsync(toMessageRowParams(m));
+      }
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  }
+
   return {
     async upsertMany(messages) {
       if (messages.length === 0) return;
       await db.withExclusiveTransactionAsync(async (txn) => {
-        const stmt = await txn.prepareAsync(UPSERT_MESSAGE_SQL);
-        try {
-          for (const m of messages) {
-            await stmt.executeAsync(toMessageRowParams(m));
-          }
-        } finally {
-          await stmt.finalizeAsync();
+        await upsertInTxn(txn, messages);
+      });
+    },
+
+    async replaceNewestWindow(roomId, messages) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        if (messages.length === 0) {
+          // Fresh page 1 is empty → the room has no visible history left
+          await txn.runAsync("DELETE FROM messages WHERE room_id = ?", [
+            roomId,
+          ]);
+          return;
         }
+        // Drop cached rows in the window's time range so messages deleted
+        // server-side while we were away don't survive the refresh
+        const oldest = messages.reduce<string | null>(
+          (min, m) =>
+            m.created_at != null && (min == null || m.created_at < min)
+              ? m.created_at
+              : min,
+          null
+        );
+        if (oldest != null) {
+          await txn.runAsync(
+            "DELETE FROM messages WHERE room_id = ? AND created_at >= ?",
+            [roomId, oldest]
+          );
+        }
+        await upsertInTxn(txn, messages);
       });
     },
 
@@ -190,27 +225,42 @@ interface RoomRow {
 }
 
 function createRoomRepository(db: SQLiteDatabase): RoomRepository {
+  async function upsertInTxn(
+    txn: Parameters<Parameters<SQLiteDatabase["withExclusiveTransactionAsync"]>[0]>[0],
+    rooms: RoomWithLastMessage[]
+  ) {
+    const stmt = await txn.prepareAsync(
+      `INSERT OR REPLACE INTO rooms (room_id, payload, last_message_at, updated_at)
+       VALUES (?, ?, ?, ?)`
+    );
+    try {
+      const now = new Date().toISOString();
+      for (const room of rooms) {
+        await stmt.executeAsync([
+          room.room_id,
+          JSON.stringify(room),
+          room.last_message_at,
+          now,
+        ]);
+      }
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  }
+
   return {
     async upsertMany(rooms) {
       if (rooms.length === 0) return;
       await db.withExclusiveTransactionAsync(async (txn) => {
-        const stmt = await txn.prepareAsync(
-          `INSERT OR REPLACE INTO rooms (room_id, payload, last_message_at, updated_at)
-           VALUES (?, ?, ?, ?)`
-        );
-        try {
-          const now = new Date().toISOString();
-          for (const room of rooms) {
-            await stmt.executeAsync([
-              room.room_id,
-              JSON.stringify(room),
-              room.last_message_at,
-              now,
-            ]);
-          }
-        } finally {
-          await stmt.finalizeAsync();
-        }
+        await upsertInTxn(txn, rooms);
+      });
+    },
+
+    async replaceAll(rooms) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        // Full-list snapshot: rooms the user left disappear from the cache
+        await txn.runAsync("DELETE FROM rooms");
+        await upsertInTxn(txn, rooms);
       });
     },
 
