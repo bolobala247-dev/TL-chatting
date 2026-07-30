@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      calls: {
+        Row: {
+          answered_at: string | null
+          callee_id: string
+          caller_id: string
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          room_id: string
+          status: string
+          type: string
+        }
+        Insert: {
+          answered_at?: string | null
+          callee_id: string
+          caller_id: string
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          room_id: string
+          status?: string
+          type: string
+        }
+        Update: {
+          answered_at?: string | null
+          callee_id?: string
+          caller_id?: string
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          room_id?: string
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_callee_id_fkey"
+            columns: ["callee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_caller_id_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string | null

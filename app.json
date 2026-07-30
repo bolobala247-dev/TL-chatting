@@ -49,7 +49,14 @@
       "expo-secure-store",
       "expo-image",
       "./plugins/withGradleBuildOptimizations",
-      "expo-localization"
+      "expo-localization",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Talo cần quyền truy cập camera cho cuộc gọi video.",
+          "microphonePermission": "Talo cần quyền truy cập micro cho cuộc gọi thoại."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

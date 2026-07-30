@@ -18,6 +18,7 @@ import { useNotifications } from "@/src/hooks/useNotifications";
 import { usePresenceHeartbeat } from "@/src/hooks/usePresence";
 import { useRealtimeRooms } from "@/src/hooks/useRealtime";
 import { AppLockGate } from "@/src/components/AppLockGate";
+import { CallHost } from "@/src/components/call/CallHost";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { VercelInsights } from "@/src/components/VercelInsights";
 import "../global.css";
@@ -59,14 +60,19 @@ function AuthGate() {
   // Native stack so detail screens (chat, search, settings...) get platform
   // slide transitions and edge/full-screen swipe-back on mobile
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-        gestureEnabled: true,
-        fullScreenGestureEnabled: true,
-      }}
-    />
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+        }}
+      />
+      {/* Global calling overlay — renders above every screen while a call is
+          active, and runs the incoming-call listener when signed in */}
+      {session && <CallHost />}
+    </>
   );
 }
 
