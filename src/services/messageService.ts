@@ -93,6 +93,43 @@ export const messageService = {
     return data ?? [];
   },
 
+  // Phase 11 §5.1: a window centered on a message time, straight from the
+  // server — used only when the local cache misses a deep jump target. Two
+  // bounded selects (at-or-before + strictly-after), merged newest-first to
+  // match chatStore order and de-duped by id. Read-only, embeds ride along, no
+  // RPC / type regen (mirrors getRoomMessagesSince). O(window), never O(convo).
+  async getMessagesAround(
+    roomId: string,
+    around: string,
+    radius: number
+  ): Promise<MessageWithMeta[]> {
+    const [olderOrEqual, newer] = await Promise.all([
+      supabase
+        .from("messages")
+        .select(MESSAGE_WITH_META_SELECT)
+        .eq("room_id", roomId)
+        .lte("created_at", around)
+        .order("created_at", { ascending: false })
+        .limit(radius),
+      supabase
+        .from("messages")
+        .select(MESSAGE_WITH_META_SELECT)
+        .eq("room_id", roomId)
+        .gt("created_at", around)
+        .order("created_at", { ascending: true })
+        .limit(radius),
+    ]);
+    if (olderOrEqual.error) throw olderOrEqual.error;
+    if (newer.error) throw newer.error;
+
+    const byId = new Map<string, MessageWithMeta>();
+    for (const row of olderOrEqual.data ?? []) byId.set(row.id, row);
+    for (const row of newer.data ?? []) byId.set(row.id, row);
+    return Array.from(byId.values()).sort((a, b) =>
+      (b.created_at ?? "").localeCompare(a.created_at ?? "")
+    );
+  },
+
   async sendMessage(
     message: InsertTables<"messages">
   ): Promise<Message> {

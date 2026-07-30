@@ -9,17 +9,29 @@ import type { FlashListRef, ViewToken } from "@shopify/flash-list";
 import {
   ANCHOR_FLUSH_MS,
   FEATURE_SCROLL_RESTORE,
+  FEATURE_SCROLL_TO_MESSAGE,
+  JUMP_HIGHLIGHT_DURATION_MS,
+  JUMP_LOAD_TIMEOUT_MS,
+  JUMP_WINDOW_RADIUS,
   MESSAGES_PER_PAGE,
   SCROLL_BOTTOM_THRESHOLD_PX,
 } from "@/src/lib/constants";
 import { cacheService } from "@/src/services/cacheService";
+import { messageService } from "@/src/services/messageService";
+import { jumpBus, type JumpTarget } from "@/src/lib/jumpBus";
 import { useChatStore } from "@/src/stores/chatStore";
+import { useJumpStore, type JumpReturnAnchor } from "@/src/stores/jumpStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import {
   isRestorable,
   useScrollAnchorStore,
 } from "@/src/stores/scrollAnchorStore";
 import type { MessageWithMeta } from "@/src/types";
+
+// Phase 11: the scroll machinery (refs, handlers, candidate tracking) activates
+// when EITHER scroll restoration or scroll-to-message is on; only the durable
+// anchor writes stay gated on FEATURE_SCROLL_RESTORE. Both off ⇒ fully inert.
+const SCROLL_ACTIVE = FEATURE_SCROLL_RESTORE || FEATURE_SCROLL_TO_MESSAGE;
 
 // Phase 9 §8. A search result (or future jump-to-reply) opens the room focused
 // on a specific message rather than at the bottom.
@@ -63,6 +75,23 @@ function nearestNewestFirstIndex(
   return messages.length > 0 ? messages.length - 1 : -1;
 }
 
+// Reject after `ms` so a slow server around-fetch degrades to the fallback (§14).
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("jump-timeout")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 // Resolve the first-render scroll index (§3.2 / §4.2): a focus target wins over
 // the saved anchor. Returns undefined ⇒ render at the bottom (default), which is
 // the common "was at bottom" case and every failure path (§10).
@@ -74,12 +103,14 @@ function resolveInitialIndex(
   const total = messages.length;
   if (total === 0) return undefined;
 
-  const target = focus ?? (() => {
-    const anchor = useScrollAnchorStore.getState().anchors[roomId];
-    return isRestorable(anchor)
-      ? { messageId: anchor.messageId, createdAt: anchor.createdAt }
-      : null;
-  })();
+  const target = focus ?? (FEATURE_SCROLL_RESTORE
+    ? (() => {
+        const anchor = useScrollAnchorStore.getState().anchors[roomId];
+        return isRestorable(anchor)
+          ? { messageId: anchor.messageId, createdAt: anchor.createdAt }
+          : null;
+      })()
+    : null);
   if (!target) return undefined;
 
   const exact = messages.findIndex((m) => m.id === target.messageId);
@@ -125,7 +156,7 @@ export function useScrollManager(
   // First-render scroll index, resolved once when data first arrives (§4.2).
   const resolvedRef = useRef(false);
   const initialIndexRef = useRef<number | undefined>(undefined);
-  if (FEATURE_SCROLL_RESTORE && !resolvedRef.current && messages.length > 0) {
+  if (SCROLL_ACTIVE && !resolvedRef.current && messages.length > 0) {
     resolvedRef.current = true;
     initialIndexRef.current = resolveInitialIndex(messages, roomId, focus);
   }
@@ -176,7 +207,7 @@ export function useScrollManager(
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!FEATURE_SCROLL_RESTORE) return;
+      if (!SCROLL_ACTIVE) return;
       const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
       const distanceFromBottom =
         contentSize.height - layoutMeasurement.height - contentOffset.y;
@@ -207,7 +238,7 @@ export function useScrollManager(
 
   const onViewableItemsChanged = useCallback(
     (info: { viewableItems: ViewToken<MessageWithMeta>[] }) => {
-      if (!FEATURE_SCROLL_RESTORE) return;
+      if (!SCROLL_ACTIVE) return;
       const items = info.viewableItems;
       if (items.length === 0) return;
       // Rendered data is chronological; the first viewable row is the topmost.
@@ -236,9 +267,197 @@ export function useScrollManager(
     }, 400);
   }, [roomId, setPill]);
 
+  // ————————————————————————————————————————————————————————————————
+  // Phase 11 — jump pipeline (§3/§13). One scheduler slot: a new request
+  // supersedes any in-flight jump via a generation counter, so overlapping taps
+  // never fight (I-J6). Everything below is gated on FEATURE_SCROLL_TO_MESSAGE.
+  // ————————————————————————————————————————————————————————————————
+  const jumpGenRef = useRef(0);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // One-shot highlight (§7): publish the target + a fresh token, then auto-clear.
+  const triggerHighlight = useCallback(
+    (messageId: string) => {
+      if (!FEATURE_SCROLL_TO_MESSAGE) return;
+      useJumpStore.getState().setHighlight(roomId, messageId);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = setTimeout(() => {
+        useJumpStore.getState().clearHighlight(roomId);
+      }, JUMP_HIGHLIGHT_DURATION_MS);
+    },
+    [roomId]
+  );
+
+  // Where the viewport is right now — captured before a jump so the return chip
+  // can undo it (§8). "bottom" when pinned to the newest message.
+  const captureReturnAnchor = useCallback((): JumpReturnAnchor => {
+    if (atBottomRef.current) return "bottom";
+    const c = candidateRef.current;
+    return c ? { messageId: c.messageId, createdAt: c.createdAt } : "bottom";
+  }, []);
+
+  // Center the current list on a resident id; returns whether it was found.
+  const scrollToResidentId = useCallback((id: string): boolean => {
+    const msgs = messagesRef.current;
+    const nfi = msgs.findIndex((m) => m.id === id);
+    if (nfi < 0) return false;
+    listRef.current
+      ?.scrollToIndex({
+        index: toRenderedIndex(msgs.length, nfi),
+        animated: false,
+        viewPosition: 0.5,
+      })
+      .catch(() => {});
+    return true;
+  }, []);
+
+  // The core pipeline (§3): resolve → resident? → cache around → server around →
+  // nearest-neighbour → bottom. `isReturn` skips pushing a new history entry.
+  const runJump = useCallback(
+    async (target: JumpTarget, isReturn = false) => {
+      if (!FEATURE_SCROLL_TO_MESSAGE) return;
+      // Optimistic/temporary rows are never a jump target (I-J9).
+      if (target.messageId.startsWith("temp-")) return;
+
+      const gen = ++jumpGenRef.current;
+      const msgs = messagesRef.current;
+
+      // Resolve the ordering key from the resident row when the caller omits it.
+      let at = target.createdAt;
+      if (!at) {
+        at = msgs.find((m) => m.id === target.messageId)?.created_at ?? undefined;
+      }
+
+      const fromAnchor = captureReturnAnchor();
+      const wantHighlight = target.highlight !== false;
+
+      // Center on the target once the (possibly swapped) window has committed;
+      // fall back to nearest-neighbour by time when the id isn't present (§14).
+      const land = () => {
+        requestAnimationFrame(() => {
+          if (gen !== jumpGenRef.current) return;
+          if (scrollToResidentId(target.messageId)) {
+            if (wantHighlight) triggerHighlight(target.messageId);
+          } else if (at) {
+            const nn = nearestNewestFirstIndex(messagesRef.current, at);
+            if (nn >= 0) {
+              listRef.current
+                ?.scrollToIndex({
+                  index: toRenderedIndex(messagesRef.current.length, nn),
+                  animated: false,
+                  viewPosition: 0.5,
+                })
+                .catch(() => {});
+            }
+          }
+          setTimeout(() => {
+            if (gen === jumpGenRef.current) suppressRef.current = false;
+          }, 500);
+        });
+      };
+
+      // 1. Resident — no data movement, instant centered scroll (§4.1).
+      if (msgs.some((m) => m.id === target.messageId)) {
+        atBottomRef.current = false;
+        setPill(true);
+        if (!isReturn) useJumpStore.getState().pushHistory(roomId, fromAnchor);
+        suppressRef.current = true;
+        land();
+        return;
+      }
+
+      // Need a window; without an ordering key we can't around-load — bail (§4).
+      if (!at) return;
+
+      suppressRef.current = true;
+      let windowRows: MessageWithMeta[] = [];
+      try {
+        windowRows = await cacheService.getRoomMessagesAround(
+          roomId,
+          at,
+          JUMP_WINDOW_RADIUS
+        );
+      } catch {
+        windowRows = [];
+      }
+      if (gen !== jumpGenRef.current) return;
+
+      let found = windowRows.some((m) => m.id === target.messageId);
+
+      // 2. Cache missed the target row → bounded server around-fetch (§5.1).
+      if (!found) {
+        try {
+          const serverRows = await withTimeout(
+            messageService.getMessagesAround(roomId, at, JUMP_WINDOW_RADIUS),
+            JUMP_LOAD_TIMEOUT_MS
+          );
+          if (gen !== jumpGenRef.current) return;
+          if (serverRows.length > 0) {
+            cacheService.saveMessages(serverRows); // write-through
+            windowRows = serverRows;
+            found = serverRows.some((m) => m.id === target.messageId);
+          }
+        } catch {
+          // Offline / timeout → fall through with whatever the cache gave us.
+        }
+      }
+      if (gen !== jumpGenRef.current) return;
+
+      if (windowRows.length === 0) {
+        // Nothing to show anywhere — stay put (§14).
+        suppressRef.current = false;
+        return;
+      }
+
+      // Swap the resident window to the around-window, then land on the target.
+      useChatStore.getState().setRoomMessages(roomId, windowRows);
+      atBottomRef.current = false;
+      setPill(true);
+      if (!isReturn) useJumpStore.getState().pushHistory(roomId, fromAnchor);
+      void found; // presence already reflected in the swapped window
+      land();
+    },
+    [roomId, captureReturnAnchor, scrollToResidentId, setPill, triggerHighlight]
+  );
+
+  // Stable bus handler: register once per room, always calling the latest runJump.
+  const runJumpRef = useRef(runJump);
+  runJumpRef.current = runJump;
+
+  useEffect(() => {
+    if (!FEATURE_SCROLL_TO_MESSAGE) return;
+    jumpBus.register(roomId, (target) => runJumpRef.current(target));
+    return () => {
+      jumpBus.unregister(roomId);
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      useJumpStore.getState().clearHighlight(roomId);
+    };
+  }, [roomId]);
+
+  // Return chip (§8): pop the trail and go back to where the user was.
+  const returnToPrevious = useCallback(() => {
+    if (!FEATURE_SCROLL_TO_MESSAGE) return;
+    const entry = useJumpStore.getState().popHistory(roomId);
+    if (!entry) return;
+    if (entry.anchor === "bottom") {
+      scrollToBottom();
+      return;
+    }
+    void runJump(
+      {
+        roomId,
+        messageId: entry.anchor.messageId,
+        createdAt: entry.anchor.createdAt,
+        source: "unread",
+        highlight: false,
+      },
+      true
+    );
+  }, [roomId, runJump, scrollToBottom]);
+
   // Show the pill straight after a non-bottom restore (before any user scroll).
   useEffect(() => {
-    if (!FEATURE_SCROLL_RESTORE) return;
+    if (!SCROLL_ACTIVE) return;
     if (messages.length === 0) return;
     const idx = initialIndexRef.current;
     if (idx != null && idx < messages.length - 1) {
@@ -252,14 +471,17 @@ export function useScrollManager(
   // the newest page, then animate to it. Runs once per focus target.
   const jumpedRef = useRef(false);
   useEffect(() => {
-    if (!FEATURE_SCROLL_RESTORE || !focus) return;
+    if (!SCROLL_ACTIVE || !focus) return;
     if (jumpedRef.current || messages.length === 0) return;
     jumpedRef.current = true;
 
     if (messages.some((m) => m.id === focus.messageId)) {
       atBottomRef.current = false;
       setPill(true);
-      requestAnimationFrame(() => scrollToRenderedId(focus.messageId, true));
+      requestAnimationFrame(() => {
+        scrollToRenderedId(focus.messageId, true);
+        triggerHighlight(focus.messageId);
+      });
       return;
     }
 
@@ -279,6 +501,7 @@ export function useScrollManager(
         setPill(true);
         requestAnimationFrame(() => {
           scrollToRenderedId(focus.messageId, true);
+          triggerHighlight(focus.messageId);
           setTimeout(() => {
             suppressRef.current = false;
           }, 500);
@@ -310,7 +533,7 @@ export function useScrollManager(
   }, [flush]);
 
   // Flag-off ⇒ everything inert so <MessageList> renders exactly as today.
-  if (!FEATURE_SCROLL_RESTORE) {
+  if (!SCROLL_ACTIVE) {
     return {
       listRef,
       initialScrollIndex: undefined as number | undefined,
@@ -319,6 +542,7 @@ export function useScrollManager(
       viewabilityConfig: undefined,
       showPill: false,
       scrollToBottom: () => {},
+      returnToPrevious: () => {},
     };
   }
 
@@ -330,5 +554,6 @@ export function useScrollManager(
     viewabilityConfig: VIEWABILITY_CONFIG,
     showPill,
     scrollToBottom,
+    returnToPrevious,
   };
 }

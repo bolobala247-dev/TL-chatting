@@ -219,6 +219,30 @@ export const JUMP_STACK_MAX = 10;
 export const SCROLL_BOTTOM_THRESHOLD_PX = 120;
 
 // ============================================
+// Scroll-to-message / jump pipeline (Phase 11)
+// ============================================
+
+// Master flag for Telegram-style scroll-to-message. false ⇒ reply previews are
+// non-interactive, the jumpBus/jumpStore are never touched, notifications open
+// at the bottom, and the only jump is the Phase 9 search ?focus=&at= path —
+// byte-identical to today. true ⇒ every jump source (search, reply, pinned,
+// mention, notification, unread) funnels through ONE pipeline: resolve target →
+// around-load if needed → centered scroll → one-shot highlight → return trail.
+// Builds on FEATURE_SCROLL_RESTORE (enable together). Rollback = flip false.
+export const FEATURE_SCROLL_TO_MESSAGE = false;
+// Rows loaded each side of a jump target for the around-window (mirrors the
+// page size so a swap stays O(window), never O(conversation) — §15).
+export const JUMP_WINDOW_RADIUS = MESSAGES_PER_PAGE;
+// One-shot highlight timing after landing on a jumped-to message (§7): a single
+// fade-in → hold → fade-out pulse, never a loop.
+export const JUMP_HIGHLIGHT_DURATION_MS = 1500;
+export const JUMP_HIGHLIGHT_FADE_IN_MS = 120;
+export const JUMP_HIGHLIGHT_FADE_OUT_MS = 500;
+// Bounds a server around-fetch for a deep / cache-missed target; on timeout the
+// jump degrades to nearest-neighbour then bottom (§14).
+export const JUMP_LOAD_TIMEOUT_MS = 6000;
+
+// ============================================
 // Intelligent prefetch & push presence (Phase 10)
 // ============================================
 

@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,12 +12,24 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
+import { useJumpStore } from "@/src/stores/jumpStore";
+import { jumpBus } from "@/src/lib/jumpBus";
+import {
+  FEATURE_SCROLL_TO_MESSAGE,
+  JUMP_HIGHLIGHT_DURATION_MS,
+  JUMP_HIGHLIGHT_FADE_IN_MS,
+  JUMP_HIGHLIGHT_FADE_OUT_MS,
+} from "@/src/lib/constants";
+import { useThemeColors } from "@/src/theme";
 import { getAttachments, getCallMetadata, formatCallDuration } from "@/src/lib/messageMeta";
 import { seenByAllAt } from "@/src/lib/receipts";
 import { getMentions, splitByMentions } from "@/src/lib/mentions";
@@ -73,12 +85,28 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
     ? t("message.deleted")
     : replyMessage.content || t("message.imagePlaceholder");
 
+  // Phase 11 §2: tapping the quoted preview jumps to the original message via
+  // the shared pipeline. Flag-off ⇒ disabled, so this renders/behaves as before.
+  const handleJump = FEATURE_SCROLL_TO_MESSAGE
+    ? () =>
+        jumpBus.request({
+          roomId,
+          messageId: replyToId,
+          createdAt: replyMessage.created_at ?? undefined,
+          source: "reply",
+        })
+    : undefined;
+
   return (
-    <View className="mb-1.5 rounded-lg border-l-2 border-border bg-ink/5 px-2.5 py-1.5">
+    <Pressable
+      onPress={handleJump}
+      disabled={!FEATURE_SCROLL_TO_MESSAGE}
+      className="mb-1.5 rounded-lg border-l-2 border-border bg-ink/5 px-2.5 py-1.5"
+    >
       <Text className="font-sans text-label text-fg-tertiary" numberOfLines={1}>
         {preview}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -110,6 +138,34 @@ export const MessageBubble = memo(function MessageBubble({
   // Phase 7B: per-message upload progress (done/total) while the media plane
   // uploads; undefined for text/poll and after the completion gate.
   const uploadProgress = useChatStore((s) => s.uploadProgress[message.id]);
+
+  // Phase 11 §7: one-shot highlight when this bubble is the jump target. The
+  // selector returns 0 for every other bubble (stable ⇒ no re-render); only the
+  // target re-renders when its token changes, and a fresh token re-pulses it.
+  const colors = useThemeColors();
+  const highlightToken = useJumpStore((s) => {
+    const h = s.highlightByRoom[message.room_id];
+    return h && h.messageId === message.id ? h.token : 0;
+  });
+  const highlight = useSharedValue(0);
+  useEffect(() => {
+    if (!highlightToken) return;
+    highlight.value = withSequence(
+      withTiming(1, { duration: JUMP_HIGHLIGHT_FADE_IN_MS }),
+      withDelay(
+        Math.max(
+          0,
+          JUMP_HIGHLIGHT_DURATION_MS -
+            JUMP_HIGHLIGHT_FADE_IN_MS -
+            JUMP_HIGHLIGHT_FADE_OUT_MS
+        ),
+        withTiming(0, { duration: JUMP_HIGHLIGHT_FADE_OUT_MS })
+      )
+    );
+  }, [highlightToken, highlight]);
+  const highlightStyle = useAnimatedStyle(() => ({
+    opacity: highlight.value * 0.18,
+  }));
 
   // Swipe-to-reply: drag the bubble toward the center, release past the
   // threshold to quote — a touch idiom, so web keeps taps only
@@ -271,6 +327,21 @@ export const MessageBubble = memo(function MessageBubble({
             : "rounded-bl-md bg-surface-secondary border border-border"
         }`}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            highlightStyle,
+            {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: 16,
+              backgroundColor: colors.info,
+            },
+          ]}
+        />
         {!isDeleted && message.reply_to && (
           <ReplyContext replyToId={message.reply_to} roomId={message.room_id} />
         )}

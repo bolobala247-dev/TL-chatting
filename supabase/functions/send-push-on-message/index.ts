@@ -50,7 +50,14 @@ interface ExpoPushMessage {
   to: string;
   title: string;
   body: string;
-  data: { roomId: string; type: string };
+  data: {
+    roomId: string;
+    type: string;
+    // Phase 11: lets the app deep-link the notification straight to this message
+    // (scroll-to-message). Extra keys are ignored by clients that don't use them.
+    messageId?: string;
+    createdAt?: string;
+  };
   channelId?: string;
   priority?: "default" | "normal" | "high";
   sound?: "default";
@@ -161,7 +168,7 @@ Deno.serve(async (req) => {
     // Never trust the payload body: re-read the message from the database
     const { data: message, error: messageError } = await supabase
       .from("messages")
-      .select("id, room_id, sender_id, content, type, media_url")
+      .select("id, room_id, sender_id, content, type, media_url, created_at")
       .eq("id", payload.record.id)
       .maybeSingle();
 
@@ -253,6 +260,8 @@ Deno.serve(async (req) => {
           data: {
             roomId: message.room_id,
             type: "message",
+            messageId: message.id,
+            createdAt: message.created_at,
           },
           channelId: ANDROID_CHANNEL_ID,
           priority: "high",
