@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useRoomStore } from "@/src/stores/roomStore";
+import { syncService } from "@/src/services/syncService";
 
 export function useRooms() {
   const user = useAuthStore((s) => s.user);
@@ -13,15 +14,18 @@ export function useRooms() {
 
   useEffect(() => {
     if (user) {
+      // First mount / login → full pull (lane 4, seeds the room-list cursor)
       fetchRooms(user.id);
     }
   }, [user]);
 
+  // Pull-to-refresh: room-list delta when the flag is on (§10.4); flag-off
+  // delegates to the exact fetchRooms full pull used before.
   const refresh = useCallback(() => {
     if (user) {
-      fetchRooms(user.id);
+      void syncService.syncNow("rooms");
     }
-  }, [user, fetchRooms]);
+  }, [user]);
 
   return { rooms, loading, error, refresh };
 }

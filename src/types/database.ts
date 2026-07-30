@@ -757,6 +757,21 @@ export type Database = {
           username: string
         }[]
       }
+      get_rooms_delta: {
+        Args: { p_since: string; p_user_id: string }
+        Returns: {
+          bookmarked_at: string
+          last_message_at: string
+          last_message_content: string
+          last_message_sender: string
+          last_message_type: string
+          room_avatar: string
+          room_id: string
+          room_name: string
+          room_type: string
+          unread_count: number
+        }[]
+      }
       get_user_rooms: {
         Args: { p_user_id: string }
         Returns: {

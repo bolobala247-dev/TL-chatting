@@ -3,6 +3,7 @@ import {
   MESSAGES_PER_PAGE,
   MEDIA_PER_PAGE,
   PINNED_MESSAGES_LIMIT,
+  DELTA_SYNC_LIMIT,
 } from "@/src/lib/constants";
 import type {
   Message,
@@ -66,6 +67,28 @@ export const messageService = {
     }
 
     const { data, error } = await query;
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  // Incremental delta (Phase 4, §17 C3): messages of a room touched since a
+  // server `updated_at` high-water-mark. Plain PostgREST select (not an RPC)
+  // so the existing reaction/vote embeds ride along and no type regen is
+  // needed. Ordered ASC by updated_at so the caller can advance the cursor to
+  // the last row; `limit` caps the window and drives the gap-overflow guard.
+  async getRoomMessagesSince(
+    roomId: string,
+    since: string,
+    limit: number = DELTA_SYNC_LIMIT
+  ): Promise<MessageWithMeta[]> {
+    const { data, error } = await supabase
+      .from("messages")
+      .select(MESSAGE_WITH_META_SELECT)
+      .eq("room_id", roomId)
+      .gt("updated_at", since)
+      .order("updated_at", { ascending: true })
+      .limit(limit);
+
     if (error) throw error;
     return data ?? [];
   },

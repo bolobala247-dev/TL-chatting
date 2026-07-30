@@ -156,3 +156,12 @@ export interface SavedMessageItem {
 
 // Query lanes of the shared-media screen
 export type MediaKind = "media" | "file" | "link";
+
+// Incremental-sync cursor for one scope (a room id, or ROOMS_SYNC_SCOPE for
+// the room list). Local-cache domain type — persisted only in SQLite.
+export interface SyncState {
+  scope_id: string;
+  last_synced_at: string | null;
+  has_full_history: boolean;
+  stale: boolean;
+}

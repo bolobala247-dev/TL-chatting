@@ -110,8 +110,36 @@ const MIGRATION_001_INITIAL_SCHEMA: Migration = {
   ],
 };
 
+/**
+ * v2 — incremental-sync cursor store (roadmap §13, design §3.3, §17 C1/C5).
+ *
+ * One high-water-mark timestamp per scope:
+ *  - scope_id = room UUID → the per-room messages cursor
+ *  - scope_id = '@rooms'  → the room-list cursor
+ * `last_synced_at` holds the max SERVER `updated_at` applied for that scope;
+ * it advances forward-only. `has_full_history` / `stale` support the
+ * gap-overflow fallback. Same droppable-cache lifecycle as everything else
+ * (wiped on logout with the DB file).
+ */
+const MIGRATION_002_SYNC_STATE: Migration = {
+  toVersion: 2,
+  name: "sync_state",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS sync_state (
+      scope_id         TEXT PRIMARY KEY NOT NULL,
+      last_synced_at   TEXT,
+      has_full_history INTEGER NOT NULL DEFAULT 0,
+      stale            INTEGER NOT NULL DEFAULT 0,
+      updated_at       TEXT
+    );`,
+  ],
+};
+
 // Append-only, ordered by toVersion
-const MIGRATIONS: Migration[] = [MIGRATION_001_INITIAL_SCHEMA];
+const MIGRATIONS: Migration[] = [
+  MIGRATION_001_INITIAL_SCHEMA,
+  MIGRATION_002_SYNC_STATE,
+];
 
 export const LATEST_SCHEMA_VERSION =
   MIGRATIONS[MIGRATIONS.length - 1]!.toVersion;

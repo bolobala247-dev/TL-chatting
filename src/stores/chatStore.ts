@@ -33,6 +33,10 @@ interface ChatState {
   removeMessage: (messageId: string, roomId: string) => void;
   addOptimisticMessage: (message: MessageWithMeta) => void;
   replaceOptimisticMessage: (tempId: string, message: Message) => void;
+  // Dumb setter for the incremental-sync path (Phase 4): syncService merges
+  // the server delta (repository-owned merge) then hands back the finished
+  // window. The store just swaps the array — no merge logic lives here.
+  setRoomMessages: (roomId: string, rows: MessageWithMeta[]) => void;
   applyReactionChange: (
     roomId: string,
     messageId: string,
@@ -312,6 +316,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // The send is confirmed server-side — safe to persist (upsert dedups
     // against the realtime echo)
     cacheService.saveMessages([message]);
+  },
+
+  // Swap in the already-merged window from the incremental-sync path. The
+  // merge (dedup, server-wins, meta-preserve, sort, cap) has already happened
+  // in the repository layer via cacheService.mergeMessages — this only writes
+  // the finished array into RAM so the list re-renders.
+  setRoomMessages: (roomId, rows) => {
+    set((state) => withRoomMessages(state, roomId, rows));
   },
 
   applyReactionChange: (roomId, messageId, reaction, kind) => {
