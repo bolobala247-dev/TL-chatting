@@ -100,6 +100,23 @@ export const OUTBOX_MAX_ATTEMPTS = 6;
 export const OUTBOX_LOGOUT_DRAIN_MS = 3000;
 
 // ============================================
+// Reliability & consistency diagnostics (Phase 6B)
+// ============================================
+
+// Master flag. false ⇒ every diagnostic tap is a guarded no-op (one boolean
+// check) and no auditor/harness ever runs — behavior is byte-identical to
+// today and the observability layer costs nothing. true ⇒ passive counters,
+// gauges, histograms, a bounded event ring, and the read-only auditor become
+// live. This flag is INDEPENDENT of FEATURE_DELTA_SYNC / FEATURE_OFFLINE_OUTBOX:
+// toggling it can never change message delivery. Rollback is flipping to false.
+export const FEATURE_RELIABILITY_DIAGNOSTICS = false;
+// Fixed capacity of the in-memory diagnostic event ring (oldest overwritten).
+export const DIAG_RING_CAPACITY = 200;
+// Cardinality cap: max distinct metric series (name+labels) the registry holds.
+// A hard leak guard so a mislabeled tap can never grow the registry unbounded.
+export const DIAG_MAX_SERIES = 256;
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 

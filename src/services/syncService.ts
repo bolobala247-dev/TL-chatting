@@ -12,6 +12,7 @@ import {
 import { messageService } from "@/src/services/messageService";
 import { roomService } from "@/src/services/roomService";
 import { cacheService } from "@/src/services/cacheService";
+import { diag } from "@/src/lib/diagnostics";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -76,6 +77,7 @@ async function withRetry<T>(
       return { ok: true, value: await task() };
     } catch (err) {
       console.error(`[syncService] ${key} attempt ${attempt}`, err);
+      diag.count("sync.retry", 1, { scope: key });
       if (attempt < DELTA_MAX_ATTEMPTS) {
         await sleep(
           Math.min(DELTA_RETRY_BASE_MS * 2 ** (attempt - 1), DELTA_RETRY_MAX_MS)
@@ -88,6 +90,8 @@ async function withRetry<T>(
   } catch (err) {
     console.error(`[syncService] ${key} fallback`, err);
   }
+  diag.count("sync.fallback", 1, { scope: key });
+  diag.event("sync.fallback", { scope: key });
   return { ok: false };
 }
 
@@ -104,6 +108,11 @@ async function withRetry<T>(
  */
 function applyServerMessages(roomId: string, rows: MessageWithMeta[]): void {
   if (rows.length === 0) return;
+
+  // Passive tap: how many delta rows a successful sync applied (§1). Reads only
+  // the already-computed batch length; changes no control flow.
+  diag.count("sync.delta.applied", 1);
+  diag.observe("sync.delta.rows", rows.length);
 
   // Persist + advance cursor (idempotent upsert; tombstones ride along)
   cacheService.saveMessages(rows);
@@ -138,9 +147,12 @@ async function syncRoom(roomId: string): Promise<void> {
     (useChatStore.getState().messages[roomId] ?? []).length > 0;
   const since = (await cacheService.getSyncState(roomId))?.last_synced_at;
   if (!resident || !since) {
+    diag.count("sync.path", 1, { path: "cold-page-fetch" });
     await legacyPageFetch();
     return;
   }
+
+  diag.count("sync.path", 1, { path: "delta" });
 
   const result = await withRetry(
     `room:${roomId}`,
@@ -154,6 +166,8 @@ async function syncRoom(roomId: string): Promise<void> {
   // Gap overflow: a full batch means we can't guarantee contiguity → mark
   // older history stale and degrade to the known-good page-1 path (§4.4).
   if (rows.length >= DELTA_SYNC_LIMIT) {
+    diag.count("sync.gap_overflow", 1, { scope: `room:${roomId}` });
+    diag.event("sync.gap_overflow", { room: roomId, rows: rows.length });
     await cacheService.setSyncState(roomId, {
       stale: true,
       has_full_history: false,
@@ -242,9 +256,20 @@ export const syncService = {
   syncNow(scope: SyncScope): Promise<void> {
     const key = scopeKey(scope);
     const existing = inFlight.get(key);
-    if (existing) return existing;
-    const p = doSync(scope).finally(() => inFlight.delete(key));
+    if (existing) {
+      // Passive tap: a trigger that rode an in-flight pull instead of racing a
+      // second one (§1). Reads registry only; returns the same promise as before.
+      diag.count("sync.coalesced", 1, { scope: key });
+      return existing;
+    }
+    const started = Date.now();
+    const p = doSync(scope).finally(() => {
+      inFlight.delete(key);
+      diag.gauge("sync.inflight", inFlight.size);
+      diag.observe("sync.duration.ms", Date.now() - started, { scope: key });
+    });
     inFlight.set(key, p);
+    diag.gauge("sync.inflight", inFlight.size);
     return p;
   },
 
