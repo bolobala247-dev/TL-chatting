@@ -7,6 +7,8 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { syncService } from "@/src/services/syncService";
 import { outboxService } from "@/src/services/outboxService";
 import { mediaService } from "@/src/services/mediaService";
+import { prefetchService } from "@/src/services/prefetchService";
+import { presenceService } from "@/src/services/presenceService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type {
   Message,
@@ -78,7 +80,7 @@ export function useRealtimeMessages(roomId: string) {
     const connect = () => {
       if (disposed) return;
 
-      channel = supabase
+      const built = supabase
         .channel(`room:${roomId}`)
         .on(
           "postgres_changes",
@@ -234,24 +236,33 @@ export function useRealtimeMessages(roomId: string) {
               .getState()
               .applyParticipantUpdate(payload.new as RoomParticipant);
           }
-        )
-        .subscribe((status) => {
-          if (disposed) return;
+        );
 
-          if (status === "SUBSCRIBED") {
-            if (hadDrop) {
-              // Recover messages missed while offline. The room is resident
-              // (the user is viewing it) → syncService takes the delta lane
-              // when the flag is on; with the flag off this delegates to the
-              // exact page-1 fetch used before (§10.4).
-              hadDrop = false;
-              void syncService.syncNow({ room: roomId });
-            }
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            hadDrop = true;
-            scheduleReconnect();
+      // Presence rides this SAME room channel (Phase 10 §6): register the
+      // sync/join/leave handlers BEFORE subscribe. Returns `built` unchanged
+      // when FEATURE_PUSH_PRESENCE is off, so the channel stays byte-identical.
+      channel = presenceService.bindRoomChannel(built, roomId);
+
+      channel.subscribe((status) => {
+        if (disposed) return;
+
+        if (status === "SUBSCRIBED") {
+          // Begin broadcasting our own presence (visibility-gated; no-op when
+          // the flag is off). Re-fires on reconnect → automatic re-track.
+          if (channel) presenceService.onSubscribed(channel, roomId);
+          if (hadDrop) {
+            // Recover messages missed while offline. The room is resident
+            // (the user is viewing it) → syncService takes the delta lane
+            // when the flag is on; with the flag off this delegates to the
+            // exact page-1 fetch used before (§10.4).
+            hadDrop = false;
+            void syncService.syncNow({ room: roomId });
           }
-        });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          hadDrop = true;
+          scheduleReconnect();
+        }
+      });
     };
 
     connect();
@@ -259,6 +270,9 @@ export function useRealtimeMessages(roomId: string) {
     return () => {
       disposed = true;
       clearTimeout(retryTimer);
+      // Stamp last-seen + drop the live read model for this room (no-op when
+      // FEATURE_PUSH_PRESENCE is off).
+      presenceService.detach(roomId);
       if (channel) supabase.removeChannel(channel);
     };
   }, [roomId]);
@@ -293,6 +307,10 @@ export function useRealtimeRooms() {
       // Same wakeup for the media plane (Phase 7A §11.2 trigger): drive any
       // uploads that were blocked offline. No-op when FEATURE_MEDIA_PIPELINE off.
       mediaService.poke();
+      // Re-evaluate the warm set on the same wakeup (Phase 10 §2.1/§6): reconnect
+      // and foreground are exactly when neighbors are most worth warming. No-op
+      // when FEATURE_INTELLIGENT_PREFETCH is off.
+      prefetchService.poke("wakeup");
     };
 
     const handleNewMessage = (message: Message) => {

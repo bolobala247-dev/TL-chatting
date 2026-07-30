@@ -12,10 +12,12 @@ import { outboxService } from "@/src/services/outboxService";
 import { mediaService, type MediaSource } from "@/src/services/mediaService";
 import { cacheService } from "@/src/services/cacheService";
 import {
+  FEATURE_INTELLIGENT_PREFETCH,
   FEATURE_MEDIA_PIPELINE,
   FEATURE_OFFLINE_OUTBOX,
   UNDO_SEND_WINDOW_MS,
 } from "@/src/lib/constants";
+import { useRoomOpenStats } from "@/src/stores/roomOpenStats";
 import { useRealtimeMessages } from "./useRealtime";
 import type { Message, MessageMention, MessageWithMeta } from "@/src/types";
 
@@ -46,6 +48,12 @@ export function useMessages(roomId: string) {
 
   useEffect(() => {
     setActiveRoom(roomId);
+    // Feed the device-local open-frequency model (§2.3): the warm-set selector
+    // blends this with recency to keep "frequent but not recent" rooms warm.
+    // Flag-gated — no persisted writes when prefetch is off.
+    if (FEATURE_INTELLIGENT_PREFETCH) {
+      useRoomOpenStats.getState().recordOpen(roomId);
+    }
     // Room-open recovery: syncService picks the delta lane for a resident
     // (same-session revisit) room and the page fetch for a cold first open
     // (§17 C6); flag-off delegates to the exact page-1 fetch used before.

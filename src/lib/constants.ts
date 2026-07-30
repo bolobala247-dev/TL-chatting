@@ -219,6 +219,47 @@ export const JUMP_STACK_MAX = 10;
 export const SCROLL_BOTTOM_THRESHOLD_PX = 120;
 
 // ============================================
+// Intelligent prefetch & push presence (Phase 10)
+// ============================================
+
+// Master flag for the speculative prefetch scheduler. false ⇒ prefetchService
+// is a guarded no-op (schedule/poke/cancel all return immediately), nothing is
+// ever pre-warmed, and every room/media/search read stays today's on-demand
+// path — byte-identical. true ⇒ a single priority-driven, cancellable,
+// concurrency-bounded scheduler speculatively warms rooms/messages/media/search
+// by DELEGATING to existing services (it issues no new queries and owns no
+// data). INDEPENDENT of FEATURE_PUSH_PRESENCE. Rollback = flip false.
+export const FEATURE_INTELLIGENT_PREFETCH = false;
+// Master flag for push-based presence. false ⇒ the existing 45s heartbeat +
+// 30s peer poll run exactly as today. true ⇒ presence rides the existing
+// room:${id} Realtime channel (track/leave/sync), the presenceStore is the
+// live read model, and user_presence is written only on state transitions.
+// INDEPENDENT of FEATURE_INTELLIGENT_PREFETCH. Rollback = flip false.
+export const FEATURE_PUSH_PRESENCE = false;
+
+// How many top rooms (list order: bookmarked-first, then last_message_at) the
+// launch/list warm set covers. "Top N" is the cheapest recency predictor.
+export const PREFETCH_ROOM_WARM_COUNT = 5;
+// Independent concurrency lanes so a slow image never blocks a text warm.
+export const PREFETCH_MAX_CONCURRENT = 2;
+export const PREFETCH_MEDIA_MAX_CONCURRENT = 2;
+// LOW/IDLE tiers drain only after this quiet debounce (no scheduling churn),
+// i.e. the in-app idle window (search-index repair, avatar/emoji warming).
+export const PREFETCH_IDLE_DELAY_MS = 400;
+// Battery gate (reserved for a NetInfo/expo-battery driver): below this % and
+// unplugged, suspend NORMAL/LOW/IDLE tiers (HIGH/CRITICAL still run).
+export const PREFETCH_LOW_BATTERY_PCT = 20;
+// Device-local open-frequency model (roomOpenStats): LRU cap by lastOpenedAt so
+// the persisted blob can never grow unbounded.
+export const ROOM_OPEN_STATS_MAX = 100;
+// Persisted-blob schema version; a mismatch discards the stats (disposable).
+export const ROOM_OPEN_STATS_SCHEMA_VERSION = 1;
+
+// Inactivity (no touch/scroll/typing) after which the local presence broadcast
+// degrades online → away via a re-track (not a network poll).
+export const PRESENCE_AWAY_MS = 60000;
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 
