@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { RoomWithLastMessage } from "@/src/types";
 import { roomService } from "@/src/services/roomService";
+import { cacheService } from "@/src/services/cacheService";
 
 interface RoomState {
   rooms: RoomWithLastMessage[];
@@ -38,10 +39,25 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   error: null,
 
   fetchRooms: async (userId) => {
+    // Hydrate-first (Phase 3): when RAM is empty (cold start), paint the
+    // cached list instantly while the network snapshot loads. The cached
+    // rows only apply while RAM is still empty, so a fast network response
+    // can never be overwritten by stale cache; painting also clears
+    // `loading` so the background refresh is silent (no spinner over data).
+    if (get().rooms.length === 0) {
+      void cacheService.getRooms().then((cached) => {
+        if (cached.length > 0 && get().rooms.length === 0) {
+          set({ rooms: cached, loading: false });
+        }
+      });
+    }
+
     set({ loading: true, error: null });
     try {
       const rooms = await roomService.getUserRooms(userId);
       set({ rooms, loading: false });
+      // Write-through: persist the fresh snapshot (async, never blocks UI)
+      cacheService.saveRooms(rooms);
     } catch (error: any) {
       set({ error: error.message, loading: false });
     }

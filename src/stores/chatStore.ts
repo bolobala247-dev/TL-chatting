@@ -6,6 +6,7 @@ import type {
   RoomParticipantWithProfile,
 } from "@/src/types";
 import { messageService } from "@/src/services/messageService";
+import { cacheService } from "@/src/services/cacheService";
 import {
   MESSAGES_PER_PAGE,
   MESSAGE_WINDOW_SIZE,
@@ -164,6 +165,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (inFlightFetches.has(flightKey)) return;
     inFlightFetches.add(flightKey);
 
+    // Hydrate-first (Phase 3, page 1 only): a room with no rows in RAM
+    // paints its newest cached window immediately, replacing the full-screen
+    // spinner. The network page below stays authoritative — it replaces the
+    // hydrated rows when it lands. SQLite feeds the store, never the UI.
+    if (!cursor && (get().messages[roomId] ?? []).length === 0) {
+      void cacheService
+        .getRoomMessages(roomId, MESSAGES_PER_PAGE)
+        .then((cached) => {
+          if (cached.length === 0) return;
+          set((state) => {
+            // The network page (or an optimistic send) may have landed
+            // first — cached rows never overwrite fresher in-memory data
+            if ((state.messages[roomId] ?? []).length > 0) return state;
+            return withRoomMessages(state, roomId, cached);
+          });
+        });
+    }
+
     set((state) => ({
       loadingByRoom: { ...state.loadingByRoom, [roomId]: true },
     }));
@@ -190,6 +209,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
           loadingByRoom: { ...state.loadingByRoom, [roomId]: false },
         };
       });
+      // Write-through (fire-and-forget): page 1 refreshes the newest cached
+      // window; older pages extend the cached history
+      if (cursor) {
+        cacheService.saveMessages(newMessages);
+      } else {
+        cacheService.saveMessagePage(roomId, newMessages);
+      }
     } catch {
       set((state) => ({
         loadingByRoom: { ...state.loadingByRoom, [roomId]: false },
@@ -222,6 +248,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMore: { ...state.hasMore, [message.room_id]: true },
       };
     });
+    // Write-through: realtime inserts survive restarts even for rooms
+    // that were never opened in this session
+    cacheService.saveMessages([message]);
   },
 
   updateMessage: (message) => {
@@ -233,6 +262,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         poll_votes: m.poll_votes,
       }))
     );
+    // Persist the merged row (with its meta) when the message is windowed;
+    // fall back to the raw payload for rooms not resident in RAM
+    const patched = get()
+      .messages[message.room_id]?.find((m) => m.id === message.id);
+    cacheService.saveMessages([patched ?? message]);
   },
 
   removeMessage: (messageId, roomId) => {
@@ -244,6 +278,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         roomMessages.filter((m) => m.id !== messageId)
       );
     });
+    // Hard deletes leave the cache too (temp- ids are ignored inside)
+    cacheService.deleteMessage(messageId);
   },
 
   addOptimisticMessage: (message) => {
@@ -273,6 +309,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         roomMessages.map((m) => (m.id === tempId ? message : m))
       );
     });
+    // The send is confirmed server-side — safe to persist (upsert dedups
+    // against the realtime echo)
+    cacheService.saveMessages([message]);
   },
 
   applyReactionChange: (roomId, messageId, reaction, kind) => {
@@ -290,6 +329,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       })
     );
+    // Keep the cached row's embeds current (optimistic reverts re-persist,
+    // so a failed toggle self-corrects on disk as well)
+    const patched = get().messages[roomId]?.find((m) => m.id === messageId);
+    if (patched) cacheService.saveMessages([patched]);
   },
 
   applyVoteChange: (roomId, messageId, vote, kind) => {
@@ -305,6 +348,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       })
     );
+    const patched = get().messages[roomId]?.find((m) => m.id === messageId);
+    if (patched) cacheService.saveMessages([patched]);
   },
 
   setRoomParticipants: (roomId, participants) => {
