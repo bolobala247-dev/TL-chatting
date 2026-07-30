@@ -57,5 +57,5 @@ yarn-error.*
 .env*
 
 # Local build artifacts
-build-*.apk
+*.apk
 *.aab
