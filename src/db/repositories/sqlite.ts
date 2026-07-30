@@ -7,6 +7,7 @@ import type {
   RoomParticipantWithProfile,
   RoomWithLastMessage,
   SyncState,
+  UploadTask,
 } from "@/src/types";
 import type {
   AttachmentRepository,
@@ -16,6 +17,7 @@ import type {
   Repositories,
   RoomRepository,
   SyncStateRepository,
+  UploadQueueRepository,
 } from "./types";
 
 /**
@@ -658,6 +660,328 @@ function createOutboxRepository(db: SQLiteDatabase): OutboxRepository {
 }
 
 // ---------------------------------------------------------------------------
+// upload_queue (Phase 7A/7B — media upload work list; message row IS the payload)
+// ---------------------------------------------------------------------------
+
+interface UploadQueueRow {
+  id: string;
+  message_id: string;
+  room_id: string;
+  position: number;
+  kind: string;
+  local_uri: string;
+  mime: string;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  thumb: string | null;
+  remote_path: string | null;
+  remote_url: string | null;
+  state: string;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+function rowToUploadTask(row: UploadQueueRow): UploadTask {
+  return {
+    id: row.id,
+    message_id: row.message_id,
+    room_id: row.room_id,
+    position: row.position,
+    kind:
+      row.kind === "video" || row.kind === "file" ? row.kind : "image",
+    local_uri: row.local_uri,
+    mime: row.mime,
+    bytes: row.bytes,
+    width: row.width,
+    height: row.height,
+    duration_ms: row.duration_ms,
+    thumb: row.thumb,
+    remote_path: row.remote_path,
+    remote_url: row.remote_url,
+    state:
+      row.state === "uploading" ||
+      row.state === "uploaded" ||
+      row.state === "failed"
+        ? row.state
+        : "queued",
+    attempts: row.attempts,
+    next_attempt_at: row.next_attempt_at,
+    last_error: row.last_error,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function createUploadQueueRepository(db: SQLiteDatabase): UploadQueueRepository {
+  return {
+    async enqueueMessageWithUploads(message, tasks) {
+      // Same monotonic per-room stamp as the outbox enqueue — the created_at
+      // written here is final: completeMessage reuses it (no restamp), so the
+      // bubble never re-sorts between authoring and delivery (§2.1 rule 3).
+      const stampedAt = monotonicCreatedAt(
+        message.room_id,
+        message.created_at ?? new Date().toISOString()
+      );
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        // The media message is a real messages row (status='pending', staged
+        // local URIs in attachments) — hydrates & renders after restart with
+        // zero special-casing, exactly like a 5A pending text (§3.1).
+        await txn.runAsync(
+          UPSERT_MESSAGE_SQL,
+          toMessageRowParams({
+            ...message,
+            created_at: stampedAt,
+            outbox_status: "pending",
+          })
+        );
+        const stmt = await txn.prepareAsync(
+          `INSERT OR REPLACE INTO upload_queue
+             (id, message_id, room_id, position, kind, local_uri, mime, bytes,
+              width, height, duration_ms, thumb, remote_path, remote_url,
+              state, attempts, next_attempt_at, last_error, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
+                   'queued', 0, NULL, NULL, ?, ?)`
+        );
+        try {
+          for (const t of tasks) {
+            await stmt.executeAsync([
+              t.id,
+              message.id,
+              message.room_id,
+              t.position,
+              t.kind,
+              t.local_uri,
+              t.mime,
+              t.bytes,
+              t.width,
+              t.height,
+              t.duration_ms,
+              t.thumb,
+              stampedAt, // authoring instant = global FIFO key (§3.3)
+              now,
+            ]);
+          }
+        } finally {
+          await stmt.finalizeAsync();
+        }
+      });
+    },
+
+    // Global FIFO by authoring time, attachments in order — no per-room
+    // seriality (uploads target distinct objects; order is fairness only).
+    async listActive() {
+      const rows = await db.getAllAsync<UploadQueueRow>(
+        `SELECT * FROM upload_queue
+          WHERE state IN ('queued','uploading')
+          ORDER BY created_at ASC, position ASC`
+      );
+      return rows.map(rowToUploadTask);
+    },
+
+    async listForMessage(messageId) {
+      const rows = await db.getAllAsync<UploadQueueRow>(
+        `SELECT * FROM upload_queue
+          WHERE message_id = ? ORDER BY position ASC`,
+        [messageId]
+      );
+      return rows.map(rowToUploadTask);
+    },
+
+    // Crashed-between-upload-and-gate window (§11.2 M5): every task uploaded,
+    // message still 'pending', no outbox row yet — the gate must re-run.
+    async listCompletableMessageIds() {
+      const rows = await db.getAllAsync<{ message_id: string }>(
+        `SELECT u.message_id FROM upload_queue u
+           JOIN messages m ON m.id = u.message_id AND m.status = 'pending'
+           LEFT JOIN outbox o ON o.id = u.message_id
+          WHERE o.id IS NULL
+          GROUP BY u.message_id
+         HAVING SUM(CASE WHEN u.state = 'uploaded' THEN 1 ELSE 0 END) = COUNT(*)`
+      );
+      return rows.map((r) => r.message_id);
+    },
+
+    // Lazy SENT sweep (§2.1 rule 7): queue rows whose message was ACKed
+    // (status='sent') — or whose message row is gone entirely (recalled /
+    // pruned) — are dead weight; the caller clears them + their staging dirs.
+    async listSentMessageIds() {
+      const rows = await db.getAllAsync<{ message_id: string }>(
+        `SELECT DISTINCT u.message_id FROM upload_queue u
+           LEFT JOIN messages m ON m.id = u.message_id
+          WHERE m.id IS NULL OR m.status = 'sent'`
+      );
+      return rows.map((r) => r.message_id);
+    },
+
+    // Crash recovery (§11.2 M4): an 'uploading' row after relaunch is stale by
+    // definition (no in-flight request survives the process). Reverting to
+    // 'queued' is safe because the PUT is idempotent by object path (§4.3).
+    async revertUploadingToQueued() {
+      await db.runAsync(
+        `UPDATE upload_queue SET state = 'queued', updated_at = ?
+          WHERE state = 'uploading'`,
+        [new Date().toISOString()]
+      );
+    },
+
+    async markUploading(id) {
+      await db.runAsync(
+        `UPDATE upload_queue SET state = 'uploading', updated_at = ?
+          WHERE id = ?`,
+        [new Date().toISOString(), id]
+      );
+    },
+
+    async markUploaded(id, remotePath, remoteUrl) {
+      await db.runAsync(
+        `UPDATE upload_queue
+            SET state = 'uploaded', remote_path = ?, remote_url = ?,
+                last_error = NULL, updated_at = ?
+          WHERE id = ?`,
+        [remotePath, remoteUrl, new Date().toISOString(), id]
+      );
+    },
+
+    // Transient retry: back to 'queued' with a future due time; the persisted
+    // attempts/schedule survive restart (same contract as outbox.reschedule).
+    async reschedule(id, attempts, nextAttemptAt, error) {
+      await db.runAsync(
+        `UPDATE upload_queue
+            SET state = 'queued', attempts = ?, next_attempt_at = ?,
+                last_error = ?, updated_at = ?
+          WHERE id = ?`,
+        [attempts, nextAttemptAt, error, new Date().toISOString(), id]
+      );
+    },
+
+    // Message-level parking (§2.1 rule 6): one permanently-failed task parks
+    // the whole message — sibling tasks stay as-is ('uploaded' work is kept;
+    // 'queued' siblings are skipped by the worker once the message is parked).
+    async markFailed(id, error) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          `UPDATE upload_queue
+              SET state = 'failed', last_error = ?, updated_at = ?
+            WHERE id = ?`,
+          [error, now, id]
+        );
+        await txn.runAsync(
+          `UPDATE messages SET status = 'failed'
+            WHERE id = (SELECT message_id FROM upload_queue WHERE id = ?)`,
+          [id]
+        );
+      });
+    },
+
+    // Manual retry (§10.3): only failed tasks reset — already-uploaded
+    // siblings keep their remote objects (the PUT was idempotent anyway).
+    async resetForRetry(messageId) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          `UPDATE upload_queue
+              SET state = 'queued', attempts = 0, next_attempt_at = NULL,
+                  last_error = NULL, updated_at = ?
+            WHERE message_id = ? AND state = 'failed'`,
+          [now, messageId]
+        );
+        await txn.runAsync(
+          "UPDATE messages SET status = 'pending' WHERE id = ?",
+          [messageId]
+        );
+      });
+    },
+
+    async getMessageCompletion(messageId) {
+      const row = await db.getFirstAsync<{
+        total: number;
+        uploaded: number;
+        failed: number;
+      }>(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN state = 'uploaded' THEN 1 ELSE 0 END) AS uploaded,
+                SUM(CASE WHEN state = 'failed' THEN 1 ELSE 0 END) AS failed
+           FROM upload_queue WHERE message_id = ?`,
+        [messageId]
+      );
+      return {
+        total: row?.total ?? 0,
+        uploaded: row?.uploaded ?? 0,
+        failed: row?.failed ?? 0,
+      };
+    },
+
+    // Completion gate (§2.1 rule 5, §4.4): local→remote rewrite + outbox
+    // insert in ONE txn — delivery can never begin with local URIs, and a
+    // crash leaves either "still uploading" or "fully handed off", nothing
+    // between. The outbox row reuses the message's already-stamped created_at
+    // so the queue position matches the authoring instant (no restamp).
+    async completeMessage(messageId, rewrittenAttachments) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        const msg = await txn.getFirstAsync<{
+          room_id: string;
+          created_at: string | null;
+          attachments: string | null;
+        }>(
+          "SELECT room_id, created_at, attachments FROM messages WHERE id = ?",
+          [messageId]
+        );
+        // Message recalled/pruned mid-upload — nothing to hand off; the
+        // orphaned queue rows fall to the SENT/orphan sweep.
+        if (!msg) return;
+        // Merge per position over the staged JSON: the rewrite only swaps the
+        // upload-derived fields (url, dims, thumb…); authoring-only fields
+        // like a file's display `name` survive untouched.
+        const existing =
+          parseJson<MessageAttachment[]>(msg.attachments) ?? [];
+        const merged = rewrittenAttachments.map((a, i) => ({
+          ...existing[i],
+          ...a,
+        }));
+        await txn.runAsync(
+          `UPDATE messages SET attachments = ?, media_url = ? WHERE id = ?`,
+          [JSON.stringify(merged), merged[0]?.url ?? null, messageId]
+        );
+        await txn.runAsync(
+          `INSERT OR REPLACE INTO outbox
+             (id, room_id, attempts, next_attempt_at, last_error, state, created_at, updated_at)
+           VALUES (?, ?, 0, NULL, NULL, 'pending', ?, ?)`,
+          [messageId, msg.room_id, msg.created_at ?? now, now]
+        );
+      });
+    },
+
+    async removeForMessage(messageId) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          "DELETE FROM upload_queue WHERE message_id = ?",
+          [messageId]
+        );
+        await txn.runAsync("DELETE FROM messages WHERE id = ?", [messageId]);
+      });
+    },
+
+    async clearSent(messageId) {
+      await db.runAsync("DELETE FROM upload_queue WHERE message_id = ?", [
+        messageId,
+      ]);
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM upload_queue");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Builds the full repository bundle over one open connection. */
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -668,5 +992,6 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     attachments: createAttachmentRepository(db),
     syncState: createSyncStateRepository(db),
     outbox: createOutboxRepository(db),
+    uploadQueue: createUploadQueueRepository(db),
   };
 }

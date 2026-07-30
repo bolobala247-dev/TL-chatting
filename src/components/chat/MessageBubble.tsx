@@ -107,6 +107,9 @@ export const MessageBubble = memo(function MessageBubble({
   // Phase 5A send state (own messages only; undefined = normal sent message)
   const isPending = message.outbox_status === "pending";
   const isFailed = message.outbox_status === "failed";
+  // Phase 7B: per-message upload progress (done/total) while the media plane
+  // uploads; undefined for text/poll and after the completion gate.
+  const uploadProgress = useChatStore((s) => s.uploadProgress[message.id]);
 
   // Swipe-to-reply: drag the bubble toward the center, release past the
   // threshold to quote — a touch idiom, so web keeps taps only
@@ -416,7 +419,9 @@ export const MessageBubble = memo(function MessageBubble({
                 size={11}
               />
               <Text className="font-sans text-micro text-ink-inverse/60">
-                {t("message.sending")}
+                {uploadProgress && uploadProgress.total > 0
+                  ? `${t("message.sending")} ${uploadProgress.done}/${uploadProgress.total}`
+                  : t("message.sending")}
               </Text>
             </View>
           )}

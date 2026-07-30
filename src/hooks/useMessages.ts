@@ -9,8 +9,13 @@ import { pollService } from "@/src/services/pollService";
 import { roomService } from "@/src/services/roomService";
 import { syncService } from "@/src/services/syncService";
 import { outboxService } from "@/src/services/outboxService";
+import { mediaService, type MediaSource } from "@/src/services/mediaService";
 import { cacheService } from "@/src/services/cacheService";
-import { FEATURE_OFFLINE_OUTBOX, UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
+import {
+  FEATURE_MEDIA_PIPELINE,
+  FEATURE_OFFLINE_OUTBOX,
+  UNDO_SEND_WINDOW_MS,
+} from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
 import type { Message, MessageMention, MessageWithMeta } from "@/src/types";
 
@@ -179,6 +184,47 @@ export function useMessages(roomId: string) {
   const sendAlbum = useCallback(
     async (imageUris: string[], caption?: string) => {
       if (!user || imageUris.length === 0) return;
+
+      // Flag on (§2, §4): durable two-plane media. The client mints the FINAL
+      // id (v4 UUID); the message persists PENDING with staged local URIs and
+      // the media worker uploads each attachment, then hands off to the outbox.
+      // Staging failure throws synchronously (M9) → remove the RAM bubble.
+      if (FEATURE_MEDIA_PIPELINE && mediaService.isEnabled()) {
+        const now = new Date().toISOString();
+        const optimistic: MessageWithMeta = {
+          id: Crypto.randomUUID(),
+          room_id: roomId,
+          sender_id: user.id,
+          content: caption?.trim() || null,
+          type: "image",
+          media_url: imageUris[0],
+          reply_to: null,
+          thread_id: null,
+          is_edited: false,
+          pinned_at: null,
+          pinned_by: null,
+          deleted_at: null,
+          deleted_by: null,
+          has_link: null,
+          attachments: imageUris.map((url) => ({ url })) as any,
+          metadata: null,
+          created_at: now,
+          updated_at: now,
+          outbox_status: "pending",
+        };
+        addOptimisticMessage(optimistic);
+        const sources: MediaSource[] = imageUris.map((uri) => ({
+          uri,
+          kind: "image",
+        }));
+        try {
+          await mediaService.enqueueMediaMessage(optimistic, sources);
+        } catch (err) {
+          removeMessage(optimistic.id, roomId);
+          throw err;
+        }
+        return;
+      }
 
       const tempId = `temp-${Date.now()}`;
       const optimistic: MessageWithMeta = {
@@ -382,8 +428,13 @@ export function useMessages(roomId: string) {
   // state=pending); the poke drives delivery.
   const retryMessage = useCallback((message: MessageWithMeta) => {
     if (!FEATURE_OFFLINE_OUTBOX) return;
-    enqueueOptimistic(message);
-    outboxService.poke();
+    // Media plane owns the retry while any attachment is still un-uploaded
+    // (re-drives uploads, not delivery). Returns false → 5A delivery retry.
+    void mediaService.retryMedia(message).then((handled) => {
+      if (handled) return;
+      enqueueOptimistic(message);
+      outboxService.poke();
+    });
   }, []);
 
   // Discard a PENDING/FAILED send (§7.4, §11.1): remove it locally (RAM +
@@ -391,8 +442,13 @@ export function useMessages(roomId: string) {
   // nothing to recall — no network op.
   const discardMessage = useCallback(
     (message: MessageWithMeta) => {
+      // Optimistic RAM removal first; the media plane then tears down its
+      // durable state (queue rows, staging dir, uploaded objects). When the
+      // media plane doesn't own it, fall back to the 5A outbox removal.
       removeMessage(message.id, roomId);
-      void cacheService.removeOutbox(message.id);
+      void mediaService.discardMedia(message).then((handled) => {
+        if (!handled) void cacheService.removeOutbox(message.id);
+      });
     },
     [roomId]
   );

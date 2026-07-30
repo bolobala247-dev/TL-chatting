@@ -1,4 +1,4 @@
-import type { MessageWithMeta } from "@/src/types";
+import type { MessageWithMeta, UploadTask } from "@/src/types";
 
 /**
  * Synthetic fixtures for the dev-only diagnostics harnesses (Phase 6B — §4–§6).
@@ -56,4 +56,52 @@ export function nowMs(): number {
   return typeof performance !== "undefined" && performance.now
     ? performance.now()
     : Date.now();
+}
+
+// Build `count` synthetic upload tasks for one message (Phase 7B media
+// benchmarks). Pure in-memory rows shaped like `upload_queue` output: enough
+// to exercise the drain due-filter / FIFO selection and the gate attachment
+// map without SQLite, FS, or network (Invariants #1–#3). `state`/`nextAt` let
+// callers model queued/uploading mixes and backoff windows.
+export function makeUploadTasks(
+  count: number,
+  opts: {
+    messageId?: string;
+    roomId?: string;
+    baseMs?: number;
+    state?: UploadTask["state"];
+  } = {}
+): UploadTask[] {
+  const {
+    messageId = "bench-msg",
+    roomId = "bench-room",
+    baseMs = Date.UTC(2025, 0, 1),
+    state = "queued",
+  } = opts;
+  const rows: UploadTask[] = [];
+  for (let i = 0; i < count; i++) {
+    rows.push({
+      id: `${messageId}-task-${i}`,
+      message_id: messageId,
+      room_id: roomId,
+      position: i,
+      kind: "image",
+      local_uri: `file:///media/outbox/${messageId}/${i}.jpg`,
+      mime: "image/jpeg",
+      bytes: 120_000,
+      width: 1080,
+      height: 1440,
+      duration_ms: null,
+      thumb: "data:image/jpeg;base64,AAAA",
+      remote_path: null,
+      remote_url: null,
+      state,
+      attempts: 0,
+      next_attempt_at: null,
+      last_error: null,
+      created_at: new Date(baseMs + i * 1000).toISOString(),
+      updated_at: null,
+    });
+  }
+  return rows;
 }

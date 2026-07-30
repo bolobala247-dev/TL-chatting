@@ -103,10 +103,55 @@ export interface MessageMention {
 }
 
 // One image inside a multi-attachment (album) message.
+// Phase 7A/7B media pipeline: extended additively — every new field is
+// optional, so legacy rows ({url,width,height}) parse and render unchanged.
 export interface MessageAttachment {
   url: string;
   width?: number;
   height?: number;
+  /** 'image' | 'video' | 'file' — absent = image (legacy rows). */
+  kind?: MediaAttachmentKind;
+  /** base64 data-URI micro thumbnail (~32px JPEG) for progressive loading. */
+  thumb?: string;
+  /** Staged (post-compression) byte size. */
+  bytes?: number;
+  mime?: string;
+  /** Original filename (kind='file'). */
+  name?: string;
+  /** Playback length (kind='video'). */
+  duration_ms?: number;
+}
+
+// Attachment kinds carried by the media pipeline (upload_queue.kind).
+export type MediaAttachmentKind = "image" | "video" | "file";
+
+// upload_queue.state lifecycle (Phase 7A §3.2).
+export type UploadTaskState = "queued" | "uploading" | "uploaded" | "failed";
+
+// One upload_queue row (domain-mapped) — the unit of upload work, retry,
+// and progress. The owning media message is a real `messages` row
+// (status='pending'); these rows are the binary work list only.
+export interface UploadTask {
+  id: string;
+  message_id: string;
+  room_id: string;
+  position: number;
+  kind: MediaAttachmentKind;
+  local_uri: string;
+  mime: string;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  thumb: string | null;
+  remote_path: string | null;
+  remote_url: string | null;
+  state: UploadTaskState;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 // Immutable poll definition stored on messages.metadata.

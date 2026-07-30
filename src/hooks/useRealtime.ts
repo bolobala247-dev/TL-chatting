@@ -6,6 +6,7 @@ import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
 import { syncService } from "@/src/services/syncService";
 import { outboxService } from "@/src/services/outboxService";
+import { mediaService } from "@/src/services/mediaService";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type {
   Message,
@@ -289,6 +290,9 @@ export function useRealtimeRooms() {
       // drain any queued sends that were waiting for the network. No-op when
       // FEATURE_OFFLINE_OUTBOX is off.
       outboxService.poke();
+      // Same wakeup for the media plane (Phase 7A §11.2 trigger): drive any
+      // uploads that were blocked offline. No-op when FEATURE_MEDIA_PIPELINE off.
+      mediaService.poke();
     };
 
     const handleNewMessage = (message: Message) => {

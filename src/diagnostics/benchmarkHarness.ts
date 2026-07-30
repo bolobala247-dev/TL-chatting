@@ -1,7 +1,13 @@
 import { diag } from "@/src/lib/diagnostics";
 import { mergeMessageWindow } from "@/src/db/repositories/merge";
 import { MESSAGE_WINDOW_SIZE } from "@/src/lib/constants";
-import { makeMessages, makeDelta, nowMs } from "@/src/diagnostics/fixtures";
+import {
+  makeMessages,
+  makeDelta,
+  makeUploadTasks,
+  nowMs,
+} from "@/src/diagnostics/fixtures";
+import type { MessageAttachment, UploadTask } from "@/src/types";
 
 /**
  * Benchmark harness (Phase 6B — design §4).
@@ -32,9 +38,17 @@ export interface MergeTiming {
   msPerMerge: number;
 }
 
+export interface MediaTiming {
+  label: string;
+  rows: number;
+  iterations: number;
+  msPerOp: number;
+}
+
 export interface BenchmarkReport {
   tapOverhead: OpTiming[];
   merge: MergeTiming[];
+  media: MediaTiming[];
 }
 
 function timeLoop(label: string, iterations: number, fn: () => void): OpTiming {
@@ -51,6 +65,39 @@ function timeLoop(label: string, iterations: number, fn: () => void): OpTiming {
   };
 }
 
+// Pure mirror of the drain due-filter (mediaService.drainOnce): pick up to
+// `slots` runnable tasks (not in flight, message not parked, next_attempt_at
+// due), oldest-first. Measured in isolation — no FS/network/store.
+function selectDueUploads(tasks: UploadTask[], slots: number): UploadTask[] {
+  const now = Date.now();
+  const parked = new Set<string>();
+  const runnable: UploadTask[] = [];
+  for (const t of tasks) {
+    if (runnable.length >= slots) break;
+    if (parked.has(t.message_id)) continue;
+    const due =
+      t.next_attempt_at == null ||
+      new Date(t.next_attempt_at).getTime() <= now;
+    if (due) runnable.push(t);
+  }
+  return runnable;
+}
+
+// Pure mirror of the completion-gate transform (mediaService.maybeComplete):
+// uploaded tasks → final remote MessageAttachment[] for the row rewrite.
+function gateAttachmentMap(tasks: UploadTask[]): MessageAttachment[] {
+  return tasks.map((t) => ({
+    url: t.remote_url ?? t.local_uri,
+    width: t.width ?? undefined,
+    height: t.height ?? undefined,
+    kind: t.kind,
+    thumb: t.thumb ?? undefined,
+    bytes: t.bytes ?? undefined,
+    mime: t.mime,
+    duration_ms: t.duration_ms ?? undefined,
+  }));
+}
+
 export const benchmarkHarness = {
   /**
    * Run the full benchmark suite. `iterations` controls the tap-overhead loop;
@@ -59,7 +106,7 @@ export const benchmarkHarness = {
    */
   run(iterations: number = 200000): BenchmarkReport {
     const wasEnabled = diag.enabled();
-    const report: BenchmarkReport = { tapOverhead: [], merge: [] };
+    const report: BenchmarkReport = { tapOverhead: [], merge: [], media: [] };
 
     try {
       // --- 1. Tap overhead (disabled = the production cost) --------------
@@ -110,6 +157,37 @@ export const benchmarkHarness = {
           deltaRows: delta.length,
           iterations: mergeIters,
           msPerMerge: totalMs / mergeIters,
+        });
+      }
+
+      // --- 3. Media plane pure hot-path transforms (Phase 7B §15.1) ------
+      // Only the CPU-bound, native-free parts run here: the per-drain due
+      // filter + oldest-first selection (`queue_scan`) and the completion-gate
+      // attachment map. Compression / upload / gate-txn are native+I/O bound
+      // and are measured on-device via the `media.compress_ms`,
+      // `media.upload_ms`, and `media.gate_ms` histograms instead.
+      for (const rows of [0, 50, 500]) {
+        const tasks = makeUploadTasks(rows);
+        const mediaIters = 5000;
+        for (let i = 0; i < 200; i++) selectDueUploads(tasks, 2);
+        let start = nowMs();
+        for (let i = 0; i < mediaIters; i++) selectDueUploads(tasks, 2);
+        report.media.push({
+          label: "queue_scan",
+          rows,
+          iterations: mediaIters,
+          msPerOp: (nowMs() - start) / mediaIters,
+        });
+
+        const uploaded = makeUploadTasks(rows, { state: "uploaded" });
+        for (let i = 0; i < 200; i++) gateAttachmentMap(uploaded);
+        start = nowMs();
+        for (let i = 0; i < mediaIters; i++) gateAttachmentMap(uploaded);
+        report.media.push({
+          label: "attachment_map",
+          rows,
+          iterations: mediaIters,
+          msPerOp: (nowMs() - start) / mediaIters,
         });
       }
 

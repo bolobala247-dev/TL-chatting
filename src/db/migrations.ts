@@ -168,11 +168,63 @@ const MIGRATION_003_OUTBOX: Migration = {
   ],
 };
 
+/**
+ * v4 — media upload queue (Phase 7A/7B, design §3.2).
+ *
+ * One row per attachment — the unit of upload work, retry, and progress.
+ * The media message itself stays a real `messages` row (status='pending',
+ * local staged URIs in `attachments`), mirroring 5A's "message is the
+ * payload" shape; this table holds only the binary work list the media
+ * worker reads:
+ *  - (message_id, position) → the owning attachment slot
+ *  - created_at → global FIFO ordering key (authoring instant)
+ *  - attempts / next_attempt_at → persisted backoff (survives restart)
+ *  - state → 'queued' | 'uploading' | 'uploaded' | 'failed'
+ * Independent from the `outbox` table by design (upload plane ≠ delivery
+ * plane); the completion gate inserts the outbox row only after every task
+ * here is 'uploaded'. Same droppable-cache lifecycle (wiped on logout).
+ */
+const MIGRATION_004_UPLOAD_QUEUE: Migration = {
+  toVersion: 4,
+  name: "upload_queue",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS upload_queue (
+      id              TEXT PRIMARY KEY NOT NULL,
+      message_id      TEXT NOT NULL,
+      room_id         TEXT NOT NULL,
+      position        INTEGER NOT NULL,
+      kind            TEXT NOT NULL,
+      local_uri       TEXT NOT NULL,
+      mime            TEXT NOT NULL,
+      bytes           INTEGER,
+      width           INTEGER,
+      height          INTEGER,
+      duration_ms     INTEGER,
+      thumb           TEXT,
+      remote_path     TEXT,
+      remote_url      TEXT,
+      state           TEXT NOT NULL DEFAULT 'queued',
+      attempts        INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT,
+      last_error      TEXT,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT
+    );`,
+    // Per-message lookup: completion gate + retry/discard fan-out
+    `CREATE INDEX IF NOT EXISTS idx_upload_queue_message
+       ON upload_queue (message_id, position);`,
+    // Worker due-set scan: active rows in global FIFO order
+    `CREATE INDEX IF NOT EXISTS idx_upload_queue_scan
+       ON upload_queue (state, created_at);`,
+  ],
+};
+
 // Append-only, ordered by toVersion
 const MIGRATIONS: Migration[] = [
   MIGRATION_001_INITIAL_SCHEMA,
   MIGRATION_002_SYNC_STATE,
   MIGRATION_003_OUTBOX,
+  MIGRATION_004_UPLOAD_QUEUE,
 ];
 
 export const LATEST_SCHEMA_VERSION =

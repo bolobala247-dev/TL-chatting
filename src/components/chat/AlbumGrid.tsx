@@ -24,6 +24,10 @@ function Tile({ attachment, width, height, overlayCount, onPress }: TileProps) {
         transition={200}
         recyclingKey={attachment.url}
         cachePolicy="memory-disk"
+        // Progressive loading (Phase 7B §7/§8): inline base64 micro-thumb paints
+        // in the same frame with zero network; absent ⇒ today's blank-then-load.
+        placeholder={attachment.thumb ? { uri: attachment.thumb } : undefined}
+        placeholderContentFit="cover"
       />
       {overlayCount ? (
         <View className="absolute inset-0 items-center justify-center bg-black/50">
@@ -49,12 +53,20 @@ export function AlbumGrid({ attachments, onPressImage }: AlbumGridProps) {
   const press = (index: number) => () => onPressImage?.(index);
 
   if (count === 1) {
+    // Reserved aspect box (Phase 7B §8): derive the exact height from the
+    // probed width/height so the full image loads with zero layout shift
+    // (keeps maintainVisibleContentPosition stable). Absent dims ⇒ today's 180.
+    const a = attachments[0];
+    const singleHeight =
+      a.width && a.height
+        ? Math.round(Math.min(Math.max((GRID_W * a.height) / a.width, 120), 320))
+        : 180;
     return (
       <View className="mb-1 overflow-hidden rounded-xl">
         <Tile
-          attachment={attachments[0]}
+          attachment={a}
           width={GRID_W}
-          height={180}
+          height={singleHeight}
           onPress={press(0)}
         />
       </View>

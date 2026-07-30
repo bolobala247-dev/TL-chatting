@@ -5,6 +5,7 @@ import type {
   RoomParticipantWithProfile,
   RoomWithLastMessage,
   SyncState,
+  UploadTask,
 } from "@/src/types";
 
 /**
@@ -138,6 +139,75 @@ export interface OutboxRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * Media upload queue (Phase 7A §3.4, Invariant M2). Owns persisted queue
+ * state and the atomic transitions — including the completion-gate
+ * transaction, because it spans `messages` + `outbox` + `upload_queue` rows
+ * and row↔domain mapping lives in sqlite.ts (the same reason OutboxRepository
+ * is co-located there). It does NOT know about networks, timers, compression,
+ * or retry policy — that is `mediaService`. Fully independent of the outbox
+ * queue: the only touch point is `completeMessage` inserting the outbox row
+ * through the same file-private SQL the OutboxRepository uses.
+ */
+export interface UploadQueueRepository {
+  /** Upsert the message row (status='pending') + N upload_queue inserts, one txn. */
+  enqueueMessageWithUploads(
+    message: MessageWithMeta,
+    tasks: UploadTask[]
+  ): Promise<void>;
+  /**
+   * All 'queued' | 'uploading' rows, global FIFO (created_at, position).
+   * 'uploading' rows are stale after a crash — resume() reverts them first.
+   */
+  listActive(): Promise<UploadTask[]>;
+  /** Every task of one message, in position order (gate rewrite, discard). */
+  listForMessage(messageId: string): Promise<UploadTask[]>;
+  /**
+   * Message ids whose tasks are ALL 'uploaded' but whose message row is
+   * still 'pending' with no outbox row — the crashed-between-upload-and-gate
+   * window (§11.2 M5); resume() re-runs the completion gate for each.
+   */
+  listCompletableMessageIds(): Promise<string[]>;
+  /**
+   * Message ids that still hold upload_queue rows but whose message row is
+   * already status='sent' (post-ACK) — the lazy SENT sweep (§2.1 rule 7)
+   * clears these rows + their staging dirs.
+   */
+  listSentMessageIds(): Promise<string[]>;
+  /** Crash recovery: 'uploading' → 'queued' (idempotent PUT makes this safe). */
+  revertUploadingToQueued(): Promise<void>;
+  markUploading(id: string): Promise<void>;
+  markUploaded(id: string, remotePath: string, remoteUrl: string): Promise<void>;
+  /** Transient retry: bump attempts + persist next_attempt_at (stays queued). */
+  reschedule(
+    id: string,
+    attempts: number,
+    nextAttemptAt: string,
+    error: string
+  ): Promise<void>;
+  /** Permanent / exhausted → task parked + owning message.status='failed', one txn. */
+  markFailed(id: string, error: string): Promise<void>;
+  /** Manual retry: failed tasks → queued, attempts=0 + message.status='pending', one txn. */
+  resetForRetry(messageId: string): Promise<void>;
+  getMessageCompletion(
+    messageId: string
+  ): Promise<{ total: number; uploaded: number; failed: number }>;
+  /**
+   * Completion gate (§2.1 rule 5): rewrite messages.attachments/media_url to
+   * remote URLs + INSERT the outbox row (using the message's already-stamped
+   * created_at — no restamp), ONE txn. Idempotent via INSERT OR REPLACE.
+   */
+  completeMessage(
+    messageId: string,
+    rewrittenAttachments: MessageAttachment[]
+  ): Promise<void>;
+  /** Discard: queue rows + message row, one txn. */
+  removeForMessage(messageId: string): Promise<void>;
+  /** Post-ACK cleanup (§2.1 rule 7): queue rows only — the message stays. */
+  clearSent(messageId: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
 /** Everything the application layer can reach — one bundle per connection. */
 export interface Repositories {
   messages: MessageRepository;
@@ -146,4 +216,5 @@ export interface Repositories {
   attachments: AttachmentRepository;
   syncState: SyncStateRepository;
   outbox: OutboxRepository;
+  uploadQueue: UploadQueueRepository;
 }

@@ -120,6 +120,12 @@ export const messageService = {
     metadata?: Message["metadata"];
     reply_to?: string | null;
     created_at: string;
+    // Media pipeline (Phase 7B): a media message hands off with its attachments
+    // already rewritten to remote URLs (completion gate). Passing them through
+    // keeps the server row authoritative so the realtime echo doesn't wipe them
+    // (M10). Additive + optional — text/poll sends omit both.
+    attachments?: Message["attachments"];
+    media_url?: string | null;
   }): Promise<Message> {
     const { data, error } = await supabase.rpc("send_message_idempotent", {
       p_id: payload.id,
@@ -129,7 +135,15 @@ export const messageService = {
       p_metadata: payload.metadata ?? undefined,
       p_reply_to: payload.reply_to ?? undefined,
       p_created_at: payload.created_at,
-    });
+      // p_attachments/p_media_url are added by migration 00019; the generated
+      // RPC types regenerate only after it is applied, so cast locally.
+      ...(payload.attachments !== undefined
+        ? { p_attachments: payload.attachments }
+        : {}),
+      ...(payload.media_url !== undefined
+        ? { p_media_url: payload.media_url }
+        : {}),
+    } as any);
 
     if (error) throw error;
     // SETOF messages → always returns the (new or pre-existing) row.
