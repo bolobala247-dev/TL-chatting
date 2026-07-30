@@ -48,3 +48,33 @@ export const USER_STATUS = {
 } as const;
 
 export const EAS_PROJECT_ID = "5ff3ce97-1320-44a7-b7f5-167bbfd02b6f";
+
+// ============================================
+// 1:1 Calling (WebRTC over Supabase Realtime signaling)
+// ============================================
+
+// Ring for this long before the outgoing call is marked missed
+export const CALL_RING_TIMEOUT_MS = 35000;
+// Connection-establishment guard: fail the call if media never connects
+export const CALL_CONNECT_TIMEOUT_MS = 30000;
+
+// Google public STUN + optional TURN (env-driven, TURN-ready by design).
+// Provide EXPO_PUBLIC_TURN_URL/USERNAME/CREDENTIAL to add a relay for
+// peers behind symmetric NATs; STUN-only still works for most networks.
+export function getIceServers(): { urls: string | string[]; username?: string; credential?: string }[] {
+  const servers: { urls: string | string[]; username?: string; credential?: string }[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+
+  const turnUrl = process.env.EXPO_PUBLIC_TURN_URL;
+  if (turnUrl) {
+    servers.push({
+      urls: turnUrl,
+      username: process.env.EXPO_PUBLIC_TURN_USERNAME,
+      credential: process.env.EXPO_PUBLIC_TURN_CREDENTIAL,
+    });
+  }
+
+  return servers;
+}

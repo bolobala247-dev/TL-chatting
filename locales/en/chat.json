@@ -231,5 +231,51 @@
     "title": "Contact info",
     "phone": "Phone"
   },
+  "call": {
+    "audio": "Voice call",
+    "video": "Video call",
+    "startAudio": "Start voice call",
+    "startVideo": "Start video call",
+    "status": {
+      "calling": "Calling…",
+      "ringing": "Ringing…",
+      "connecting": "Connecting…",
+      "incomingAudio": "Incoming voice call",
+      "incomingVideo": "Incoming video call",
+      "ended": "Call ended",
+      "declined": "Call declined",
+      "missed": "Missed call",
+      "failed": "Connection failed",
+      "reconnecting": "Reconnecting…"
+    },
+    "actions": {
+      "accept": "Accept",
+      "decline": "Decline",
+      "cancel": "Cancel"
+    },
+    "controls": {
+      "mic": "Microphone",
+      "camera": "Camera",
+      "switchCamera": "Switch camera",
+      "speaker": "Speaker",
+      "pip": "Picture in picture",
+      "end": "End call"
+    },
+    "log": {
+      "outgoingAudio": "Outgoing voice call",
+      "outgoingVideo": "Outgoing video call",
+      "incomingAudio": "Incoming voice call",
+      "incomingVideo": "Incoming video call",
+      "missed": "Missed call",
+      "declined": "Call declined",
+      "cancelled": "Cancelled call",
+      "duration": "Duration {{duration}}"
+    },
+    "error": {
+      "permission": "Camera and microphone access is required for calls.",
+      "start": "Couldn't start the call, please try again.",
+      "busy": "This person is on another call."
+    }
+  },
   "startChatFailed": "Couldn't start the conversation, please try again"
 }
