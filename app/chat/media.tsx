@@ -107,6 +107,8 @@ export default function SharedMediaScreen() {
               style={{ width: cellSize, height: cellSize }}
               contentFit="cover"
               transition={150}
+              recyclingKey={item.id}
+              cachePolicy="memory-disk"
             />
           ) : (
             <Icon

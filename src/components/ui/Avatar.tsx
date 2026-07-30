@@ -25,6 +25,10 @@ export function Avatar({ uri, name, size = 40 }: AvatarProps) {
         style={{ width: size, height: size, borderRadius: size / 2 }}
         contentFit="cover"
         transition={200}
+        // Avatars repeat across recycled list rows — memory cache avoids
+        // disk hits, recyclingKey prevents stale frames while recycling
+        cachePolicy="memory-disk"
+        recyclingKey={uri}
       />
     );
   }

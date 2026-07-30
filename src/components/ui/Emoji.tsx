@@ -33,6 +33,8 @@ export function Emoji({ emoji, size = 20 }: EmojiProps) {
       }}
       style={{ width: size, height: size }}
       contentFit="contain"
+      // Same few glyphs render constantly — keep the CDN SVGs in memory
+      cachePolicy="memory-disk"
       accessibilityLabel={emoji}
     />
   );
