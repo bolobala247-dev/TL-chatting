@@ -9,6 +9,7 @@ import i18n, {
 import { supabase } from "@/src/lib/supabase";
 import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
+import { cacheService } from "@/src/services/cacheService";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
@@ -167,6 +168,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useChatStore.getState().reset();
     useRoomStore.getState().reset();
     usePrivacyStore.getState().reset();
+    // Cached plaintext must not survive an account switch: close + delete
+    // the SQLite file, then reopen an empty one (cacheService never throws)
+    await cacheService.wipe();
     set({ session: null, user: null, profile: null });
   },
 
