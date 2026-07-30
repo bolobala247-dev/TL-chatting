@@ -103,7 +103,6 @@ export function MessageInput({
       <View className="min-h-[36px] flex-1 justify-center rounded-2xl bg-surface-secondary px-4 py-2">
         <TextInput
           className="max-h-24 font-sans text-body leading-5 text-fg"
-          style={Platform.OS === "web" ? ({ outlineStyle: "none" } as never) : undefined}
           placeholder={t("input.placeholder")}
           placeholderTextColor={colors.placeholder}
           value={value}
