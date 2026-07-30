@@ -117,6 +117,80 @@ export const DIAG_RING_CAPACITY = 200;
 export const DIAG_MAX_SERIES = 256;
 
 // ============================================
+// Media pipeline (Phase 7A/7B)
+// ============================================
+
+// Master flag. false ⇒ media sends stay today's legacy path byte-for-byte
+// (in-session sendAlbumMessage, no durability, no upload_queue writes).
+// true ⇒ media messages become durable two-plane work: staged + compressed
+// locally, uploaded by the media worker (idempotent storage paths), then
+// handed to the Phase 5A outbox for delivery. Requires FEATURE_OFFLINE_OUTBOX
+// (delivery rides the outbox); mediaService verifies this at runtime and
+// degrades to legacy when unmet (logged, not thrown). Rollback = flip false.
+export const FEATURE_MEDIA_PIPELINE = false;
+// Global upload concurrency cap (oldest message first, no per-room seriality).
+export const UPLOAD_MAX_CONCURRENT = 2;
+// Bounded exponential backoff per upload task, persisted in
+// upload_queue.next_attempt_at (survives restart): 2s, 4s, 8s, 16s, 32s.
+// Higher cap than the outbox — upload attempts are expensive.
+export const MEDIA_RETRY_BASE_MS = 2000;
+export const MEDIA_RETRY_MAX_MS = 60000;
+// Transient failures beyond this cap park the whole message (manual retry).
+export const MEDIA_MAX_ATTEMPTS = 5;
+// Image compression: downscale so max(width, height) ≤ this, re-encode JPEG.
+export const MEDIA_IMAGE_MAX_EDGE = 2048;
+export const MEDIA_IMAGE_QUALITY = 0.8;
+// Sources already JPEG, ≤ max edge AND ≤ this size stage as a plain copy
+// (screenshots keep pixel-perfect text; EXIF risk accepted — design §6/§13.5).
+export const MEDIA_IMAGE_COPY_THROUGH_BYTES = 500 * 1024;
+// Inline micro-thumbnail (base64 data URI in attachments JSON, ~1 KB each).
+export const MEDIA_THUMB_EDGE = 32;
+export const MEDIA_THUMB_QUALITY = 0.5;
+// Per-kind payload caps (client-side validation before staging).
+export const MEDIA_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MEDIA_MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+export const MEDIA_MAX_VIDEO_DURATION_S = 180;
+export const MEDIA_MAX_FILE_BYTES = 50 * 1024 * 1024;
+// Disk budgets: outgoing staging (documentDirectory, app-owned) soft cap and
+// tapped video/file downloads (cacheDirectory) LRU cap — both swept on boot.
+export const MEDIA_STAGING_MAX_BYTES = 256 * 1024 * 1024;
+export const MEDIA_DOWNLOAD_CACHE_MAX_BYTES = 256 * 1024 * 1024;
+// When a page/delta is applied, Image.prefetch the newest N image URLs
+// (roadmap §14 hook — activated with FEATURE_MEDIA_PIPELINE).
+export const IMAGE_PREFETCH_COUNT = 10;
+
+// ============================================
+// Local search & indexing (Phase 8A/8B)
+// ============================================
+
+// Master flag. false ⇒ searchService.searchMessages delegates to today's
+// server search_messages RPC byte-for-byte (online-only, no index reads); the
+// v5 index tables may exist on disk but are never queried. true ⇒ search runs
+// local-first over the SQLite FTS5 index (offline, ranked, highlighted),
+// falling back to the RPC only when the cache/FTS is unavailable. INDEPENDENT
+// of every other feature flag — toggling search can never change delivery,
+// sync, or media behavior. Rollback = flip false.
+export const FEATURE_LOCAL_SEARCH = false;
+// Below this trimmed-query length FTS prefix terms are skipped and the service
+// falls back to a bounded local LIKE scan over search_index.text (§5.3).
+export const SEARCH_MIN_TOKEN_LEN = 2;
+// FTS5 snippet() window width (tokens) for the result preview line (§10).
+export const SEARCH_SNIPPET_TOKENS = 10;
+// Ranking blend weights (§8): score = w_bm25*bm25 − w_recency*recency_boost −
+// w_room*(in scoped room). bm25 is negative (lower = better), so lower score
+// ranks first. w_bm25=1,w_recency=0 ⇒ relevance-only; w_bm25=0 ⇒ recency-only.
+export const SEARCH_RANK_W_BM25 = 1;
+export const SEARCH_RANK_W_RECENCY = 0.3;
+export const SEARCH_RANK_W_ROOM = 2;
+// Boot coverage-repair chunk size (§16.2): re-index at most this many
+// missing/stale rows per pass so a large cache never blocks first paint.
+export const SEARCH_REPAIR_BATCH = 500;
+// Tokenizer/column fingerprint stored in meta['search_schema_hash']; a mismatch
+// on boot triggers a rebuild so a future tokenizer change can't serve a stale
+// index (§16.4).
+export const SEARCH_SCHEMA_VERSION = "fts5:unicode61-rd2:cols=text,media_text:v1";
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 

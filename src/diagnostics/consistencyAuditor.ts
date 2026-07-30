@@ -1,5 +1,7 @@
 import { diag } from "@/src/lib/diagnostics";
 import { cacheService } from "@/src/services/cacheService";
+import { databaseService } from "@/src/services/databaseService";
+import { FEATURE_LOCAL_SEARCH } from "@/src/lib/constants";
 import { useChatStore } from "@/src/stores/chatStore";
 import type { MessageWithMeta, OutboxItem } from "@/src/types";
 
@@ -33,7 +35,8 @@ export interface ConsistencyIssue {
     | "order-ram"
     | "outbox-orphan"
     | "state-mismatch"
-    | "ram-dangling";
+    | "ram-dangling"
+    | "search-drift";
   roomId: string;
   detail: string;
 }
@@ -49,6 +52,8 @@ export interface ConsistencyReport {
   outboxOrphans: number;
   stateMismatches: number;
   ramDangling: number;
+  searchIndexRows: number;
+  searchCoverageDrift: number;
   issues: ConsistencyIssue[];
 }
 
@@ -68,6 +73,8 @@ function emptyReport(ran: boolean): ConsistencyReport {
     outboxOrphans: 0,
     stateMismatches: 0,
     ramDangling: 0,
+    searchIndexRows: 0,
+    searchCoverageDrift: 0,
     issues: [],
   };
 }
@@ -188,12 +195,42 @@ export const consistencyAuditor = {
         }
       }
 
+      // (4) search index coverage (Phase 8B — invariants I-S1/I-S3). The
+      // search_index is a derived cache: every indexable cached message must
+      // own an index row (drift → 0, kept there by the boot coverage-repair
+      // pass), and the projection is bounded by the cached message set. This is
+      // gated on the flag, so with local search OFF it is a pure no-op and the
+      // report is byte-identical to Phase 7B. Read-only: count() + a drift
+      // COUNT (limit 0 ⇒ no pending rows materialized), never a write.
+      if (FEATURE_LOCAL_SEARCH) {
+        const searchRepo = databaseService.repositories?.search;
+        if (searchRepo) {
+          try {
+            report.searchIndexRows = await searchRepo.count();
+            const { drift } = await searchRepo.coverageAudit(0);
+            report.searchCoverageDrift = drift;
+            if (drift > 0 && report.issues.length < MAX_ISSUES) {
+              report.issues.push({
+                kind: "search-drift",
+                roomId: "*",
+                detail: `${drift} indexable message(s) missing from search_index`,
+              });
+            }
+            diag.gauge("search.index_rows", report.searchIndexRows);
+            diag.gauge("search.coverage_drift", report.searchCoverageDrift);
+          } catch (err) {
+            console.error("[consistencyAuditor] search coverage", err);
+          }
+        }
+      }
+
       report.ok =
         report.duplicateIds === 0 &&
         report.orderViolations === 0 &&
         report.outboxOrphans === 0 &&
         report.stateMismatches === 0 &&
-        report.ramDangling === 0;
+        report.ramDangling === 0 &&
+        report.searchCoverageDrift === 0;
 
       // Publish the outcome into the passive registry (read-only side, §8).
       diag.gauge("consistency.duplicate_ids", report.duplicateIds);

@@ -113,6 +113,13 @@ async function attemptSend(item: OutboxItem): Promise<SendOutcome> {
       // The stored (monotonic-stamped) authoring instant is the ordering key
       // everywhere (§6.1) — send it so the server row matches the local one.
       created_at: message.created_at ?? new Date().toISOString(),
+      // Media pipeline (Phase 7B): a media message reaches the outbox only
+      // AFTER its completion gate rewrote attachments local→remote, so the
+      // stored row already carries remote URLs. Pass them through so the
+      // server row stays authoritative and the realtime echo can't wipe them
+      // (M10). Additive + undefined for text/poll — the RPC omits both then.
+      attachments: message.attachments ?? undefined,
+      media_url: message.media_url ?? undefined,
     });
 
     // ACK (§4.2): durable txn first (adopt server row → status=sent, delete

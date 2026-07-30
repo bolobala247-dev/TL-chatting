@@ -2,11 +2,15 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import type {
   Message,
   MessageAttachment,
+  MessageSearchKind,
   MessageWithMeta,
   OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SearchDoc,
+  SearchHit,
   SyncState,
+  UploadTask,
 } from "@/src/types";
 import type {
   AttachmentRepository,
@@ -15,8 +19,11 @@ import type {
   ParticipantRepository,
   Repositories,
   RoomRepository,
+  SearchRepository,
   SyncStateRepository,
+  UploadQueueRepository,
 } from "./types";
+import { ensureSearchFtsSchema } from "../migrations";
 
 /**
  * SQLite implementations of the repository contracts (see ./types.ts).
@@ -658,6 +665,668 @@ function createOutboxRepository(db: SQLiteDatabase): OutboxRepository {
 }
 
 // ---------------------------------------------------------------------------
+// upload_queue (Phase 7A/7B — media upload work list; message row IS the payload)
+// ---------------------------------------------------------------------------
+
+interface UploadQueueRow {
+  id: string;
+  message_id: string;
+  room_id: string;
+  position: number;
+  kind: string;
+  local_uri: string;
+  mime: string;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  thumb: string | null;
+  remote_path: string | null;
+  remote_url: string | null;
+  state: string;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+function rowToUploadTask(row: UploadQueueRow): UploadTask {
+  return {
+    id: row.id,
+    message_id: row.message_id,
+    room_id: row.room_id,
+    position: row.position,
+    kind:
+      row.kind === "video" || row.kind === "file" ? row.kind : "image",
+    local_uri: row.local_uri,
+    mime: row.mime,
+    bytes: row.bytes,
+    width: row.width,
+    height: row.height,
+    duration_ms: row.duration_ms,
+    thumb: row.thumb,
+    remote_path: row.remote_path,
+    remote_url: row.remote_url,
+    state:
+      row.state === "uploading" ||
+      row.state === "uploaded" ||
+      row.state === "failed"
+        ? row.state
+        : "queued",
+    attempts: row.attempts,
+    next_attempt_at: row.next_attempt_at,
+    last_error: row.last_error,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function createUploadQueueRepository(db: SQLiteDatabase): UploadQueueRepository {
+  return {
+    async enqueueMessageWithUploads(message, tasks) {
+      // Same monotonic per-room stamp as the outbox enqueue — the created_at
+      // written here is final: completeMessage reuses it (no restamp), so the
+      // bubble never re-sorts between authoring and delivery (§2.1 rule 3).
+      const stampedAt = monotonicCreatedAt(
+        message.room_id,
+        message.created_at ?? new Date().toISOString()
+      );
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        // The media message is a real messages row (status='pending', staged
+        // local URIs in attachments) — hydrates & renders after restart with
+        // zero special-casing, exactly like a 5A pending text (§3.1).
+        await txn.runAsync(
+          UPSERT_MESSAGE_SQL,
+          toMessageRowParams({
+            ...message,
+            created_at: stampedAt,
+            outbox_status: "pending",
+          })
+        );
+        const stmt = await txn.prepareAsync(
+          `INSERT OR REPLACE INTO upload_queue
+             (id, message_id, room_id, position, kind, local_uri, mime, bytes,
+              width, height, duration_ms, thumb, remote_path, remote_url,
+              state, attempts, next_attempt_at, last_error, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
+                   'queued', 0, NULL, NULL, ?, ?)`
+        );
+        try {
+          for (const t of tasks) {
+            await stmt.executeAsync([
+              t.id,
+              message.id,
+              message.room_id,
+              t.position,
+              t.kind,
+              t.local_uri,
+              t.mime,
+              t.bytes,
+              t.width,
+              t.height,
+              t.duration_ms,
+              t.thumb,
+              stampedAt, // authoring instant = global FIFO key (§3.3)
+              now,
+            ]);
+          }
+        } finally {
+          await stmt.finalizeAsync();
+        }
+      });
+    },
+
+    // Global FIFO by authoring time, attachments in order — no per-room
+    // seriality (uploads target distinct objects; order is fairness only).
+    async listActive() {
+      const rows = await db.getAllAsync<UploadQueueRow>(
+        `SELECT * FROM upload_queue
+          WHERE state IN ('queued','uploading')
+          ORDER BY created_at ASC, position ASC`
+      );
+      return rows.map(rowToUploadTask);
+    },
+
+    async listForMessage(messageId) {
+      const rows = await db.getAllAsync<UploadQueueRow>(
+        `SELECT * FROM upload_queue
+          WHERE message_id = ? ORDER BY position ASC`,
+        [messageId]
+      );
+      return rows.map(rowToUploadTask);
+    },
+
+    // Crashed-between-upload-and-gate window (§11.2 M5): every task uploaded,
+    // message still 'pending', no outbox row yet — the gate must re-run.
+    async listCompletableMessageIds() {
+      const rows = await db.getAllAsync<{ message_id: string }>(
+        `SELECT u.message_id FROM upload_queue u
+           JOIN messages m ON m.id = u.message_id AND m.status = 'pending'
+           LEFT JOIN outbox o ON o.id = u.message_id
+          WHERE o.id IS NULL
+          GROUP BY u.message_id
+         HAVING SUM(CASE WHEN u.state = 'uploaded' THEN 1 ELSE 0 END) = COUNT(*)`
+      );
+      return rows.map((r) => r.message_id);
+    },
+
+    // Lazy SENT sweep (§2.1 rule 7): queue rows whose message was ACKed
+    // (status='sent') — or whose message row is gone entirely (recalled /
+    // pruned) — are dead weight; the caller clears them + their staging dirs.
+    async listSentMessageIds() {
+      const rows = await db.getAllAsync<{ message_id: string }>(
+        `SELECT DISTINCT u.message_id FROM upload_queue u
+           LEFT JOIN messages m ON m.id = u.message_id
+          WHERE m.id IS NULL OR m.status = 'sent'`
+      );
+      return rows.map((r) => r.message_id);
+    },
+
+    // Crash recovery (§11.2 M4): an 'uploading' row after relaunch is stale by
+    // definition (no in-flight request survives the process). Reverting to
+    // 'queued' is safe because the PUT is idempotent by object path (§4.3).
+    async revertUploadingToQueued() {
+      await db.runAsync(
+        `UPDATE upload_queue SET state = 'queued', updated_at = ?
+          WHERE state = 'uploading'`,
+        [new Date().toISOString()]
+      );
+    },
+
+    async markUploading(id) {
+      await db.runAsync(
+        `UPDATE upload_queue SET state = 'uploading', updated_at = ?
+          WHERE id = ?`,
+        [new Date().toISOString(), id]
+      );
+    },
+
+    async markUploaded(id, remotePath, remoteUrl) {
+      await db.runAsync(
+        `UPDATE upload_queue
+            SET state = 'uploaded', remote_path = ?, remote_url = ?,
+                last_error = NULL, updated_at = ?
+          WHERE id = ?`,
+        [remotePath, remoteUrl, new Date().toISOString(), id]
+      );
+    },
+
+    // Transient retry: back to 'queued' with a future due time; the persisted
+    // attempts/schedule survive restart (same contract as outbox.reschedule).
+    async reschedule(id, attempts, nextAttemptAt, error) {
+      await db.runAsync(
+        `UPDATE upload_queue
+            SET state = 'queued', attempts = ?, next_attempt_at = ?,
+                last_error = ?, updated_at = ?
+          WHERE id = ?`,
+        [attempts, nextAttemptAt, error, new Date().toISOString(), id]
+      );
+    },
+
+    // Message-level parking (§2.1 rule 6): one permanently-failed task parks
+    // the whole message — sibling tasks stay as-is ('uploaded' work is kept;
+    // 'queued' siblings are skipped by the worker once the message is parked).
+    async markFailed(id, error) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          `UPDATE upload_queue
+              SET state = 'failed', last_error = ?, updated_at = ?
+            WHERE id = ?`,
+          [error, now, id]
+        );
+        await txn.runAsync(
+          `UPDATE messages SET status = 'failed'
+            WHERE id = (SELECT message_id FROM upload_queue WHERE id = ?)`,
+          [id]
+        );
+      });
+    },
+
+    // Manual retry (§10.3): only failed tasks reset — already-uploaded
+    // siblings keep their remote objects (the PUT was idempotent anyway).
+    async resetForRetry(messageId) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          `UPDATE upload_queue
+              SET state = 'queued', attempts = 0, next_attempt_at = NULL,
+                  last_error = NULL, updated_at = ?
+            WHERE message_id = ? AND state = 'failed'`,
+          [now, messageId]
+        );
+        await txn.runAsync(
+          "UPDATE messages SET status = 'pending' WHERE id = ?",
+          [messageId]
+        );
+      });
+    },
+
+    async getMessageCompletion(messageId) {
+      const row = await db.getFirstAsync<{
+        total: number;
+        uploaded: number;
+        failed: number;
+      }>(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN state = 'uploaded' THEN 1 ELSE 0 END) AS uploaded,
+                SUM(CASE WHEN state = 'failed' THEN 1 ELSE 0 END) AS failed
+           FROM upload_queue WHERE message_id = ?`,
+        [messageId]
+      );
+      return {
+        total: row?.total ?? 0,
+        uploaded: row?.uploaded ?? 0,
+        failed: row?.failed ?? 0,
+      };
+    },
+
+    // Completion gate (§2.1 rule 5, §4.4): local→remote rewrite + outbox
+    // insert in ONE txn — delivery can never begin with local URIs, and a
+    // crash leaves either "still uploading" or "fully handed off", nothing
+    // between. The outbox row reuses the message's already-stamped created_at
+    // so the queue position matches the authoring instant (no restamp).
+    async completeMessage(messageId, rewrittenAttachments) {
+      const now = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        const msg = await txn.getFirstAsync<{
+          room_id: string;
+          created_at: string | null;
+          attachments: string | null;
+        }>(
+          "SELECT room_id, created_at, attachments FROM messages WHERE id = ?",
+          [messageId]
+        );
+        // Message recalled/pruned mid-upload — nothing to hand off; the
+        // orphaned queue rows fall to the SENT/orphan sweep.
+        if (!msg) return;
+        // Merge per position over the staged JSON: the rewrite only swaps the
+        // upload-derived fields (url, dims, thumb…); authoring-only fields
+        // like a file's display `name` survive untouched.
+        const existing =
+          parseJson<MessageAttachment[]>(msg.attachments) ?? [];
+        const merged = rewrittenAttachments.map((a, i) => ({
+          ...existing[i],
+          ...a,
+        }));
+        await txn.runAsync(
+          `UPDATE messages SET attachments = ?, media_url = ? WHERE id = ?`,
+          [JSON.stringify(merged), merged[0]?.url ?? null, messageId]
+        );
+        await txn.runAsync(
+          `INSERT OR REPLACE INTO outbox
+             (id, room_id, attempts, next_attempt_at, last_error, state, created_at, updated_at)
+           VALUES (?, ?, 0, NULL, NULL, 'pending', ?, ?)`,
+          [messageId, msg.room_id, msg.created_at ?? now, now]
+        );
+      });
+    },
+
+    async removeForMessage(messageId) {
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.runAsync(
+          "DELETE FROM upload_queue WHERE message_id = ?",
+          [messageId]
+        );
+        await txn.runAsync("DELETE FROM messages WHERE id = ?", [messageId]);
+      });
+    },
+
+    async clearSent(messageId) {
+      await db.runAsync("DELETE FROM upload_queue WHERE message_id = ?", [
+        messageId,
+      ]);
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM upload_queue");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// search index (Phase 8A/8B) — the DERIVED FTS projection over `messages`
+// ---------------------------------------------------------------------------
+
+interface SearchHitRow {
+  message_id: string;
+  room_id: string;
+  sender_id: string | null;
+  type: string;
+  created_at: string;
+  content: string | null;
+  media_url: string | null;
+  attachments: string | null;
+  score: number;
+  snippet: string | null;
+  highlight: string | null;
+}
+
+const UPSERT_SEARCH_SQL = `
+  INSERT INTO search_index
+    (message_id, room_id, sender_id, type, has_link, created_ms, created_at, text, media_text, indexed_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(message_id) DO UPDATE SET
+    room_id     = excluded.room_id,
+    sender_id   = excluded.sender_id,
+    type        = excluded.type,
+    has_link    = excluded.has_link,
+    created_ms  = excluded.created_ms,
+    created_at  = excluded.created_at,
+    text        = excluded.text,
+    media_text  = excluded.media_text,
+    indexed_at  = excluded.indexed_at`;
+
+function searchDocParams(doc: SearchDoc, indexedAt: string) {
+  return [
+    doc.message_id,
+    doc.room_id,
+    doc.sender_id,
+    doc.type,
+    doc.has_link ? 1 : 0,
+    doc.created_ms,
+    doc.created_at,
+    doc.text,
+    doc.media_text,
+    indexedAt,
+  ];
+}
+
+function rowToSearchHit(row: SearchHitRow): SearchHit {
+  return {
+    message_id: row.message_id,
+    room_id: row.room_id,
+    sender_id: row.sender_id,
+    content: row.content,
+    type: row.type,
+    media_url: row.media_url,
+    attachments: parseJson<Message["attachments"]>(row.attachments),
+    created_at: row.created_at,
+    score: row.score,
+    snippet: row.snippet,
+    highlight: row.highlight,
+  };
+}
+
+// Lane → SQL predicate on the `si` (search_index) alias — identical visibility
+// to the server search_messages RPC (design §11).
+function lanePredicate(kind: MessageSearchKind): string {
+  switch (kind) {
+    case "image":
+      return "si.type IN ('image','video')";
+    case "file":
+      return "si.type = 'file'";
+    case "link":
+      return "si.has_link = 1";
+    case "message":
+    default:
+      return "si.type IN ('text','image','video','file')";
+  }
+}
+
+// Whitelist-tokenize (fold case; keep letters/numbers only) — the FTS analogue
+// of parameterization: raw operators (" * : AND NEAR) can never reach the
+// MATCH grammar because only [\p{L}\p{N}] runs survive (design §5.2).
+function searchTokens(query: string): string[] {
+  return query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+// Escape LIKE metacharacters for the substring fallback (paired with ESCAPE '\\').
+function likePattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+// Delimiters FTS5 highlight()/snippet() wrap matches in — control chars that
+// never occur in chat text, so searchService can split them into offsets (§9).
+const HL_OPEN = "\u0002";
+const HL_CLOSE = "\u0003";
+
+function createSearchRepository(db: SQLiteDatabase): SearchRepository {
+  // Per-connection memo of FTS5 availability (design §16.5): the vtable is
+  // created best-effort outside the migration chain, so a build without FTS5
+  // simply has no `message_fts` table and every query takes the LIKE path.
+  // Reset by rebuild(); re-probed lazily.
+  let ftsAvailable: boolean | null = null;
+
+  async function hasFts(): Promise<boolean> {
+    if (ftsAvailable !== null) return ftsAvailable;
+    try {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'message_fts'"
+      );
+      ftsAvailable = (row?.n ?? 0) > 0;
+    } catch {
+      ftsAvailable = false;
+    }
+    return ftsAvailable;
+  }
+
+  async function upsertInTxn(
+    txn: Parameters<Parameters<SQLiteDatabase["withExclusiveTransactionAsync"]>[0]>[0],
+    docs: SearchDoc[],
+    indexedAt: string
+  ) {
+    const stmt = await txn.prepareAsync(UPSERT_SEARCH_SQL);
+    try {
+      for (const doc of docs) {
+        await stmt.executeAsync(searchDocParams(doc, indexedAt));
+      }
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  }
+
+  return {
+    async apply(docs) {
+      if (docs.length === 0) return;
+      const indexedAt = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await upsertInTxn(txn, docs, indexedAt);
+      });
+    },
+
+    async applyWindow(roomId, docs) {
+      const indexedAt = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        if (docs.length === 0) {
+          await txn.runAsync("DELETE FROM search_index WHERE room_id = ?", [
+            roomId,
+          ]);
+          return;
+        }
+        // Mirror MessageRepository.replaceNewestWindow: clear the page's time
+        // range so index rows for messages deleted server-side don't linger.
+        const oldest = docs.reduce<string | null>(
+          (min, d) =>
+            min == null || d.created_at < min ? d.created_at : min,
+          null
+        );
+        if (oldest != null) {
+          await txn.runAsync(
+            "DELETE FROM search_index WHERE room_id = ? AND created_at >= ?",
+            [roomId, oldest]
+          );
+        }
+        await upsertInTxn(txn, docs, indexedAt);
+      });
+    },
+
+    async removeByMessage(messageId) {
+      await db.runAsync("DELETE FROM search_index WHERE message_id = ?", [
+        messageId,
+      ]);
+    },
+
+    async removeByRoom(roomId) {
+      await db.runAsync("DELETE FROM search_index WHERE room_id = ?", [roomId]);
+    },
+
+    async pruneRoom(roomId, keep) {
+      await db.runAsync(
+        `DELETE FROM search_index
+          WHERE room_id = ? AND message_id NOT IN (
+            SELECT message_id FROM search_index
+             WHERE room_id = ?
+             ORDER BY created_ms DESC LIMIT ?
+          )`,
+        [roomId, roomId, keep]
+      );
+    },
+
+    async removeOrphans() {
+      await db.runAsync(
+        "DELETE FROM search_index WHERE message_id NOT IN (SELECT id FROM messages)"
+      );
+    },
+
+    async search(params) {
+      const { kind, roomId, before, limit } = params;
+      const mediaLane = kind !== "message";
+      const lane = lanePredicate(kind);
+      const roomScope = roomId ?? "";
+      const beforeClause = before ? " AND si.created_at < ?" : "";
+
+      const tokens = searchTokens(params.query);
+      const usable = tokens.filter((t) => t.length >= params.minTokenLen);
+      const emptyQuery = params.query.trim().length === 0;
+
+      // Media lanes browse recent items with an empty query (no MATCH); the
+      // message lane requires text (RPC parity) — empty query ⇒ no results.
+      if (emptyQuery) {
+        if (!mediaLane) return { hits: [], path: "empty" };
+        const rows = await db.getAllAsync<SearchHitRow>(
+          `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                  m.content AS content, m.media_url AS media_url,
+                  m.attachments AS attachments,
+                  0 AS score, NULL AS snippet, NULL AS highlight
+             FROM search_index si
+             JOIN messages m ON m.id = si.message_id
+            WHERE ${lane}${beforeClause}
+            ORDER BY si.created_ms DESC, si.message_id
+            LIMIT ?`,
+          before ? [before, limit] : [limit]
+        );
+        return { hits: rows.map(rowToSearchHit), path: "empty" };
+      }
+
+      if ((await hasFts()) && usable.length > 0) {
+        // Column-scoped for the message lane (body match); both columns for
+        // media lanes (filenames / link hosts live in media_text). Explicit
+        // AND between prefix terms so "bao cao" ⇒ báo* AND cáo*.
+        const matchExpr = mediaLane
+          ? usable.map((t) => `"${t}"*`).join(" AND ")
+          : usable.map((t) => `text:"${t}"*`).join(" AND ");
+        const nowMs = Date.now();
+        const args: (string | number)[] = [
+          params.weights.bm25,
+          params.weights.recency,
+          nowMs,
+          params.weights.room,
+          roomScope,
+          params.snippetTokens,
+          matchExpr,
+        ];
+        if (before) args.push(before);
+        args.push(limit);
+        const rows = await db.getAllAsync<SearchHitRow>(
+          `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                  m.content AS content, m.media_url AS media_url,
+                  m.attachments AS attachments,
+                  (? * bm25(message_fts, 10.0, 2.0)
+                   - ? * (1.0 / (1.0 + (? - si.created_ms) / 86400000.0))
+                   - ? * (CASE WHEN si.room_id = ? THEN 1 ELSE 0 END)) AS score,
+                  snippet(message_fts, 0, '${HL_OPEN}', '${HL_CLOSE}', '…', ?) AS snippet,
+                  highlight(message_fts, 0, '${HL_OPEN}', '${HL_CLOSE}') AS highlight
+             FROM message_fts
+             JOIN search_index si ON si.rowid = message_fts.rowid
+             JOIN messages m ON m.id = si.message_id
+            WHERE message_fts MATCH ?
+              AND ${lane}${beforeClause}
+            ORDER BY score ASC, si.created_ms DESC, si.message_id
+            LIMIT ?`,
+          args
+        );
+        return { hits: rows.map(rowToSearchHit), path: "fts" };
+      }
+
+      // Substring fallback: short query, or a build without FTS5. Still fully
+      // local/offline — a bounded scan over the projection. No MATCH ⇒ no bm25,
+      // so the blend degrades to recency-first (today's RPC order).
+      const like = likePattern(params.query.trim());
+      const nowMs = Date.now();
+      const textMatch = mediaLane
+        ? "(si.text LIKE ? ESCAPE '\\' OR si.media_text LIKE ? ESCAPE '\\')"
+        : "si.text LIKE ? ESCAPE '\\'";
+      const args: (string | number)[] = [params.weights.recency, nowMs, params.weights.room, roomScope];
+      args.push(like);
+      if (mediaLane) args.push(like);
+      if (before) args.push(before);
+      args.push(limit);
+      const rows = await db.getAllAsync<SearchHitRow>(
+        `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                m.content AS content, m.media_url AS media_url,
+                m.attachments AS attachments,
+                (- ? * (1.0 / (1.0 + (? - si.created_ms) / 86400000.0))
+                 - ? * (CASE WHEN si.room_id = ? THEN 1 ELSE 0 END)) AS score,
+                NULL AS snippet, NULL AS highlight
+           FROM search_index si
+           JOIN messages m ON m.id = si.message_id
+          WHERE ${lane} AND ${textMatch}${beforeClause}
+          ORDER BY score ASC, si.created_ms DESC, si.message_id
+          LIMIT ?`,
+        args
+      );
+      return { hits: rows.map(rowToSearchHit), path: "like" };
+    },
+
+    async coverageAudit(limit) {
+      const driftRow = await db.getFirstAsync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM messages m
+          WHERE m.deleted_at IS NULL AND (m.type IS NULL OR m.type <> 'system')
+            AND NOT EXISTS (SELECT 1 FROM search_index si WHERE si.message_id = m.id)`
+      );
+      const rows = await db.getAllAsync<MessageRow>(
+        `SELECT m.* FROM messages m
+          WHERE m.deleted_at IS NULL AND (m.type IS NULL OR m.type <> 'system')
+            AND NOT EXISTS (SELECT 1 FROM search_index si WHERE si.message_id = m.id)
+          ORDER BY m.created_at DESC
+          LIMIT ?`,
+        [limit]
+      );
+      return { pending: rows.map(rowToMessage), drift: driftRow?.n ?? 0 };
+    },
+
+    async count() {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM search_index"
+      );
+      return row?.n ?? 0;
+    },
+
+    async rebuild() {
+      // Corruption / schema-hash path (§16.4): tear down the derived FTS layer
+      // + empty the projection, then recreate FTS. The caller refills from
+      // `messages` via the coverage-repair pass — zero data loss (derived).
+      await db.execAsync(
+        `DROP TRIGGER IF EXISTS search_index_ai;
+         DROP TRIGGER IF EXISTS search_index_ad;
+         DROP TRIGGER IF EXISTS search_index_au;
+         DROP TABLE IF EXISTS message_fts;
+         DELETE FROM search_index;`
+      );
+      await ensureSearchFtsSchema(db);
+      ftsAvailable = null; // re-probe after recreate
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM search_index");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Builds the full repository bundle over one open connection. */
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -668,5 +1337,7 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     attachments: createAttachmentRepository(db),
     syncState: createSyncStateRepository(db),
     outbox: createOutboxRepository(db),
+    uploadQueue: createUploadQueueRepository(db),
+    search: createSearchRepository(db),
   };
 }

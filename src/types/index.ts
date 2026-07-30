@@ -95,6 +95,82 @@ export interface MessageSearchResult {
   room_type: string;
 }
 
+// ---------------------------------------------------------------------------
+// Local search index (Phase 8A/8B) — a DERIVED projection of `messages`.
+// These types never touch the wire or database.ts; they describe the local
+// FTS5 cache only. Messages remain the single source of truth (§18).
+// ---------------------------------------------------------------------------
+
+// One message flattened into the searchable projection (search_index row).
+// Built by the pure `buildSearchDoc` helper from a MessageWithMeta.
+export interface SearchDoc {
+  message_id: string;
+  room_id: string;
+  sender_id: string | null;
+  type: string;
+  has_link: boolean;
+  // Date.parse(created_at) — integer recency ranking + sort key.
+  created_ms: number;
+  // ISO created_at — pagination cursor (parity with the RPC's p_before).
+  created_at: string;
+  // FTS column 0 (message body).
+  text: string | null;
+  // FTS column 1 (attachment filenames + kind keyword + link hosts).
+  media_text: string | null;
+}
+
+// A matched span within a plain-text string (highlight side-channel, §9).
+export interface MatchRange {
+  start: number;
+  length: number;
+}
+
+// Which local path served a query (tapped as search.path, §15). 'fts' = ranked
+// MATCH; 'like' = short-query/no-FTS substring scan; 'empty' = media-lane browse.
+export type SearchPath = "fts" | "like" | "empty";
+
+// A resolved search request handed to SearchRepository.search. A superset of
+// the RPC arguments plus the ranking policy (weights/snippet width) the
+// service injects — the repo owns SQL/FTS, never the policy numbers (§4/§8).
+export interface SearchQuery {
+  query: string;
+  kind: MessageSearchKind;
+  roomId?: string;
+  before?: string;
+  limit: number;
+  weights: { bm25: number; recency: number; room: number };
+  snippetTokens: number;
+  minTokenLen: number;
+}
+
+// One index-local hit. Display fields (content/media_url/attachments) come from
+// a JOIN back to `messages` in the search SQL — the index locates WHICH row
+// matched; `messages` supplies what to show (reinforcing source-of-truth).
+export interface SearchHit {
+  message_id: string;
+  room_id: string;
+  sender_id: string | null;
+  content: string | null;
+  type: string;
+  media_url: string | null;
+  attachments: Message["attachments"];
+  created_at: string;
+  // Blended rank (lower = better); ordering is done in SQL, this is for taps.
+  score: number;
+  // FTS snippet() excerpt, or null on the like/browse path (service synthesizes).
+  snippet: string | null;
+  // highlight() output delimited with U+0002/U+0003 around matched terms, or
+  // null off the FTS path; searchService converts it to MatchRange[].
+  highlight: string | null;
+}
+
+// SearchRepository.search result: the ranked hits plus which path produced them
+// (so searchService can tap search.path without re-deriving the decision).
+export interface SearchResultSet {
+  hits: SearchHit[];
+  path: SearchPath;
+}
+
 // One user tagged in a message, stored on messages.metadata.mentions.
 export interface MessageMention {
   id: string;
@@ -103,10 +179,55 @@ export interface MessageMention {
 }
 
 // One image inside a multi-attachment (album) message.
+// Phase 7A/7B media pipeline: extended additively — every new field is
+// optional, so legacy rows ({url,width,height}) parse and render unchanged.
 export interface MessageAttachment {
   url: string;
   width?: number;
   height?: number;
+  /** 'image' | 'video' | 'file' — absent = image (legacy rows). */
+  kind?: MediaAttachmentKind;
+  /** base64 data-URI micro thumbnail (~32px JPEG) for progressive loading. */
+  thumb?: string;
+  /** Staged (post-compression) byte size. */
+  bytes?: number;
+  mime?: string;
+  /** Original filename (kind='file'). */
+  name?: string;
+  /** Playback length (kind='video'). */
+  duration_ms?: number;
+}
+
+// Attachment kinds carried by the media pipeline (upload_queue.kind).
+export type MediaAttachmentKind = "image" | "video" | "file";
+
+// upload_queue.state lifecycle (Phase 7A §3.2).
+export type UploadTaskState = "queued" | "uploading" | "uploaded" | "failed";
+
+// One upload_queue row (domain-mapped) — the unit of upload work, retry,
+// and progress. The owning media message is a real `messages` row
+// (status='pending'); these rows are the binary work list only.
+export interface UploadTask {
+  id: string;
+  message_id: string;
+  room_id: string;
+  position: number;
+  kind: MediaAttachmentKind;
+  local_uri: string;
+  mime: string;
+  bytes: number | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  thumb: string | null;
+  remote_path: string | null;
+  remote_url: string | null;
+  state: UploadTaskState;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 // Immutable poll definition stored on messages.metadata.

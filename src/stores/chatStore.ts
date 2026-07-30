@@ -1,6 +1,8 @@
 import { create } from "zustand";
+import { Image } from "expo-image";
 import type {
   Message,
+  MessageAttachment,
   MessageWithMeta,
   RoomParticipant,
   RoomParticipantWithProfile,
@@ -12,10 +14,15 @@ import {
   MESSAGE_WINDOW_SIZE,
   ROOM_CACHE_TRIM_SIZE,
   MAX_CACHED_ROOMS,
+  FEATURE_MEDIA_PIPELINE,
+  IMAGE_PREFETCH_COUNT,
 } from "@/src/lib/constants";
 
 type ReactionPatch = { user_id: string; emoji: string };
 type VotePatch = { user_id: string; option_index: number };
+
+// Per-message upload progress (Phase 7B): done/total tasks + failed count.
+type UploadProgress = { done: number; total: number; failed: number };
 
 interface ChatState {
   messages: Record<string, MessageWithMeta[]>;
@@ -25,6 +32,9 @@ interface ChatState {
   activeRoomId: string | null;
   // Participants cached per room: header + read-receipt watermarks
   participantsByRoom: Record<string, RoomParticipantWithProfile[]>;
+  // Media pipeline (Phase 7B): live upload progress keyed by message id.
+  // RAM-only render annotation — durable truth lives in upload_queue.
+  uploadProgress: Record<string, UploadProgress>;
 
   setActiveRoom: (roomId: string | null) => void;
   fetchMessages: (roomId: string, cursor?: string) => Promise<void>;
@@ -41,6 +51,19 @@ interface ChatState {
   enqueueOptimistic: (message: MessageWithMeta) => void;
   markMessageSent: (serverRow: Message) => void;
   markMessageFailed: (id: string) => void;
+  // Media pipeline (Phase 7B) — additive; flag-off never touches these.
+  // setUploadProgress drives the "n/N" pending footer; applyAttachmentsPatch
+  // swaps a bubble's attachments in RAM (staged → remote at the completion
+  // gate — same id, so expo-image transitions seamlessly); markMessagePending
+  // is the RAM mirror of a media retry (failed → pending, no outbox write).
+  setUploadProgress: (messageId: string, progress: UploadProgress | null) => void;
+  applyAttachmentsPatch: (
+    roomId: string,
+    messageId: string,
+    attachments: MessageAttachment[],
+    mediaUrl: string | null
+  ) => void;
+  markMessagePending: (id: string) => void;
   // Dumb setter for the incremental-sync path (Phase 4): syncService merges
   // the server delta (repository-owned merge) then hands back the finished
   // window. The store just swaps the array — no merge logic lives here.
@@ -104,12 +127,41 @@ function withPatchedMessage(
   );
 }
 
+// Warm expo-image's disk/memory cache for the newest image attachments of a
+// just-applied page/delta (design §8 step 4, roadmap §14 hook). Module-scope
+// helper — NOT mediaService — so the store gains no service import (and no
+// cycle: mediaService reads this store via getState()). Fire-and-forget;
+// prefetch failures are invisible (the bubble just loads on scroll as today).
+function prefetchAlbumImages(rows: MessageWithMeta[]): void {
+  if (!FEATURE_MEDIA_PIPELINE) return;
+  const urls: string[] = [];
+  for (const m of rows) {
+    if (urls.length >= IMAGE_PREFETCH_COUNT) break;
+    const attachments = m.attachments as MessageAttachment[] | null;
+    if (!Array.isArray(attachments)) continue;
+    for (const a of attachments) {
+      if (urls.length >= IMAGE_PREFETCH_COUNT) break;
+      if (a.kind != null && a.kind !== "image") continue;
+      if (typeof a.url === "string" && a.url.startsWith("http")) {
+        urls.push(a.url);
+      }
+    }
+  }
+  if (urls.length === 0) return;
+  try {
+    void Image.prefetch(urls);
+  } catch {
+    // best-effort cache warm only
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: {},
   loadingByRoom: {},
   hasMore: {},
   activeRoomId: null,
   participantsByRoom: {},
+  uploadProgress: {},
 
   // Besides switching the active room, this is where the bounded cache is
   // enforced: the room being left is trimmed to its re-open window and
@@ -227,6 +279,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         cacheService.saveMessages(newMessages);
       } else {
         cacheService.saveMessagePage(roomId, newMessages);
+        // Warm the image cache for the fresh newest window (§8 step 4)
+        prefetchAlbumImages(newMessages);
       }
     } catch {
       set((state) => ({
@@ -399,6 +453,61 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // the finished array into RAM so the list re-renders.
   setRoomMessages: (roomId, rows) => {
     set((state) => withRoomMessages(state, roomId, rows));
+    // Delta may carry fresh media — warm the newest image URLs (§8 step 4)
+    prefetchAlbumImages(rows);
+  },
+
+  // -------------------------------------------------------------------------
+  // Media pipeline (Phase 7B) — RAM-only annotations; durable state is the
+  // upload_queue via cacheService (written by mediaService, never here).
+  // -------------------------------------------------------------------------
+
+  setUploadProgress: (messageId, progress) => {
+    set((state) => {
+      if (progress == null) {
+        if (!(messageId in state.uploadProgress)) return state;
+        const next = { ...state.uploadProgress };
+        delete next[messageId];
+        return { uploadProgress: next };
+      }
+      return {
+        uploadProgress: { ...state.uploadProgress, [messageId]: progress },
+      };
+    });
+  },
+
+  // Completion-gate swap (§4.4): same row id, attachments local → remote.
+  // RAM only — the durable rewrite happened in the completeMessage txn.
+  applyAttachmentsPatch: (roomId, messageId, attachments, mediaUrl) => {
+    set((state) =>
+      withPatchedMessage(state, roomId, messageId, (m) => ({
+        ...m,
+        // MessageAttachment is a domain view over the Json column
+        attachments: attachments as unknown as Message["attachments"],
+        media_url: mediaUrl,
+      }))
+    );
+  },
+
+  // Media retry re-enters PENDING (mirror of markMessageFailed — flips the
+  // render annotation only; upload_queue/messages.status are reset by the
+  // repository's resetForRetry). Scans rooms since only the id is known.
+  markMessagePending: (id) => {
+    set((state) => {
+      for (const roomId of Object.keys(state.messages)) {
+        const rows = state.messages[roomId];
+        if (rows.some((m) => m.id === id)) {
+          return withRoomMessages(
+            state,
+            roomId,
+            rows.map((m) =>
+              m.id === id ? { ...m, outbox_status: "pending" } : m
+            )
+          );
+        }
+      }
+      return state;
+    });
   },
 
   applyReactionChange: (roomId, messageId, reaction, kind) => {
@@ -476,6 +585,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       hasMore: {},
       activeRoomId: null,
       participantsByRoom: {},
+      uploadProgress: {},
     });
   },
 }));

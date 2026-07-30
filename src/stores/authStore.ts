@@ -11,6 +11,7 @@ import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
 import { cacheService } from "@/src/services/cacheService";
 import { outboxService } from "@/src/services/outboxService";
+import { mediaService } from "@/src/services/mediaService";
 import { OUTBOX_LOGOUT_DRAIN_MS } from "@/src/lib/constants";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
@@ -179,6 +180,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       new Promise<void>((resolve) => setTimeout(resolve, OUTBOX_LOGOUT_DRAIN_MS)),
     ]);
     await cacheService.wipe();
+    // Media plane (Phase 7B §9): drop the on-disk staged/downloaded binaries too
+    // so cached plaintext media never survives an account switch. No-op when
+    // the pipeline was never used (dirs absent); never throws.
+    await mediaService.wipe();
     set({ session: null, user: null, profile: null });
   },
 

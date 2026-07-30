@@ -4,7 +4,11 @@ import type {
   OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SearchDoc,
+  SearchQuery,
+  SearchResultSet,
   SyncState,
+  UploadTask,
 } from "@/src/types";
 
 /**
@@ -138,6 +142,124 @@ export interface OutboxRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * Media upload queue (Phase 7A §3.4, Invariant M2). Owns persisted queue
+ * state and the atomic transitions — including the completion-gate
+ * transaction, because it spans `messages` + `outbox` + `upload_queue` rows
+ * and row↔domain mapping lives in sqlite.ts (the same reason OutboxRepository
+ * is co-located there). It does NOT know about networks, timers, compression,
+ * or retry policy — that is `mediaService`. Fully independent of the outbox
+ * queue: the only touch point is `completeMessage` inserting the outbox row
+ * through the same file-private SQL the OutboxRepository uses.
+ */
+export interface UploadQueueRepository {
+  /** Upsert the message row (status='pending') + N upload_queue inserts, one txn. */
+  enqueueMessageWithUploads(
+    message: MessageWithMeta,
+    tasks: UploadTask[]
+  ): Promise<void>;
+  /**
+   * All 'queued' | 'uploading' rows, global FIFO (created_at, position).
+   * 'uploading' rows are stale after a crash — resume() reverts them first.
+   */
+  listActive(): Promise<UploadTask[]>;
+  /** Every task of one message, in position order (gate rewrite, discard). */
+  listForMessage(messageId: string): Promise<UploadTask[]>;
+  /**
+   * Message ids whose tasks are ALL 'uploaded' but whose message row is
+   * still 'pending' with no outbox row — the crashed-between-upload-and-gate
+   * window (§11.2 M5); resume() re-runs the completion gate for each.
+   */
+  listCompletableMessageIds(): Promise<string[]>;
+  /**
+   * Message ids that still hold upload_queue rows but whose message row is
+   * already status='sent' (post-ACK) — the lazy SENT sweep (§2.1 rule 7)
+   * clears these rows + their staging dirs.
+   */
+  listSentMessageIds(): Promise<string[]>;
+  /** Crash recovery: 'uploading' → 'queued' (idempotent PUT makes this safe). */
+  revertUploadingToQueued(): Promise<void>;
+  markUploading(id: string): Promise<void>;
+  markUploaded(id: string, remotePath: string, remoteUrl: string): Promise<void>;
+  /** Transient retry: bump attempts + persist next_attempt_at (stays queued). */
+  reschedule(
+    id: string,
+    attempts: number,
+    nextAttemptAt: string,
+    error: string
+  ): Promise<void>;
+  /** Permanent / exhausted → task parked + owning message.status='failed', one txn. */
+  markFailed(id: string, error: string): Promise<void>;
+  /** Manual retry: failed tasks → queued, attempts=0 + message.status='pending', one txn. */
+  resetForRetry(messageId: string): Promise<void>;
+  getMessageCompletion(
+    messageId: string
+  ): Promise<{ total: number; uploaded: number; failed: number }>;
+  /**
+   * Completion gate (§2.1 rule 5): rewrite messages.attachments/media_url to
+   * remote URLs + INSERT the outbox row (using the message's already-stamped
+   * created_at — no restamp), ONE txn. Idempotent via INSERT OR REPLACE.
+   */
+  completeMessage(
+    messageId: string,
+    rewrittenAttachments: MessageAttachment[]
+  ): Promise<void>;
+  /** Discard: queue rows + message row, one txn. */
+  removeForMessage(messageId: string): Promise<void>;
+  /** Post-ACK cleanup (§2.1 rule 7): queue rows only — the message stays. */
+  clearSent(messageId: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
+/**
+ * Local search index (Phase 8A/8B §4). Sole owner of the `search_index`
+ * projection + the `message_fts` FTS5 vtable — a DERIVED, droppable cache of
+ * the searchable `messages` corpus, never a source of truth (§18). It knows
+ * SQL/FTS only: NOT networks, ranking-weight policy, debounce, or the
+ * MessageSearchResult shape (that is `searchService`). Every write is
+ * idempotent and rebuildable from `messages` (§16). No existing repository
+ * gains, loses, or shares responsibility — this is added beside them exactly
+ * as Phase 7 added `UploadQueueRepository`.
+ */
+export interface SearchRepository {
+  /** Idempotent upsert of N projected docs (INSERT OR REPLACE by message_id), one txn. */
+  apply(docs: SearchDoc[]): Promise<void>;
+  /**
+   * Page-1 window reconcile (mirrors MessageRepository.replaceNewestWindow):
+   * drop indexed rows of the room at/after the batch's oldest created_at (so
+   * server-side deletions in that range don't linger in the index), then upsert
+   * the batch — one txn. Empty batch clears the room's index rows.
+   */
+  applyWindow(roomId: string, docs: SearchDoc[]): Promise<void>;
+  /** Remove a message from the index (delete / recall / soft-delete). No-op if absent. */
+  removeByMessage(messageId: string): Promise<void>;
+  /** Drop a whole room's index rows (leave room / cache eviction). */
+  removeByRoom(roomId: string): Promise<void>;
+  /** Keep only the newest `keep` indexed rows of a room (lockstep with cache prune). */
+  pruneRoom(roomId: string, keep: number): Promise<void>;
+  /** Drop index rows whose backing `messages` row is gone (I-S2 orphan sweep). */
+  removeOrphans(): Promise<void>;
+  /**
+   * Ranked local query. Returns hydrated hits (ids + display fields JOINed from
+   * `messages` + blended score + FTS snippet/highlight) and which path served
+   * them. `kind` maps to the same lane predicate as the server RPC.
+   */
+  search(params: SearchQuery): Promise<SearchResultSet>;
+  /**
+   * Searchable cached messages (deleted_at IS NULL AND type<>'system') missing
+   * from the index, as domain rows ready to re-index, plus the total drift
+   * count (§16.2 boot repair / I-S1 coverage). `limit` bounds the returned batch.
+   */
+  coverageAudit(
+    limit: number
+  ): Promise<{ pending: MessageWithMeta[]; drift: number }>;
+  /** Current indexed row count (I-S3 bound gauge). */
+  count(): Promise<number>;
+  /** DROP + CREATE the projection (triggers/FTS follow), then return (caller refills). §16.4. */
+  rebuild(): Promise<void>;
+  clear(): Promise<void>;
+}
+
 /** Everything the application layer can reach — one bundle per connection. */
 export interface Repositories {
   messages: MessageRepository;
@@ -146,4 +268,6 @@ export interface Repositories {
   attachments: AttachmentRepository;
   syncState: SyncStateRepository;
   outbox: OutboxRepository;
+  uploadQueue: UploadQueueRepository;
+  search: SearchRepository;
 }
