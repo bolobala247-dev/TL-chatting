@@ -1,5 +1,6 @@
 import { databaseService } from "@/src/services/databaseService";
 import { mergeMessageWindow } from "@/src/db/repositories/merge";
+import { diag } from "@/src/lib/diagnostics";
 import type {
   MessageWithMeta,
   OutboxItem,
@@ -208,6 +209,7 @@ export const cacheService = {
     if (!repos) return;
     try {
       await repos.outbox.enqueue(message, createdAt);
+      diag.count("outbox.enqueued", 1);
     } catch (err) {
       console.error("[cacheService] enqueueOutbox", err);
     }

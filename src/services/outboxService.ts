@@ -6,6 +6,7 @@ import {
 } from "@/src/lib/constants";
 import { cacheService } from "@/src/services/cacheService";
 import { messageService } from "@/src/services/messageService";
+import { diag } from "@/src/lib/diagnostics";
 import { useChatStore } from "@/src/stores/chatStore";
 import type { OutboxItem } from "@/src/types";
 
@@ -93,10 +94,14 @@ async function attemptSend(item: OutboxItem): Promise<SendOutcome> {
   // Single-flight guard: treat an already-in-flight id as still blocking its
   // room (do not double-send). The `draining` coalescing makes this rare.
   if (inFlight.has(message.id)) {
+    diag.count("outbox.inflight_collision", 1);
     return { kind: "retry", nextAtMs: Date.now() };
   }
   inFlight.add(message.id);
+  diag.count("outbox.attempt", 1);
+  diag.gauge("outbox.inflight", inFlight.size);
 
+  const startedAt = Date.now();
   try {
     const row = await messageService.sendMessageIdempotent({
       id: message.id,
@@ -115,6 +120,8 @@ async function attemptSend(item: OutboxItem): Promise<SendOutcome> {
     // by id → idempotent against a realtime echo that raced ahead (§4.3).
     await cacheService.markOutboxSent(message.id, row);
     useChatStore.getState().markMessageSent(row);
+    diag.count("outbox.sent", 1);
+    diag.observe("outbox.send.ms", Date.now() - startedAt);
     return { kind: "sent" };
   } catch (err) {
     return handleSendError(item, err);
@@ -122,6 +129,7 @@ async function attemptSend(item: OutboxItem): Promise<SendOutcome> {
     // Cleared only after the ACK txn commits (or the failure is recorded), so a
     // crash between RPC-success and commit simply re-drives (idempotent RPC).
     inFlight.delete(message.id);
+    diag.gauge("outbox.inflight", inFlight.size);
   }
 }
 
@@ -136,6 +144,8 @@ async function handleSendError(
   if (isPermanent(err)) {
     await cacheService.markOutboxFailed(message.id, text, true);
     useChatStore.getState().markMessageFailed(message.id);
+    diag.count("outbox.parked", 1, { reason: "permanent" });
+    diag.event("outbox.parked", { id: message.id, reason: "permanent" });
     console.error(`[outboxService] permanent failure ${message.id}`, err);
     return { kind: "failed" };
   }
@@ -145,6 +155,8 @@ async function handleSendError(
   if (nextAttempts >= OUTBOX_MAX_ATTEMPTS) {
     await cacheService.markOutboxFailed(message.id, text, false);
     useChatStore.getState().markMessageFailed(message.id);
+    diag.count("outbox.parked", 1, { reason: "max-attempts" });
+    diag.event("outbox.parked", { id: message.id, reason: "max-attempts" });
     console.error(
       `[outboxService] exhausted ${message.id} after ${nextAttempts} attempts`,
       err
@@ -165,6 +177,8 @@ async function handleSendError(
     new Date(nextAtMs).toISOString(),
     text
   );
+  diag.count("outbox.retry_scheduled", 1);
+  diag.observe("outbox.backoff.ms", delay);
   return { kind: "retry", nextAtMs };
 }
 
@@ -214,7 +228,18 @@ async function drainRoom(items: OutboxItem[]): Promise<number | null> {
  */
 async function drainOnce(): Promise<number | null> {
   const all = await cacheService.listOutboxAll();
-  if (all.length === 0) return null;
+  if (all.length === 0) {
+    diag.gauge("outbox.queue.depth", 0);
+    return null;
+  }
+
+  // Passive tap: current queue depth split by state (§2). Reads the already-read
+  // enumeration; changes nothing about how it is grouped or drained.
+  let pending = 0;
+  for (const item of all) if (item.state !== "failed") pending += 1;
+  diag.gauge("outbox.queue.depth", all.length);
+  diag.gauge("outbox.queue.pending", pending);
+  diag.gauge("outbox.queue.failed", all.length - pending);
 
   // Group by room, preserving created_at order (listAll is ORDER BY created_at).
   const byRoom = new Map<string, OutboxItem[]>();
@@ -255,9 +280,11 @@ function armTimer(soonestMs: number | null): void {
 async function drain(): Promise<void> {
   if (draining) {
     rerun = true;
+    diag.count("outbox.drain.coalesced", 1);
     return;
   }
   draining = true;
+  diag.count("outbox.drain.pass", 1);
   let soonest: number | null = null;
   try {
     do {
