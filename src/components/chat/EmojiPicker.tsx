@@ -6,12 +6,9 @@ import emojiGroups from "unicode-emoji-json/data-by-group.json";
 import { Emoji } from "@/src/components/ui/Emoji";
 import { Icon, type IconName } from "@/src/components/ui/Icon";
 import { SearchField } from "@/src/components/ui/SearchField";
-import { Sheet } from "@/src/components/ui/Sheet";
 import { useEmojiStore } from "@/src/stores/emojiStore";
 
 interface EmojiPickerProps {
-  visible: boolean;
-  onClose: () => void;
   /** Insert the picked emoji into the composer at the cursor. */
   onPick: (emoji: string) => void;
 }
@@ -84,7 +81,7 @@ const EmojiCell = memo(function EmojiCell({
   );
 });
 
-function EmojiPicker({ visible, onClose, onPick }: EmojiPickerProps) {
+function EmojiPicker({ onPick }: EmojiPickerProps) {
   const { t } = useTranslation("chat");
   const recentEmojis = useEmojiStore((s) => s.recentEmojis);
 
@@ -125,8 +122,10 @@ function EmojiPicker({ visible, onClose, onPick }: EmojiPickerProps) {
     [handlePick]
   );
 
+  // Inline panel below the composer (Gboard-style) — the chat and the
+  // input bar stay fully visible above it
   return (
-    <Sheet visible={visible} onClose={onClose}>
+    <View className="border-t border-divider bg-surface pt-2">
       <View className="px-4 pb-2">
         <SearchField
           value={query}
@@ -185,7 +184,7 @@ function EmojiPicker({ visible, onClose, onPick }: EmojiPickerProps) {
           />
         )}
       </View>
-    </Sheet>
+    </View>
   );
 }
 

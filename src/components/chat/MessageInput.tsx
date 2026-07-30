@@ -3,6 +3,7 @@ import {
   View,
   TextInput,
   Pressable,
+  Keyboard,
   Platform,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
@@ -54,6 +55,7 @@ export function MessageInput({
 
   const [emojiMounted, setEmojiMounted] = useState(false);
   const [emojiVisible, setEmojiVisible] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   const handleChangeText = useCallback(
     (next: string) => {
@@ -81,12 +83,21 @@ export function MessageInput({
     if (forcedSelection) setForcedSelection(null);
   };
 
-  const openEmojiPicker = () => {
-    setEmojiMounted(true);
-    setEmojiVisible(true);
+  // Toggle emoji panel ↔ keyboard: the panel sits below the composer so the
+  // input bar stays visible while picking (Gboard-style)
+  const toggleEmojiPicker = () => {
+    if (emojiVisible) {
+      setEmojiVisible(false);
+      inputRef.current?.focus();
+    } else {
+      Keyboard.dismiss();
+      setEmojiMounted(true);
+      setEmojiVisible(true);
+    }
   };
 
-  const closeEmojiPicker = useCallback(() => setEmojiVisible(false), []);
+  // Tapping the text field brings the keyboard back — hide the panel
+  const handleInputFocus = useCallback(() => setEmojiVisible(false), []);
 
   // Splice the emoji in at the cursor and park the caret right after it —
   // works mid-text and across multiline content
@@ -137,79 +148,85 @@ export function MessageInput({
   const hasText = value.trim().length > 0;
 
   return (
-    <View className="flex-row items-end gap-2 border-t border-divider bg-surface px-3 py-2">
-      {onAttach && (
+    <View className="border-t border-divider bg-surface">
+      <View className="flex-row items-end gap-2 px-3 py-2">
+        {onAttach && (
+          <Pressable
+            className="mb-1.5 h-9 w-9 items-center justify-center rounded-full active:bg-pressed"
+            onPress={onAttach}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t("input.attach")}
+          >
+            <Icon
+              name={{ ios: "plus.circle.fill", android: "add_circle", web: "add_circle" }}
+              tone="tertiary"
+              size="lg"
+            />
+          </Pressable>
+        )}
+
+        <View className="min-h-[44px] flex-1 flex-row items-end rounded-3xl bg-surface-secondary pl-4 pr-1.5">
+          <TextInput
+            ref={inputRef}
+            className="max-h-24 flex-1 py-3 font-sans text-body leading-5 text-fg"
+            placeholder={t("input.placeholder")}
+            placeholderTextColor={colors.placeholder}
+            value={value}
+            onChangeText={handleChangeText}
+            multiline
+            textAlignVertical="center"
+            returnKeyType="default"
+            submitBehavior="newline"
+            onKeyPress={handleKeyPress}
+            onFocus={handleInputFocus}
+            onSelectionChange={handleSelectionChange}
+            selection={forcedSelection ?? undefined}
+          />
+          <Pressable
+            className="mb-1.5 h-8 w-8 items-center justify-center rounded-full active:bg-pressed"
+            onPress={toggleEmojiPicker}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={
+              emojiVisible ? t("input.keyboard") : t("input.emoji")
+            }
+          >
+            <Icon
+              name={
+                emojiVisible
+                  ? { ios: "keyboard", android: "keyboard", web: "keyboard" }
+                  : { ios: "face.smiling", android: "mood", web: "mood" }
+              }
+              tone="tertiary"
+              size="md"
+            />
+          </Pressable>
+        </View>
+
         <Pressable
-          className="mb-1.5 h-9 w-9 items-center justify-center rounded-full active:bg-pressed"
-          onPress={onAttach}
+          className={`mb-1 h-11 w-11 items-center justify-center rounded-full ${
+            hasText ? "bg-ink active:opacity-90" : ""
+          }`}
+          onPress={handleSend}
+          onLongPress={onLongPressSend ? handleLongPressSend : undefined}
+          delayLongPress={350}
+          disabled={!hasText}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={t("input.attach")}
+          accessibilityLabel={t("input.send")}
         >
           <Icon
-            name={{ ios: "plus.circle.fill", android: "add_circle", web: "add_circle" }}
-            tone="tertiary"
-            size="lg"
-          />
-        </Pressable>
-      )}
-
-      <View className="min-h-[36px] flex-1 flex-row items-end rounded-2xl bg-surface-secondary pl-4 pr-1">
-        <TextInput
-          className="max-h-24 flex-1 py-2 font-sans text-body leading-5 text-fg"
-          placeholder={t("input.placeholder")}
-          placeholderTextColor={colors.placeholder}
-          value={value}
-          onChangeText={handleChangeText}
-          multiline
-          textAlignVertical="center"
-          returnKeyType="default"
-          submitBehavior="newline"
-          onKeyPress={handleKeyPress}
-          onSelectionChange={handleSelectionChange}
-          selection={forcedSelection ?? undefined}
-        />
-        <Pressable
-          className="mb-1 h-7 w-7 items-center justify-center rounded-full active:bg-pressed"
-          onPress={openEmojiPicker}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={t("input.emoji")}
-        >
-          <Icon
-            name={{ ios: "face.smiling", android: "mood", web: "mood" }}
-            tone="tertiary"
-            size="md"
+            name={{ ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" }}
+            color={hasText ? colors.inkInverse : colors.disabled}
+            size={20}
           />
         </Pressable>
       </View>
 
-      <Pressable
-        className={`mb-1.5 h-9 w-9 items-center justify-center rounded-full ${
-          hasText ? "bg-ink active:opacity-90" : ""
-        }`}
-        onPress={handleSend}
-        onLongPress={onLongPressSend ? handleLongPressSend : undefined}
-        delayLongPress={350}
-        disabled={!hasText}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t("input.send")}
-      >
-        <Icon
-          name={{ ios: "arrow.up", android: "arrow_upward", web: "arrow_upward" }}
-          color={hasText ? colors.inkInverse : colors.disabled}
-          size={18}
-        />
-      </Pressable>
-
-      {emojiMounted && (
+      {emojiMounted && emojiVisible && (
         <Suspense fallback={null}>
-          <EmojiPicker
-            visible={emojiVisible}
-            onClose={closeEmojiPicker}
-            onPick={handlePickEmoji}
-          />
+          <EmojiPicker onPick={handlePickEmoji} />
         </Suspense>
       )}
     </View>

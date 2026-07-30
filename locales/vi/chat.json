@@ -56,7 +56,8 @@
     "placeholder": "Nhập tin nhắn...",
     "attach": "Đính kèm",
     "send": "Gửi",
-    "emoji": "Biểu tượng cảm xúc"
+    "emoji": "Biểu tượng cảm xúc",
+    "keyboard": "Bàn phím"
   },
   "emoji": {
     "searchPlaceholder": "Tìm emoji...",

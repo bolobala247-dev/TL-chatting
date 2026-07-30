@@ -61,7 +61,8 @@
     "placeholder": "Type a message...",
     "attach": "Attach",
     "send": "Send",
-    "emoji": "Emoji"
+    "emoji": "Emoji",
+    "keyboard": "Keyboard"
   },
   "emoji": {
     "searchPlaceholder": "Search emoji...",
