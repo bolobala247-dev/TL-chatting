@@ -15,11 +15,11 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
-import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
+import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
-import { hasSeen } from "@/src/lib/receipts";
 import { getAttachments, getCallMetadata, formatCallDuration } from "@/src/lib/messageMeta";
+import { seenByAllAt } from "@/src/lib/receipts";
 import { getMentions, splitByMentions } from "@/src/lib/mentions";
 import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { Icon } from "@/src/components/ui/Icon";
@@ -29,8 +29,8 @@ import { PollBubble } from "./PollBubble";
 
 interface MessageBubbleProps {
   message: MessageWithMeta;
-  /** Room participants (watermarks) — drives the own-message receipt ticks. */
-  participants?: RoomParticipantWithProfile[];
+  /** Seen-by-all watermark (min other last_read_at) — drives the own-message receipt ticks. */
+  seenWatermark?: string | null;
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
   onLongPress?: (message: MessageWithMeta) => void;
@@ -41,7 +41,6 @@ interface MessageBubbleProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
-  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
 /** Drag distance that arms the swipe-to-reply on release. */
@@ -58,8 +57,11 @@ function formatTime(dateStr: string, locale: string): string {
 
 function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string }) {
   const { t } = useTranslation("chat");
-  const messages = useChatStore((s) => s.messages[roomId] ?? []);
-  const replyMessage = messages.find((m) => m.id === replyToId);
+  // Select the quoted message itself (stable reference): appending other
+  // messages to the room does not re-render this preview
+  const replyMessage = useChatStore((s) =>
+    s.messages[roomId]?.find((m) => m.id === replyToId)
+  );
 
   if (!replyMessage) return null;
 
@@ -76,54 +78,11 @@ function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string
   );
 }
 
-// Reply-count chip: counts loaded thread replies in the store (cheap,
-// no extra query) — the thread screen fetches the full list.
-function ThreadChip({
-  message,
-  isMine,
-  onPress,
-}: {
-  message: MessageWithMeta;
-  isMine: boolean;
-  onPress?: () => void;
-}) {
-  const { t } = useTranslation("chat");
-  const messages = useChatStore((s) => s.messages[message.room_id] ?? []);
-  const replyCount = messages.filter((m) => m.thread_id === message.id).length;
-
-  if (replyCount === 0) return null;
-
-  return (
-    <Pressable
-      className="mt-1 flex-row items-center gap-1 self-start active:opacity-60"
-      onPress={onPress}
-      accessibilityRole="button"
-    >
-      <Icon
-        name={{
-          ios: "bubble.left.and.bubble.right",
-          android: "forum",
-          web: "forum",
-        }}
-        tone={isMine ? "inverse" : "tertiary"}
-        size={12}
-      />
-      <Text
-        className={`font-sans-medium text-label ${
-          isMine ? "text-ink-inverse/80" : "text-fg-secondary"
-        }`}
-      >
-        {t("thread.replyCount", { count: replyCount })}
-      </Text>
-    </Pressable>
-  );
-}
-
 // Memoized: message object identity changes on any patch, so memo keeps
 // FlashList re-renders cheap while reactions/votes/receipts update live
 export const MessageBubble = memo(function MessageBubble({
   message,
-  participants,
+  seenWatermark,
   showPollVoters,
   onLongPress,
   onSwipeReply,
@@ -132,7 +91,6 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenAlbum,
   onVote,
   onViewVoters,
-  onOpenThread,
 }: MessageBubbleProps) {
   const { t, i18n } = useTranslation("chat");
   const userId = useAuthStore((s) => s.user?.id);
@@ -187,11 +145,8 @@ export const MessageBubble = memo(function MessageBubble({
   // Receipt ticks: one check = sent, two = seen by every other participant
   const showReceipt =
     isMine && !isDeleted && !message.id.startsWith("temp-");
-  const others = showReceipt
-    ? (participants ?? []).filter((p) => p.user_id !== message.sender_id)
-    : [];
   const seenByAll =
-    others.length > 0 && others.every((p) => hasSeen(p, message.created_at));
+    showReceipt && seenByAllAt(seenWatermark, message.created_at);
 
   if (message.type === "system") {
     return (
@@ -438,14 +393,6 @@ export const MessageBubble = memo(function MessageBubble({
             </View>
           )}
         </View>
-
-        {!isDeleted && !message.thread_id && (
-          <ThreadChip
-            message={message}
-            isMine={isMine}
-            onPress={() => onOpenThread?.(message)}
-          />
-        )}
       </View>
 
       {!isDeleted && (message.message_reactions?.length ?? 0) > 0 && (

@@ -6,6 +6,7 @@ import type {
   RoomParticipantWithProfile,
 } from "@/src/types";
 import { messageService } from "@/src/services/messageService";
+import { MESSAGES_PER_PAGE } from "@/src/lib/constants";
 
 type ReactionPatch = { user_id: string; emoji: string };
 type VotePatch = { user_id: string; option_index: number };
@@ -64,17 +65,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const unique = Array.from(
           new Map(merged.map((m) => [m.id, m])).values()
         );
-        unique.sort(
-          (a, b) =>
-            new Date(b.created_at ?? 0).getTime() -
-            new Date(a.created_at ?? 0).getTime()
+        // Parse each timestamp once (not per comparison) before sorting
+        const timeById = new Map(
+          unique.map((m) => [m.id, new Date(m.created_at ?? 0).getTime()])
         );
+        unique.sort((a, b) => timeById.get(b.id)! - timeById.get(a.id)!);
 
         return {
           messages: { ...state.messages, [roomId]: unique },
           hasMore: {
             ...state.hasMore,
-            [roomId]: newMessages.length >= 20,
+            [roomId]: newMessages.length >= MESSAGES_PER_PAGE,
           },
           loading: false,
         };

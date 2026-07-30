@@ -60,15 +60,32 @@
   "input": {
     "placeholder": "Type a message...",
     "attach": "Attach",
-    "send": "Send"
+    "send": "Send",
+    "emoji": "Emoji"
+  },
+  "emoji": {
+    "searchPlaceholder": "Search emoji...",
+    "recent": "Recently used",
+    "recentEmpty": "Emojis you use will appear here",
+    "noResults": "No emoji found",
+    "categories": {
+      "smileys_emotion": "Smileys & emotion",
+      "people_body": "People",
+      "animals_nature": "Animals & nature",
+      "food_drink": "Food & drink",
+      "travel_places": "Travel & places",
+      "activities": "Activities",
+      "objects": "Objects",
+      "symbols": "Symbols",
+      "flags": "Flags"
+    }
   },
   "actions": {
     "pin": "Pin message",
     "unpin": "Unpin",
     "save": "Save message",
     "unsave": "Unsave",
-    "recall": "Delete for everyone",
-    "viewThread": "View thread"
+    "recall": "Delete for everyone"
   },
   "message": {
     "imagePlaceholder": "[Photo]",
@@ -102,15 +119,6 @@
     "count_one": "{{count}} pinned message",
     "count_other": "{{count}} pinned messages",
     "unpin": "Unpin"
-  },
-  "thread": {
-    "title": "Thread",
-    "replyCount_one": "{{count}} reply",
-    "replyCount_other": "{{count}} replies",
-    "empty": "No replies in this thread yet",
-    "inputPlaceholder": "Reply in thread...",
-    "loadFailed": "Couldn't load the thread",
-    "sendFailed": "Couldn't send the reply"
   },
   "bookmark": {
     "add": "Pin conversation",

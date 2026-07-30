@@ -309,17 +309,6 @@ export default function ChatScreen() {
     [updateInputText]
   );
 
-  // Replies open their root's thread; roots open their own
-  const handleOpenThread = useCallback(
-    (message: MessageWithMeta) => {
-      router.push({
-        pathname: "/chat/thread" as any,
-        params: { roomId: roomId!, rootId: message.thread_id ?? message.id },
-      });
-    },
-    [router, roomId]
-  );
-
   const handleEdit = useCallback((message: Message) => {
     setEditingMessage(message);
     setEditContent(message.content || "");
@@ -495,8 +484,6 @@ export default function ChatScreen() {
             content: content.trim(),
             type: "text",
             reply_to: replyTo.id,
-            // Replies join the parent's thread (or start one at the parent)
-            thread_id: replyTo.thread_id ?? replyTo.id,
             metadata: mentions.length ? ({ mentions } as any) : null,
           });
         } catch (err: unknown) {
@@ -627,7 +614,6 @@ export default function ChatScreen() {
           onOpenAlbum={handleOpenAlbum}
           onVote={votePoll}
           onViewVoters={handleViewVoters}
-          onOpenThread={handleOpenThread}
         />
       </View>
 
@@ -711,7 +697,6 @@ export default function ChatScreen() {
         onReact={toggleReaction}
         onViewReceipts={handleViewReceipts}
         onReport={handleReportMessage}
-        onOpenThread={handleOpenThread}
       />
 
       <ReactionsSheet

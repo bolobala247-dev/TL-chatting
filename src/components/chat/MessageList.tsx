@@ -1,8 +1,10 @@
-import { useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { View, Text, ActivityIndicator, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FlashList } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
+import { useAuthStore } from "@/src/stores/authStore";
+import { getSeenWatermark } from "@/src/lib/receipts";
 import { useThemeColors } from "@/src/theme";
 import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
 
@@ -23,10 +25,11 @@ interface MessageListProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
-  onOpenThread?: (message: MessageWithMeta) => void;
 }
 
-export function MessageList({
+// Memoized: the chat screen re-renders on every composer keystroke; stable
+// props (store arrays + useCallback handlers) let the whole list skip those
+export const MessageList = memo(function MessageList({
   messages,
   loading,
   hasMore,
@@ -40,10 +43,10 @@ export function MessageList({
   onOpenAlbum,
   onVote,
   onViewVoters,
-  onOpenThread,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
+  const userId = useAuthStore((s) => s.user?.id);
 
   // Store keeps messages newest-first (legacy inverted-list order);
   // FlashList v2 renders chat bottom-up from chronological data instead.
@@ -52,11 +55,18 @@ export function MessageList({
     [messages]
   );
 
+  // Collapse participant watermarks into one stable string so memoized
+  // bubbles only re-render when a peer's read position actually moves
+  const seenWatermark = useMemo(
+    () => getSeenWatermark(participants ?? [], userId),
+    [participants, userId]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: MessageWithMeta }) => (
       <MessageBubble
         message={item}
-        participants={participants}
+        seenWatermark={seenWatermark}
         showPollVoters={showPollVoters}
         onLongPress={onMessageLongPress}
         onSwipeReply={onSwipeReply}
@@ -65,11 +75,10 @@ export function MessageList({
         onOpenAlbum={onOpenAlbum}
         onVote={onVote}
         onViewVoters={onViewVoters}
-        onOpenThread={onOpenThread}
       />
     ),
     [
-      participants,
+      seenWatermark,
       showPollVoters,
       onMessageLongPress,
       onSwipeReply,
@@ -78,7 +87,6 @@ export function MessageList({
       onOpenAlbum,
       onVote,
       onViewVoters,
-      onOpenThread,
     ]
   );
 
@@ -120,7 +128,7 @@ export function MessageList({
       data={orderedMessages}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
-      extraData={participants}
+      extraData={seenWatermark}
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,
         autoscrollToBottomThreshold: 0.2,
@@ -129,9 +137,10 @@ export function MessageList({
       onStartReachedThreshold={0.2}
       ListHeaderComponent={renderHeader}
       contentContainerStyle={{ paddingVertical: 8 }}
+      showsVerticalScrollIndicator={false}
       // iOS: drag the keyboard down interactively; Android: dismiss on scroll
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
     />
   );
-}
+});

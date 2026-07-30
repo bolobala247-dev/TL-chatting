@@ -55,15 +55,32 @@
   "input": {
     "placeholder": "Nhập tin nhắn...",
     "attach": "Đính kèm",
-    "send": "Gửi"
+    "send": "Gửi",
+    "emoji": "Biểu tượng cảm xúc"
+  },
+  "emoji": {
+    "searchPlaceholder": "Tìm emoji...",
+    "recent": "Dùng gần đây",
+    "recentEmpty": "Emoji bạn dùng sẽ xuất hiện ở đây",
+    "noResults": "Không tìm thấy emoji",
+    "categories": {
+      "smileys_emotion": "Mặt cười & cảm xúc",
+      "people_body": "Con người",
+      "animals_nature": "Động vật & thiên nhiên",
+      "food_drink": "Đồ ăn & thức uống",
+      "travel_places": "Du lịch & địa điểm",
+      "activities": "Hoạt động",
+      "objects": "Đồ vật",
+      "symbols": "Ký hiệu",
+      "flags": "Cờ"
+    }
   },
   "actions": {
     "pin": "Ghim tin nhắn",
     "unpin": "Bỏ ghim",
     "save": "Lưu tin nhắn",
     "unsave": "Bỏ lưu",
-    "recall": "Thu hồi tin nhắn",
-    "viewThread": "Xem chủ đề"
+    "recall": "Thu hồi tin nhắn"
   },
   "message": {
     "imagePlaceholder": "[Hình ảnh]",
@@ -96,14 +113,6 @@
     "title": "Tin nhắn đã ghim",
     "count_other": "{{count}} tin nhắn đã ghim",
     "unpin": "Bỏ ghim"
-  },
-  "thread": {
-    "title": "Chủ đề",
-    "replyCount_other": "{{count}} trả lời",
-    "empty": "Chưa có trả lời nào trong chủ đề này",
-    "inputPlaceholder": "Trả lời trong chủ đề...",
-    "loadFailed": "Không thể tải chủ đề",
-    "sendFailed": "Không thể gửi trả lời"
   },
   "bookmark": {
     "add": "Ghim cuộc trò chuyện",
