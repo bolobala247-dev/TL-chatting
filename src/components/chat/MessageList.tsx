@@ -101,6 +101,13 @@ export const MessageList = memo(function MessageList({
 
   const keyExtractor = useCallback((item: MessageWithMeta) => item.id, []);
 
+  // Recycling pools per message type: a text bubble is never recycled into
+  // an image/poll layout, avoiding expensive re-layout on scroll
+  const getItemType = useCallback(
+    (item: MessageWithMeta) => item.type ?? "text",
+    []
+  );
+
   // FlashList does not support flex styles in contentContainerStyle,
   // so the loading/empty states render outside the list.
   if (messages.length === 0) {
@@ -128,6 +135,7 @@ export const MessageList = memo(function MessageList({
       data={orderedMessages}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
+      getItemType={getItemType}
       extraData={seenWatermark}
       maintainVisibleContentPosition={{
         startRenderingFromBottom: true,

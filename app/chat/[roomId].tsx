@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import { View, Text, TextInput, Pressable, InteractionManager } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -41,19 +41,9 @@ import { MentionAutocomplete } from "@/src/components/chat/MentionAutocomplete";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
 import { ReactionsSheet } from "@/src/components/chat/ReactionBar";
-import { ReadReceiptsSheet } from "@/src/components/chat/ReadReceiptsSheet";
-import { AttachmentSheet } from "@/src/components/chat/AttachmentSheet";
-import { ImageViewerModal } from "@/src/components/chat/ImageViewerModal";
-import { PollComposer } from "@/src/components/chat/PollComposer";
-import { PollVotersSheet } from "@/src/components/chat/PollBubble";
 import { ReplyPreview } from "@/src/components/chat/ReplyPreview";
 import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
-import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
-import { ScheduleSheet } from "@/src/components/chat/ScheduleSheet";
-import { ScheduledMessagesSheet } from "@/src/components/chat/ScheduledMessagesSheet";
-import { ContactInfoSheet } from "@/src/components/chat/ContactInfoSheet";
-import { GroupInfoSheet } from "@/src/components/chat/GroupInfoSheet";
-import { ReportUserSheet } from "@/src/components/chat/ReportUserSheet";
+import { PollVotersSheet } from "@/src/components/chat/PollBubble";
 import { Icon } from "@/src/components/ui/Icon";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
@@ -61,6 +51,60 @@ import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
 import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage, CallType, Room } from "@/src/types";
+
+// Lazy: sheets/modals below are chat-screen-only and closed at mount — on web
+// they split out of the route chunk, on native their evaluation is deferred
+// (same pattern as EmojiPicker in MessageInput)
+const ReadReceiptsSheet = lazy(() =>
+  import("@/src/components/chat/ReadReceiptsSheet").then((m) => ({
+    default: m.ReadReceiptsSheet,
+  }))
+);
+const AttachmentSheet = lazy(() =>
+  import("@/src/components/chat/AttachmentSheet").then((m) => ({
+    default: m.AttachmentSheet,
+  }))
+);
+const ImageViewerModal = lazy(() =>
+  import("@/src/components/chat/ImageViewerModal").then((m) => ({
+    default: m.ImageViewerModal,
+  }))
+);
+const PollComposer = lazy(() =>
+  import("@/src/components/chat/PollComposer").then((m) => ({
+    default: m.PollComposer,
+  }))
+);
+const PinnedMessagesSheet = lazy(() =>
+  import("@/src/components/chat/PinnedMessagesSheet").then((m) => ({
+    default: m.PinnedMessagesSheet,
+  }))
+);
+const ScheduleSheet = lazy(() =>
+  import("@/src/components/chat/ScheduleSheet").then((m) => ({
+    default: m.ScheduleSheet,
+  }))
+);
+const ScheduledMessagesSheet = lazy(() =>
+  import("@/src/components/chat/ScheduledMessagesSheet").then((m) => ({
+    default: m.ScheduledMessagesSheet,
+  }))
+);
+const ContactInfoSheet = lazy(() =>
+  import("@/src/components/chat/ContactInfoSheet").then((m) => ({
+    default: m.ContactInfoSheet,
+  }))
+);
+const GroupInfoSheet = lazy(() =>
+  import("@/src/components/chat/GroupInfoSheet").then((m) => ({
+    default: m.GroupInfoSheet,
+  }))
+);
+const ReportUserSheet = lazy(() =>
+  import("@/src/components/chat/ReportUserSheet").then((m) => ({
+    default: m.ReportUserSheet,
+  }))
+);
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
@@ -208,22 +252,27 @@ export default function ChatScreen() {
     [roomId]
   );
 
-  // Feature data: pinned list, saved bookmarks, pending scheduled sends
+  // Feature data: pinned list, saved bookmarks, pending scheduled sends.
+  // Deferred past the navigation transition (InteractionManager) — none of it
+  // is needed for first paint, so the message list becomes interactive first.
   useEffect(() => {
     if (!roomId || !user) return;
 
-    messageService
-      .getPinnedMessages(roomId)
-      .then(setPinnedMessages)
-      .catch((err) => console.error("[ChatScreen] load pinned", err));
-    savedMessageService
-      .getSavedIdsForRoom(roomId)
-      .then(setSavedIds)
-      .catch((err) => console.error("[ChatScreen] load saved ids", err));
-    scheduledMessageService
-      .getPendingForRoom(roomId)
-      .then(setScheduled)
-      .catch((err) => console.error("[ChatScreen] load scheduled", err));
+    const task = InteractionManager.runAfterInteractions(() => {
+      messageService
+        .getPinnedMessages(roomId)
+        .then(setPinnedMessages)
+        .catch((err) => console.error("[ChatScreen] load pinned", err));
+      savedMessageService
+        .getSavedIdsForRoom(roomId)
+        .then(setSavedIds)
+        .catch((err) => console.error("[ChatScreen] load saved ids", err));
+      scheduledMessageService
+        .getPendingForRoom(roomId)
+        .then(setScheduled)
+        .catch((err) => console.error("[ChatScreen] load scheduled", err));
+    });
+    return () => task.cancel();
   }, [roomId, user]);
 
   // Keep the pinned list in sync with realtime pin/unpin/recall updates
@@ -705,67 +754,90 @@ export default function ChatScreen() {
         onClose={() => setReactionsTarget(null)}
       />
 
-      <ContactInfoSheet
-        visible={showContactInfo}
-        peer={peer}
-        fallbackName={roomName || t("defaultRoomName")}
-        fallbackAvatarUrl={roomAvatar}
-        onClose={() => setShowContactInfo(false)}
-        onReport={() => {
-          if (otherProfile) setReportTarget({ userId: otherProfile.id });
-        }}
-        onBlockChanged={refreshPeer}
-      />
-
-      {room && (
-        <GroupInfoSheet
-          visible={showGroupInfo}
-          room={room}
-          participants={participants}
-          isAdmin={isRoomAdmin}
-          onClose={() => setShowGroupInfo(false)}
-          onRoomUpdated={handleRoomUpdated}
+      {/* Closed-at-mount sheets — fallback null is invisible while chunks load */}
+      <Suspense fallback={null}>
+        <ContactInfoSheet
+          visible={showContactInfo}
+          peer={peer}
+          fallbackName={roomName || t("defaultRoomName")}
+          fallbackAvatarUrl={roomAvatar}
+          onClose={() => setShowContactInfo(false)}
+          onReport={() => {
+            if (otherProfile) setReportTarget({ userId: otherProfile.id });
+          }}
+          onBlockChanged={refreshPeer}
         />
-      )}
 
-      <ReportUserSheet
-        visible={!!reportTarget}
-        reportedUserId={reportTarget?.userId ?? null}
-        messageId={reportTarget?.messageId ?? null}
-        onClose={() => setReportTarget(null)}
-      />
+        {room && (
+          <GroupInfoSheet
+            visible={showGroupInfo}
+            room={room}
+            participants={participants}
+            isAdmin={isRoomAdmin}
+            onClose={() => setShowGroupInfo(false)}
+            onRoomUpdated={handleRoomUpdated}
+          />
+        )}
 
-      <ReadReceiptsSheet
-        message={receiptsTarget}
-        visible={!!receiptsTarget}
-        onClose={() => setReceiptsTarget(null)}
-      />
+        <ReportUserSheet
+          visible={!!reportTarget}
+          reportedUserId={reportTarget?.userId ?? null}
+          messageId={reportTarget?.messageId ?? null}
+          onClose={() => setReportTarget(null)}
+        />
 
-      <PollVotersSheet
-        message={votersTarget}
-        visible={!!votersTarget}
-        onClose={() => setVotersTarget(null)}
-      />
+        <ReadReceiptsSheet
+          message={receiptsTarget}
+          visible={!!receiptsTarget}
+          onClose={() => setReceiptsTarget(null)}
+        />
 
-      <AttachmentSheet
-        visible={showAttachSheet}
-        onClose={() => setShowAttachSheet(false)}
-        onPickPhotos={handlePickPhotos}
-        onCreatePoll={() => setShowPollComposer(true)}
-      />
+        <PollVotersSheet
+          message={votersTarget}
+          visible={!!votersTarget}
+          onClose={() => setVotersTarget(null)}
+        />
 
-      <PollComposer
-        visible={showPollComposer}
-        onClose={() => setShowPollComposer(false)}
-        onSubmit={handleSendPoll}
-      />
+        <AttachmentSheet
+          visible={showAttachSheet}
+          onClose={() => setShowAttachSheet(false)}
+          onPickPhotos={handlePickPhotos}
+          onCreatePoll={() => setShowPollComposer(true)}
+        />
 
-      <ImageViewerModal
-        attachments={albumView?.images ?? []}
-        initialIndex={albumView?.index ?? 0}
-        visible={!!albumView}
-        onClose={() => setAlbumView(null)}
-      />
+        <PollComposer
+          visible={showPollComposer}
+          onClose={() => setShowPollComposer(false)}
+          onSubmit={handleSendPoll}
+        />
+
+        <ImageViewerModal
+          attachments={albumView?.images ?? []}
+          initialIndex={albumView?.index ?? 0}
+          visible={!!albumView}
+          onClose={() => setAlbumView(null)}
+        />
+
+        <PinnedMessagesSheet
+          visible={showPinnedSheet}
+          pinnedMessages={pinnedMessages}
+          onClose={() => setShowPinnedSheet(false)}
+          onUnpin={(message) => handlePin(message, false)}
+        />
+
+        <ScheduleSheet
+          visible={scheduleDraft !== null}
+          onClose={handleScheduleClose}
+          onPick={handleSchedulePick}
+        />
+
+        <ScheduledMessagesSheet
+          visible={showScheduledList}
+          scheduledMessages={scheduled}
+          onClose={() => setShowScheduledList(false)}
+          onCancel={handleCancelScheduled}
+        />
+      </Suspense>
 
       <ConfirmDialog
         visible={!!recallTarget}
@@ -776,26 +848,6 @@ export default function ChatScreen() {
         destructive
         onConfirm={confirmRecall}
         onCancel={() => setRecallTarget(null)}
-      />
-
-      <PinnedMessagesSheet
-        visible={showPinnedSheet}
-        pinnedMessages={pinnedMessages}
-        onClose={() => setShowPinnedSheet(false)}
-        onUnpin={(message) => handlePin(message, false)}
-      />
-
-      <ScheduleSheet
-        visible={scheduleDraft !== null}
-        onClose={handleScheduleClose}
-        onPick={handleSchedulePick}
-      />
-
-      <ScheduledMessagesSheet
-        visible={showScheduledList}
-        scheduledMessages={scheduled}
-        onClose={() => setShowScheduledList(false)}
-        onCancel={handleCancelScheduled}
       />
 
       <Dialog

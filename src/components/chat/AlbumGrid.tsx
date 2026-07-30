@@ -23,6 +23,7 @@ function Tile({ attachment, width, height, overlayCount, onPress }: TileProps) {
         contentFit="cover"
         transition={200}
         recyclingKey={attachment.url}
+        cachePolicy="memory-disk"
       />
       {overlayCount ? (
         <View className="absolute inset-0 items-center justify-center bg-black/50">

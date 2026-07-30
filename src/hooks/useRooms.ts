@@ -4,7 +4,12 @@ import { useRoomStore } from "@/src/stores/roomStore";
 
 export function useRooms() {
   const user = useAuthStore((s) => s.user);
-  const { rooms, loading, error, fetchRooms } = useRoomStore();
+  // Individual selectors (not a whole-store destructure) so consumers only
+  // re-render when a selected field actually changes
+  const rooms = useRoomStore((s) => s.rooms);
+  const loading = useRoomStore((s) => s.loading);
+  const error = useRoomStore((s) => s.error);
+  const fetchRooms = useRoomStore((s) => s.fetchRooms);
 
   useEffect(() => {
     if (user) {

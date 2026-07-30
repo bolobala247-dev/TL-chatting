@@ -1,7 +1,17 @@
+import { lazy, Suspense } from "react";
 import { useCalls } from "@/src/hooks/useCalls";
 import { useCallStore } from "@/src/stores/callStore";
-import { CallScreen } from "./CallScreen";
-import { IncomingCallOverlay } from "./IncomingCallOverlay";
+
+// Lazy: the call surfaces (RTCView, controls, PiP…) only load when a call
+// actually starts — CallHost itself mounts at the root on every session
+const CallScreen = lazy(() =>
+  import("./CallScreen").then((m) => ({ default: m.CallScreen }))
+);
+const IncomingCallOverlay = lazy(() =>
+  import("./IncomingCallOverlay").then((m) => ({
+    default: m.IncomingCallOverlay,
+  }))
+);
 
 /**
  * Root-mounted calling host. Runs the global incoming-call listener and
@@ -18,7 +28,15 @@ export function CallHost() {
 
   if (phase === "idle") return null;
   if (direction === "incoming" && phase === "ringing") {
-    return <IncomingCallOverlay />;
+    return (
+      <Suspense fallback={null}>
+        <IncomingCallOverlay />
+      </Suspense>
+    );
   }
-  return <CallScreen />;
+  return (
+    <Suspense fallback={null}>
+      <CallScreen />
+    </Suspense>
+  );
 }

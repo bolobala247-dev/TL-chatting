@@ -2,14 +2,16 @@ import { useState, useCallback } from "react";
 import {
   View,
   Text,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { FlashList } from "@shopify/flash-list";
 import { useRooms } from "@/src/hooks/useRooms";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { RoomListItem } from "@/src/components/rooms/RoomListItem";
@@ -35,6 +37,10 @@ export default function ChatsScreen() {
 
   const handleRoomPress = useCallback(
     (roomId: string) => {
+      // Warm the in-memory cache before navigating: page 1 races the screen
+      // transition, and the chat-screen mount fetch dedups against this
+      // request while it's still in flight (chatStore inFlightFetches).
+      void useChatStore.getState().fetchMessages(roomId);
       router.push(`/chat/${roomId}` as any);
     },
     [router]
@@ -105,25 +111,39 @@ export default function ChatsScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={rooms}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.room_id}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={refresh}
-            tintColor={colors.fgTertiary}
-          />
-        }
-        ListEmptyComponent={renderEmpty}
-        // Bottom padding keeps the floating tab bar and FAB off the last row
-        contentContainerStyle={
-          rooms.length === 0
-            ? { flexGrow: 1, paddingBottom: tabBarSpace }
-            : { paddingBottom: tabBarSpace + 72 }
-        }
-      />
+      {/* FlashList recycles row views (FlatList unmounts them) — cheaper
+          long-list scrolling. FlashList can't stretch an empty container
+          (no flexGrow support), so the empty state renders as a plain
+          ScrollView that keeps the same pull-to-refresh behavior. */}
+      {rooms.length === 0 ? (
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={colors.fgTertiary}
+            />
+          }
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: tabBarSpace }}
+        >
+          {renderEmpty()}
+        </ScrollView>
+      ) : (
+        <FlashList
+          data={rooms}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.room_id}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={colors.fgTertiary}
+            />
+          }
+          // Bottom padding keeps the floating tab bar and FAB off the last row
+          contentContainerStyle={{ paddingBottom: tabBarSpace + 72 }}
+        />
+      )}
 
       <Pressable
         className="absolute right-5 h-14 w-14 items-center justify-center rounded-full bg-ink active:opacity-80"

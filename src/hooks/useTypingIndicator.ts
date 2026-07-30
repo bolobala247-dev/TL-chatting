@@ -17,6 +17,7 @@ export function useTypingIndicator(roomId: string) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastTypingRef = useRef(0);
+  const isTrackedRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -42,7 +43,22 @@ export function useTypingIndicator(roomId: string) {
           }
         }
 
-        setTypingUsers(users);
+        // Keep the array identity stable when nothing visible changed —
+        // syncs also fire for our own track/untrack echoes and would
+        // otherwise re-render the chat screen on every keystroke burst
+        setTypingUsers((prev) => {
+          if (
+            prev.length === users.length &&
+            prev.every(
+              (p, i) =>
+                p.user_id === users[i].user_id &&
+                p.display_name === users[i].display_name
+            )
+          ) {
+            return prev;
+          }
+          return users;
+        });
       })
       .subscribe();
 
@@ -50,6 +66,8 @@ export function useTypingIndicator(roomId: string) {
 
     return () => {
       clearTimeout(timeoutRef.current);
+      isTrackedRef.current = false;
+      lastTypingRef.current = 0;
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
@@ -65,20 +83,31 @@ export function useTypingIndicator(roomId: string) {
     if (now - lastTypingRef.current < TYPING_DEBOUNCE_MS) return;
     lastTypingRef.current = now;
 
-    channelRef.current?.track({
-      typing: true,
-      display_name: profile?.display_name || profile?.username || i18n.t("user"),
-    });
+    // track() only on the off→on edge: presence state is unchanged while
+    // typing continues, so re-tracking would just fan out redundant syncs
+    // to every member. The timeout below keeps the "on" state alive.
+    if (!isTrackedRef.current) {
+      isTrackedRef.current = true;
+      channelRef.current?.track({
+        typing: true,
+        display_name: profile?.display_name || profile?.username || i18n.t("user"),
+      });
+    }
 
     clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
+      isTrackedRef.current = false;
       channelRef.current?.untrack();
     }, TYPING_TIMEOUT_MS);
   }, [profile]);
 
   const stopTyping = useCallback(() => {
     clearTimeout(timeoutRef.current);
-    channelRef.current?.untrack();
+    if (isTrackedRef.current) {
+      isTrackedRef.current = false;
+      lastTypingRef.current = 0;
+      channelRef.current?.untrack();
+    }
   }, []);
 
   return { typingUsers, startTyping, stopTyping };
