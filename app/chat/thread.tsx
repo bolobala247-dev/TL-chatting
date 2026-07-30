@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { KeyboardAvoidingView } from "@/src/lib/keyboard";
 import { supabase } from "@/src/lib/supabase";
 import { messageService } from "@/src/services/messageService";
+import { getSeenWatermark } from "@/src/lib/receipts";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useRoomParticipants } from "@/src/hooks/useRoomParticipants";
 import { MessageBubble } from "@/src/components/chat/MessageBubble";
@@ -200,11 +201,17 @@ export default function ThreadScreen() {
     [user, roomId, rootId, error, t]
   );
 
+  // Receipt cutoff for own bubbles — stable string keeps the memo effective
+  const seenWatermark = useMemo(
+    () => getSeenWatermark(participants, user?.id),
+    [participants, user?.id]
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: MessageWithMeta }) => (
-      <MessageBubble message={item} participants={participants} />
+      <MessageBubble message={item} seenWatermark={seenWatermark} />
     ),
-    [participants]
+    [seenWatermark]
   );
 
   return (

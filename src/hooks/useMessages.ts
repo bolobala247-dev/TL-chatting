@@ -294,11 +294,16 @@ export function useMessages(roomId: string) {
     [roomId, user]
   );
 
+  // Reads pagination state imperatively so the callback stays stable —
+  // FlashList's onStartReached keeps its identity across message updates
   const loadMore = useCallback(() => {
-    if (loading || !hasMore || messages.length === 0) return;
-    const oldest = messages[messages.length - 1];
-    fetchMessages(roomId, oldest.created_at ?? undefined);
-  }, [roomId, loading, hasMore, messages]);
+    const state = useChatStore.getState();
+    if (state.loading || state.hasMore[roomId] === false) return;
+    const roomMessages = state.messages[roomId] ?? EMPTY_MESSAGES;
+    if (roomMessages.length === 0) return;
+    const oldest = roomMessages[roomMessages.length - 1];
+    state.fetchMessages(roomId, oldest.created_at ?? undefined);
+  }, [roomId]);
 
   return {
     messages,

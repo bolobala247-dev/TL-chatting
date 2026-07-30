@@ -15,11 +15,11 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
-import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
+import type { MessageWithMeta } from "@/src/types";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
-import { hasSeen } from "@/src/lib/receipts";
 import { getAttachments, getCallMetadata, formatCallDuration } from "@/src/lib/messageMeta";
+import { seenByAllAt } from "@/src/lib/receipts";
 import { getMentions, splitByMentions } from "@/src/lib/mentions";
 import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
 import { Icon } from "@/src/components/ui/Icon";
@@ -29,8 +29,8 @@ import { PollBubble } from "./PollBubble";
 
 interface MessageBubbleProps {
   message: MessageWithMeta;
-  /** Room participants (watermarks) — drives the own-message receipt ticks. */
-  participants?: RoomParticipantWithProfile[];
+  /** Seen-by-all watermark (min other last_read_at) — drives the own-message receipt ticks. */
+  seenWatermark?: string | null;
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
   onLongPress?: (message: MessageWithMeta) => void;
@@ -58,8 +58,11 @@ function formatTime(dateStr: string, locale: string): string {
 
 function ReplyContext({ replyToId, roomId }: { replyToId: string; roomId: string }) {
   const { t } = useTranslation("chat");
-  const messages = useChatStore((s) => s.messages[roomId] ?? []);
-  const replyMessage = messages.find((m) => m.id === replyToId);
+  // Select the quoted message itself (stable reference): appending other
+  // messages to the room does not re-render this preview
+  const replyMessage = useChatStore((s) =>
+    s.messages[roomId]?.find((m) => m.id === replyToId)
+  );
 
   if (!replyMessage) return null;
 
@@ -88,8 +91,17 @@ function ThreadChip({
   onPress?: () => void;
 }) {
   const { t } = useTranslation("chat");
-  const messages = useChatStore((s) => s.messages[message.room_id] ?? []);
-  const replyCount = messages.filter((m) => m.thread_id === message.id).length;
+  // Select the count (a primitive): store updates that don't change this
+  // message's reply count skip the re-render entirely
+  const replyCount = useChatStore((s) => {
+    const roomMessages = s.messages[message.room_id];
+    if (!roomMessages) return 0;
+    let count = 0;
+    for (const m of roomMessages) {
+      if (m.thread_id === message.id) count++;
+    }
+    return count;
+  });
 
   if (replyCount === 0) return null;
 
@@ -123,7 +135,7 @@ function ThreadChip({
 // FlashList re-renders cheap while reactions/votes/receipts update live
 export const MessageBubble = memo(function MessageBubble({
   message,
-  participants,
+  seenWatermark,
   showPollVoters,
   onLongPress,
   onSwipeReply,
@@ -187,11 +199,8 @@ export const MessageBubble = memo(function MessageBubble({
   // Receipt ticks: one check = sent, two = seen by every other participant
   const showReceipt =
     isMine && !isDeleted && !message.id.startsWith("temp-");
-  const others = showReceipt
-    ? (participants ?? []).filter((p) => p.user_id !== message.sender_id)
-    : [];
   const seenByAll =
-    others.length > 0 && others.every((p) => hasSeen(p, message.created_at));
+    showReceipt && seenByAllAt(seenWatermark, message.created_at);
 
   if (message.type === "system") {
     return (
