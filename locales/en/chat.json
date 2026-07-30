@@ -231,6 +231,11 @@
     "title": "Contact info",
     "phone": "Phone"
   },
+  "group": {
+    "changeAvatar": "Change group photo",
+    "adminRole": "Admin",
+    "updateFailed": "Couldn't update group info"
+  },
   "call": {
     "audio": "Voice call",
     "video": "Video call",

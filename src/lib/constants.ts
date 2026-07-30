@@ -5,6 +5,8 @@ export const TYPING_DEBOUNCE_MS = 2000;
 export const TYPING_TIMEOUT_MS = 5000;
 // Grace window to recall a just-sent message (undo send)
 export const UNDO_SEND_WINDOW_MS = 8000;
+// A sent message can only be edited within this window
+export const EDIT_MESSAGE_WINDOW_MS = 60000;
 // Debounce before persisting a draft to on-device storage
 export const DRAFT_SAVE_DEBOUNCE_MS = 400;
 // Upper bounds for album / poll composition

@@ -17,10 +17,12 @@ import { useTypingIndicator } from "@/src/hooks/useTypingIndicator";
 import { useRoomParticipants } from "@/src/hooks/useRoomParticipants";
 import { usePeerPresence } from "@/src/hooks/usePresence";
 import { messageService } from "@/src/services/messageService";
+import { roomService } from "@/src/services/roomService";
 import { savedMessageService } from "@/src/services/savedMessageService";
 import { scheduledMessageService } from "@/src/services/scheduledMessageService";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
+import { useRoomStore } from "@/src/stores/roomStore";
 import { useCallStore } from "@/src/stores/callStore";
 import { WEBRTC_SUPPORTED } from "@/src/lib/webrtc";
 import { useDraftStore } from "@/src/stores/draftStore";
@@ -49,8 +51,8 @@ import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
 import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
 import { ScheduleSheet } from "@/src/components/chat/ScheduleSheet";
 import { ScheduledMessagesSheet } from "@/src/components/chat/ScheduledMessagesSheet";
-import { UndoSendBar } from "@/src/components/chat/UndoSendBar";
 import { ContactInfoSheet } from "@/src/components/chat/ContactInfoSheet";
+import { GroupInfoSheet } from "@/src/components/chat/GroupInfoSheet";
 import { ReportUserSheet } from "@/src/components/chat/ReportUserSheet";
 import { Icon } from "@/src/components/ui/Icon";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
@@ -58,7 +60,7 @@ import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage, CallType } from "@/src/types";
+import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage, CallType, Room } from "@/src/types";
 
 export default function ChatScreen() {
   const { t } = useTranslation(["chat", "common", "errors"]);
@@ -77,19 +79,45 @@ export default function ChatScreen() {
     toggleReaction,
     votePoll,
     loadMore,
-    undoableMessage,
-    undoSend,
   } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
 
   // Single participants fetch: header + read receipts share it
   const { participants, otherProfile } = useRoomParticipants(roomId!);
-  const roomName = otherProfile
-    ? otherProfile.display_name || otherProfile.username
-    : "";
-  const roomAvatar = otherProfile?.avatar_url ?? null;
+
+  // Room row: authoritative type + group name/avatar
+  const [room, setRoom] = useState<Room | null>(null);
+  useEffect(() => {
+    if (!roomId) return;
+    roomService
+      .getRoom(roomId)
+      .then(setRoom)
+      .catch((err) => console.error("[ChatScreen] getRoom", err));
+  }, [roomId]);
+
   const participantCount = participants.length;
-  const isGroup = participantCount > 2;
+  const isGroup = room ? room.type === "group" : participantCount > 2;
+
+  // Direct: the other person's name/avatar. Group: the room's own name/avatar.
+  const roomName = isGroup
+    ? room?.name ?? ""
+    : otherProfile
+      ? otherProfile.display_name || otherProfile.username
+      : "";
+  const roomAvatar = isGroup
+    ? room?.avatar_url ?? null
+    : otherProfile?.avatar_url ?? null;
+
+  // Group info edit gate — mirrors the rooms_update RLS (admins only)
+  const isRoomAdmin =
+    participants.find((p) => p.user_id === user?.id)?.role === "admin";
+
+  const handleRoomUpdated = useCallback((updated: Room) => {
+    setRoom(updated);
+    // Keep the room list in sync with the new name/avatar
+    const uid = useAuthStore.getState().user?.id;
+    if (uid) void useRoomStore.getState().fetchRooms(uid);
+  }, []);
 
   // DM-only: privacy-gated peer presence + block state (get_peer_profile)
   const peerId = !isGroup ? otherProfile?.id ?? null : null;
@@ -123,6 +151,7 @@ export default function ChatScreen() {
   const [trackedMentions, setTrackedMentions] = useState<MessageMention[]>([]);
   const mentionQuery = getMentionQuery(inputText);
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
   // Report target: DM peer (from contact sheet) or a message sender
   const [reportTarget, setReportTarget] = useState<{
     userId: string;
@@ -387,15 +416,6 @@ export default function ChatScreen() {
     [user, t]
   );
 
-  const handleUndo = useCallback(async () => {
-    try {
-      const recalled = await undoSend();
-      if (recalled) updateInputText(recalled);
-    } catch {
-      setChatError(t("undo.failed"));
-    }
-  }, [undoSend, updateInputText, t]);
-
   const handleLongPressSend = useCallback(
     (content: string) => {
       setScheduleDraft(content);
@@ -574,9 +594,11 @@ export default function ChatScreen() {
           lastSeenAt={!isGroup ? peer?.last_seen_at : undefined}
           participantCount={isGroup ? participantCount : undefined}
           onPressInfo={
-            !isGroup && otherProfile
-              ? () => setShowContactInfo(true)
-              : undefined
+            isGroup && room
+              ? () => setShowGroupInfo(true)
+              : otherProfile
+                ? () => setShowContactInfo(true)
+                : undefined
           }
           onStartAudioCall={canCall ? () => handleStartCall("audio") : undefined}
           onStartVideoCall={canCall ? () => handleStartCall("video") : undefined}
@@ -610,7 +632,6 @@ export default function ChatScreen() {
       </View>
 
       <Animated.View style={composerInsetStyle}>
-        <UndoSendBar visible={!!undoableMessage} onUndo={handleUndo} />
         <TypingIndicator typingUsers={typingUsers} />
         {chatError ? (
           <View className="border-t border-divider bg-danger-bg px-4 py-2">
@@ -710,6 +731,17 @@ export default function ChatScreen() {
         }}
         onBlockChanged={refreshPeer}
       />
+
+      {room && (
+        <GroupInfoSheet
+          visible={showGroupInfo}
+          room={room}
+          participants={participants}
+          isAdmin={isRoomAdmin}
+          onClose={() => setShowGroupInfo(false)}
+          onRoomUpdated={handleRoomUpdated}
+        />
+      )}
 
       <ReportUserSheet
         visible={!!reportTarget}
