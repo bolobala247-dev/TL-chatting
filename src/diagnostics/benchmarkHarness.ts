@@ -1,13 +1,16 @@
 import { diag } from "@/src/lib/diagnostics";
 import { mergeMessageWindow } from "@/src/db/repositories/merge";
-import { MESSAGE_WINDOW_SIZE } from "@/src/lib/constants";
+import { MESSAGE_WINDOW_SIZE, SEARCH_PAGE_SIZE } from "@/src/lib/constants";
 import {
   makeMessages,
   makeDelta,
   makeUploadTasks,
+  makeSearchCorpus,
   nowMs,
 } from "@/src/diagnostics/fixtures";
-import type { MessageAttachment, UploadTask } from "@/src/types";
+import { buildSearchDoc } from "@/src/services/searchIndexer";
+import { toHighlightRanges } from "@/src/services/searchService";
+import type { MessageAttachment, SearchDoc, UploadTask } from "@/src/types";
 
 /**
  * Benchmark harness (Phase 6B — design §4).
@@ -45,10 +48,18 @@ export interface MediaTiming {
   msPerOp: number;
 }
 
+export interface SearchTiming {
+  label: string;
+  rows: number;
+  iterations: number;
+  msPerOp: number;
+}
+
 export interface BenchmarkReport {
   tapOverhead: OpTiming[];
   merge: MergeTiming[];
   media: MediaTiming[];
+  search: SearchTiming[];
 }
 
 function timeLoop(label: string, iterations: number, fn: () => void): OpTiming {
@@ -106,7 +117,12 @@ export const benchmarkHarness = {
    */
   run(iterations: number = 200000): BenchmarkReport {
     const wasEnabled = diag.enabled();
-    const report: BenchmarkReport = { tapOverhead: [], merge: [], media: [] };
+    const report: BenchmarkReport = {
+      tapOverhead: [],
+      merge: [],
+      media: [],
+      search: [],
+    };
 
     try {
       // --- 1. Tap overhead (disabled = the production cost) --------------
@@ -188,6 +204,78 @@ export const benchmarkHarness = {
           rows,
           iterations: mediaIters,
           msPerOp: (nowMs() - start) / mediaIters,
+        });
+      }
+
+      // --- 4. Search plane pure hot-path transforms (Phase 8B §14) -------
+      // CPU-bound, SQLite-free parts only: the write-through projection
+      // (`buildSearchDoc` → `buildMediaText`) and the highlight offset parse
+      // (`toHighlightRanges`). The FTS MATCH / bm25 query, the upsert, and the
+      // coverage rebuild are SQLite-bound and measured on-device via the
+      // `search.query_ms`, `search.apply_ms`, and `search.repair` series.
+      for (const rows of [1000, 10000, 50000]) {
+        const corpus = makeSearchCorpus(rows);
+        const buildIters = 20;
+        for (let i = 0; i < 2; i++) for (const m of corpus) buildSearchDoc(m);
+        const start = nowMs();
+        for (let i = 0; i < buildIters; i++)
+          for (const m of corpus) buildSearchDoc(m);
+        report.search.push({
+          label: "build_doc",
+          rows,
+          iterations: buildIters * rows,
+          msPerOp: (nowMs() - start) / (buildIters * rows),
+        });
+      }
+
+      // Highlight offset parse over a page of synthetic FTS excerpts (matches
+      // wrapped in U+0002/U+0003, the exact `highlight()` output shape).
+      {
+        const HL_OPEN = "\u0002";
+        const HL_CLOSE = "\u0003";
+        const excerpts = makeSearchCorpus(SEARCH_PAGE_SIZE).map((m, i) => {
+          const body = m.content ?? `attachment ${i}`;
+          const [first, ...rest] = body.split(" ");
+          const tail = rest.length ? ` ${rest.join(" ")}` : "";
+          return `${HL_OPEN}${first}${HL_CLOSE}${tail}`;
+        });
+        const hlIters = 5000;
+        for (let i = 0; i < 200; i++)
+          for (const e of excerpts) toHighlightRanges(e);
+        const start = nowMs();
+        for (let i = 0; i < hlIters; i++)
+          for (const e of excerpts) toHighlightRanges(e);
+        report.search.push({
+          label: "highlight_page",
+          rows: excerpts.length,
+          iterations: hlIters * excerpts.length,
+          msPerOp: (nowMs() - start) / (hlIters * excerpts.length),
+        });
+      }
+
+      // Memory-churn: repeated allocate→build→discard cycles at a fixed window.
+      // The search-plane memory benchmark — `buildSearchDoc` is pure and retains
+      // no corpus reference, so each cycle's docs fall out of scope. A steady
+      // heap across cycles (watched via the memory leak detector) confirms the
+      // projection accumulates nothing between write-through batches (§14).
+      {
+        const churnRows = 10000;
+        const cycles = 50;
+        const start = nowMs();
+        let sink = 0;
+        for (let c = 0; c < cycles; c++) {
+          const corpus = makeSearchCorpus(churnRows);
+          const docs = corpus
+            .map(buildSearchDoc)
+            .filter((d): d is SearchDoc => d !== null);
+          sink += docs.length; // keep the loop live; docs drop each cycle
+        }
+        diag.count("bench.search_churn_docs", sink);
+        report.search.push({
+          label: "mem_churn",
+          rows: churnRows,
+          iterations: cycles,
+          msPerOp: (nowMs() - start) / cycles,
         });
       }
 

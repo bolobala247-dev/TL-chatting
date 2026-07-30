@@ -4,6 +4,9 @@ import type {
   OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SearchDoc,
+  SearchQuery,
+  SearchResultSet,
   SyncState,
   UploadTask,
 } from "@/src/types";
@@ -208,6 +211,55 @@ export interface UploadQueueRepository {
   clear(): Promise<void>;
 }
 
+/**
+ * Local search index (Phase 8A/8B §4). Sole owner of the `search_index`
+ * projection + the `message_fts` FTS5 vtable — a DERIVED, droppable cache of
+ * the searchable `messages` corpus, never a source of truth (§18). It knows
+ * SQL/FTS only: NOT networks, ranking-weight policy, debounce, or the
+ * MessageSearchResult shape (that is `searchService`). Every write is
+ * idempotent and rebuildable from `messages` (§16). No existing repository
+ * gains, loses, or shares responsibility — this is added beside them exactly
+ * as Phase 7 added `UploadQueueRepository`.
+ */
+export interface SearchRepository {
+  /** Idempotent upsert of N projected docs (INSERT OR REPLACE by message_id), one txn. */
+  apply(docs: SearchDoc[]): Promise<void>;
+  /**
+   * Page-1 window reconcile (mirrors MessageRepository.replaceNewestWindow):
+   * drop indexed rows of the room at/after the batch's oldest created_at (so
+   * server-side deletions in that range don't linger in the index), then upsert
+   * the batch — one txn. Empty batch clears the room's index rows.
+   */
+  applyWindow(roomId: string, docs: SearchDoc[]): Promise<void>;
+  /** Remove a message from the index (delete / recall / soft-delete). No-op if absent. */
+  removeByMessage(messageId: string): Promise<void>;
+  /** Drop a whole room's index rows (leave room / cache eviction). */
+  removeByRoom(roomId: string): Promise<void>;
+  /** Keep only the newest `keep` indexed rows of a room (lockstep with cache prune). */
+  pruneRoom(roomId: string, keep: number): Promise<void>;
+  /** Drop index rows whose backing `messages` row is gone (I-S2 orphan sweep). */
+  removeOrphans(): Promise<void>;
+  /**
+   * Ranked local query. Returns hydrated hits (ids + display fields JOINed from
+   * `messages` + blended score + FTS snippet/highlight) and which path served
+   * them. `kind` maps to the same lane predicate as the server RPC.
+   */
+  search(params: SearchQuery): Promise<SearchResultSet>;
+  /**
+   * Searchable cached messages (deleted_at IS NULL AND type<>'system') missing
+   * from the index, as domain rows ready to re-index, plus the total drift
+   * count (§16.2 boot repair / I-S1 coverage). `limit` bounds the returned batch.
+   */
+  coverageAudit(
+    limit: number
+  ): Promise<{ pending: MessageWithMeta[]; drift: number }>;
+  /** Current indexed row count (I-S3 bound gauge). */
+  count(): Promise<number>;
+  /** DROP + CREATE the projection (triggers/FTS follow), then return (caller refills). §16.4. */
+  rebuild(): Promise<void>;
+  clear(): Promise<void>;
+}
+
 /** Everything the application layer can reach — one bundle per connection. */
 export interface Repositories {
   messages: MessageRepository;
@@ -217,4 +269,5 @@ export interface Repositories {
   syncState: SyncStateRepository;
   outbox: OutboxRepository;
   uploadQueue: UploadQueueRepository;
+  search: SearchRepository;
 }

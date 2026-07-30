@@ -2,10 +2,13 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import type {
   Message,
   MessageAttachment,
+  MessageSearchKind,
   MessageWithMeta,
   OutboxItem,
   RoomParticipantWithProfile,
   RoomWithLastMessage,
+  SearchDoc,
+  SearchHit,
   SyncState,
   UploadTask,
 } from "@/src/types";
@@ -16,9 +19,11 @@ import type {
   ParticipantRepository,
   Repositories,
   RoomRepository,
+  SearchRepository,
   SyncStateRepository,
   UploadQueueRepository,
 } from "./types";
+import { ensureSearchFtsSchema } from "../migrations";
 
 /**
  * SQLite implementations of the repository contracts (see ./types.ts).
@@ -982,6 +987,346 @@ function createUploadQueueRepository(db: SQLiteDatabase): UploadQueueRepository 
 }
 
 // ---------------------------------------------------------------------------
+// search index (Phase 8A/8B) — the DERIVED FTS projection over `messages`
+// ---------------------------------------------------------------------------
+
+interface SearchHitRow {
+  message_id: string;
+  room_id: string;
+  sender_id: string | null;
+  type: string;
+  created_at: string;
+  content: string | null;
+  media_url: string | null;
+  attachments: string | null;
+  score: number;
+  snippet: string | null;
+  highlight: string | null;
+}
+
+const UPSERT_SEARCH_SQL = `
+  INSERT INTO search_index
+    (message_id, room_id, sender_id, type, has_link, created_ms, created_at, text, media_text, indexed_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(message_id) DO UPDATE SET
+    room_id     = excluded.room_id,
+    sender_id   = excluded.sender_id,
+    type        = excluded.type,
+    has_link    = excluded.has_link,
+    created_ms  = excluded.created_ms,
+    created_at  = excluded.created_at,
+    text        = excluded.text,
+    media_text  = excluded.media_text,
+    indexed_at  = excluded.indexed_at`;
+
+function searchDocParams(doc: SearchDoc, indexedAt: string) {
+  return [
+    doc.message_id,
+    doc.room_id,
+    doc.sender_id,
+    doc.type,
+    doc.has_link ? 1 : 0,
+    doc.created_ms,
+    doc.created_at,
+    doc.text,
+    doc.media_text,
+    indexedAt,
+  ];
+}
+
+function rowToSearchHit(row: SearchHitRow): SearchHit {
+  return {
+    message_id: row.message_id,
+    room_id: row.room_id,
+    sender_id: row.sender_id,
+    content: row.content,
+    type: row.type,
+    media_url: row.media_url,
+    attachments: parseJson<Message["attachments"]>(row.attachments),
+    created_at: row.created_at,
+    score: row.score,
+    snippet: row.snippet,
+    highlight: row.highlight,
+  };
+}
+
+// Lane → SQL predicate on the `si` (search_index) alias — identical visibility
+// to the server search_messages RPC (design §11).
+function lanePredicate(kind: MessageSearchKind): string {
+  switch (kind) {
+    case "image":
+      return "si.type IN ('image','video')";
+    case "file":
+      return "si.type = 'file'";
+    case "link":
+      return "si.has_link = 1";
+    case "message":
+    default:
+      return "si.type IN ('text','image','video','file')";
+  }
+}
+
+// Whitelist-tokenize (fold case; keep letters/numbers only) — the FTS analogue
+// of parameterization: raw operators (" * : AND NEAR) can never reach the
+// MATCH grammar because only [\p{L}\p{N}] runs survive (design §5.2).
+function searchTokens(query: string): string[] {
+  return query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+// Escape LIKE metacharacters for the substring fallback (paired with ESCAPE '\\').
+function likePattern(query: string): string {
+  return `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+// Delimiters FTS5 highlight()/snippet() wrap matches in — control chars that
+// never occur in chat text, so searchService can split them into offsets (§9).
+const HL_OPEN = "\u0002";
+const HL_CLOSE = "\u0003";
+
+function createSearchRepository(db: SQLiteDatabase): SearchRepository {
+  // Per-connection memo of FTS5 availability (design §16.5): the vtable is
+  // created best-effort outside the migration chain, so a build without FTS5
+  // simply has no `message_fts` table and every query takes the LIKE path.
+  // Reset by rebuild(); re-probed lazily.
+  let ftsAvailable: boolean | null = null;
+
+  async function hasFts(): Promise<boolean> {
+    if (ftsAvailable !== null) return ftsAvailable;
+    try {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'message_fts'"
+      );
+      ftsAvailable = (row?.n ?? 0) > 0;
+    } catch {
+      ftsAvailable = false;
+    }
+    return ftsAvailable;
+  }
+
+  async function upsertInTxn(
+    txn: Parameters<Parameters<SQLiteDatabase["withExclusiveTransactionAsync"]>[0]>[0],
+    docs: SearchDoc[],
+    indexedAt: string
+  ) {
+    const stmt = await txn.prepareAsync(UPSERT_SEARCH_SQL);
+    try {
+      for (const doc of docs) {
+        await stmt.executeAsync(searchDocParams(doc, indexedAt));
+      }
+    } finally {
+      await stmt.finalizeAsync();
+    }
+  }
+
+  return {
+    async apply(docs) {
+      if (docs.length === 0) return;
+      const indexedAt = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await upsertInTxn(txn, docs, indexedAt);
+      });
+    },
+
+    async applyWindow(roomId, docs) {
+      const indexedAt = new Date().toISOString();
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        if (docs.length === 0) {
+          await txn.runAsync("DELETE FROM search_index WHERE room_id = ?", [
+            roomId,
+          ]);
+          return;
+        }
+        // Mirror MessageRepository.replaceNewestWindow: clear the page's time
+        // range so index rows for messages deleted server-side don't linger.
+        const oldest = docs.reduce<string | null>(
+          (min, d) =>
+            min == null || d.created_at < min ? d.created_at : min,
+          null
+        );
+        if (oldest != null) {
+          await txn.runAsync(
+            "DELETE FROM search_index WHERE room_id = ? AND created_at >= ?",
+            [roomId, oldest]
+          );
+        }
+        await upsertInTxn(txn, docs, indexedAt);
+      });
+    },
+
+    async removeByMessage(messageId) {
+      await db.runAsync("DELETE FROM search_index WHERE message_id = ?", [
+        messageId,
+      ]);
+    },
+
+    async removeByRoom(roomId) {
+      await db.runAsync("DELETE FROM search_index WHERE room_id = ?", [roomId]);
+    },
+
+    async pruneRoom(roomId, keep) {
+      await db.runAsync(
+        `DELETE FROM search_index
+          WHERE room_id = ? AND message_id NOT IN (
+            SELECT message_id FROM search_index
+             WHERE room_id = ?
+             ORDER BY created_ms DESC LIMIT ?
+          )`,
+        [roomId, roomId, keep]
+      );
+    },
+
+    async removeOrphans() {
+      await db.runAsync(
+        "DELETE FROM search_index WHERE message_id NOT IN (SELECT id FROM messages)"
+      );
+    },
+
+    async search(params) {
+      const { kind, roomId, before, limit } = params;
+      const mediaLane = kind !== "message";
+      const lane = lanePredicate(kind);
+      const roomScope = roomId ?? "";
+      const beforeClause = before ? " AND si.created_at < ?" : "";
+
+      const tokens = searchTokens(params.query);
+      const usable = tokens.filter((t) => t.length >= params.minTokenLen);
+      const emptyQuery = params.query.trim().length === 0;
+
+      // Media lanes browse recent items with an empty query (no MATCH); the
+      // message lane requires text (RPC parity) — empty query ⇒ no results.
+      if (emptyQuery) {
+        if (!mediaLane) return { hits: [], path: "empty" };
+        const rows = await db.getAllAsync<SearchHitRow>(
+          `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                  m.content AS content, m.media_url AS media_url,
+                  m.attachments AS attachments,
+                  0 AS score, NULL AS snippet, NULL AS highlight
+             FROM search_index si
+             JOIN messages m ON m.id = si.message_id
+            WHERE ${lane}${beforeClause}
+            ORDER BY si.created_ms DESC, si.message_id
+            LIMIT ?`,
+          before ? [before, limit] : [limit]
+        );
+        return { hits: rows.map(rowToSearchHit), path: "empty" };
+      }
+
+      if ((await hasFts()) && usable.length > 0) {
+        // Column-scoped for the message lane (body match); both columns for
+        // media lanes (filenames / link hosts live in media_text). Explicit
+        // AND between prefix terms so "bao cao" ⇒ báo* AND cáo*.
+        const matchExpr = mediaLane
+          ? usable.map((t) => `"${t}"*`).join(" AND ")
+          : usable.map((t) => `text:"${t}"*`).join(" AND ");
+        const nowMs = Date.now();
+        const args: (string | number)[] = [
+          params.weights.bm25,
+          params.weights.recency,
+          nowMs,
+          params.weights.room,
+          roomScope,
+          params.snippetTokens,
+          matchExpr,
+        ];
+        if (before) args.push(before);
+        args.push(limit);
+        const rows = await db.getAllAsync<SearchHitRow>(
+          `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                  m.content AS content, m.media_url AS media_url,
+                  m.attachments AS attachments,
+                  (? * bm25(message_fts, 10.0, 2.0)
+                   - ? * (1.0 / (1.0 + (? - si.created_ms) / 86400000.0))
+                   - ? * (CASE WHEN si.room_id = ? THEN 1 ELSE 0 END)) AS score,
+                  snippet(message_fts, 0, '${HL_OPEN}', '${HL_CLOSE}', '…', ?) AS snippet,
+                  highlight(message_fts, 0, '${HL_OPEN}', '${HL_CLOSE}') AS highlight
+             FROM message_fts
+             JOIN search_index si ON si.rowid = message_fts.rowid
+             JOIN messages m ON m.id = si.message_id
+            WHERE message_fts MATCH ?
+              AND ${lane}${beforeClause}
+            ORDER BY score ASC, si.created_ms DESC, si.message_id
+            LIMIT ?`,
+          args
+        );
+        return { hits: rows.map(rowToSearchHit), path: "fts" };
+      }
+
+      // Substring fallback: short query, or a build without FTS5. Still fully
+      // local/offline — a bounded scan over the projection. No MATCH ⇒ no bm25,
+      // so the blend degrades to recency-first (today's RPC order).
+      const like = likePattern(params.query.trim());
+      const nowMs = Date.now();
+      const textMatch = mediaLane
+        ? "(si.text LIKE ? ESCAPE '\\' OR si.media_text LIKE ? ESCAPE '\\')"
+        : "si.text LIKE ? ESCAPE '\\'";
+      const args: (string | number)[] = [params.weights.recency, nowMs, params.weights.room, roomScope];
+      args.push(like);
+      if (mediaLane) args.push(like);
+      if (before) args.push(before);
+      args.push(limit);
+      const rows = await db.getAllAsync<SearchHitRow>(
+        `SELECT si.message_id, si.room_id, si.sender_id, si.type, si.created_at,
+                m.content AS content, m.media_url AS media_url,
+                m.attachments AS attachments,
+                (- ? * (1.0 / (1.0 + (? - si.created_ms) / 86400000.0))
+                 - ? * (CASE WHEN si.room_id = ? THEN 1 ELSE 0 END)) AS score,
+                NULL AS snippet, NULL AS highlight
+           FROM search_index si
+           JOIN messages m ON m.id = si.message_id
+          WHERE ${lane} AND ${textMatch}${beforeClause}
+          ORDER BY score ASC, si.created_ms DESC, si.message_id
+          LIMIT ?`,
+        args
+      );
+      return { hits: rows.map(rowToSearchHit), path: "like" };
+    },
+
+    async coverageAudit(limit) {
+      const driftRow = await db.getFirstAsync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM messages m
+          WHERE m.deleted_at IS NULL AND (m.type IS NULL OR m.type <> 'system')
+            AND NOT EXISTS (SELECT 1 FROM search_index si WHERE si.message_id = m.id)`
+      );
+      const rows = await db.getAllAsync<MessageRow>(
+        `SELECT m.* FROM messages m
+          WHERE m.deleted_at IS NULL AND (m.type IS NULL OR m.type <> 'system')
+            AND NOT EXISTS (SELECT 1 FROM search_index si WHERE si.message_id = m.id)
+          ORDER BY m.created_at DESC
+          LIMIT ?`,
+        [limit]
+      );
+      return { pending: rows.map(rowToMessage), drift: driftRow?.n ?? 0 };
+    },
+
+    async count() {
+      const row = await db.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM search_index"
+      );
+      return row?.n ?? 0;
+    },
+
+    async rebuild() {
+      // Corruption / schema-hash path (§16.4): tear down the derived FTS layer
+      // + empty the projection, then recreate FTS. The caller refills from
+      // `messages` via the coverage-repair pass — zero data loss (derived).
+      await db.execAsync(
+        `DROP TRIGGER IF EXISTS search_index_ai;
+         DROP TRIGGER IF EXISTS search_index_ad;
+         DROP TRIGGER IF EXISTS search_index_au;
+         DROP TABLE IF EXISTS message_fts;
+         DELETE FROM search_index;`
+      );
+      await ensureSearchFtsSchema(db);
+      ftsAvailable = null; // re-probe after recreate
+    },
+
+    async clear() {
+      await db.runAsync("DELETE FROM search_index");
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 /** Builds the full repository bundle over one open connection. */
 export function createRepositories(db: SQLiteDatabase): Repositories {
@@ -993,5 +1338,6 @@ export function createRepositories(db: SQLiteDatabase): Repositories {
     syncState: createSyncStateRepository(db),
     outbox: createOutboxRepository(db),
     uploadQueue: createUploadQueueRepository(db),
+    search: createSearchRepository(db),
   };
 }

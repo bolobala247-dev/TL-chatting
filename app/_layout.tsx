@@ -15,6 +15,7 @@ import { initI18n } from "@/src/i18n";
 import { databaseService } from "@/src/services/databaseService";
 import { outboxService } from "@/src/services/outboxService";
 import { mediaService } from "@/src/services/mediaService";
+import { searchIndexer } from "@/src/services/searchIndexer";
 import { ThemeProvider, useTheme, useThemeBootstrap, useThemeColors } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
@@ -66,6 +67,10 @@ function AuthGate() {
     // schedule from the durable queue right beside the outbox. No-op when the
     // media flag is off or the queue is empty; safe to re-run on session change.
     void mediaService.resume();
+    // Search-index coverage repair + initial fill (Phase 8B §16.2/§16.3):
+    // heal any drift and fill the derived index from the cache. No-op when the
+    // search flag is off; bounded, chunked, and never blocks first paint.
+    void searchIndexer.repair();
   }, [session, initialized]);
 
   if (!initialized) {

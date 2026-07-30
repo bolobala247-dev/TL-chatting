@@ -4,7 +4,7 @@ import {
   isSqliteAvailable,
   openDatabase,
 } from "@/src/db/database";
-import { runMigrations } from "@/src/db/migrations";
+import { runMigrations, ensureSearchFtsSchema } from "@/src/db/migrations";
 import { createRepositories } from "@/src/db/repositories/sqlite";
 import type { Repositories } from "@/src/db/repositories/types";
 
@@ -54,6 +54,10 @@ export const databaseService = {
       try {
         const db = await openDatabase();
         await runMigrations(db);
+        // Best-effort FTS5 layer for local search (Phase 8B) — created OUTSIDE
+        // the migration chain so a build lacking FTS5 degrades to a LIKE scan
+        // instead of failing init and disabling the ENTIRE cache. Never throws.
+        await ensureSearchFtsSchema(db);
         this._repositories = createRepositories(db);
       } catch (err) {
         console.error("[databaseService] init failed — cache disabled", err);

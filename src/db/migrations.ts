@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { SEARCH_SCHEMA_VERSION } from "@/src/lib/constants";
 
 /**
  * Local-cache migration framework.
@@ -219,12 +220,56 @@ const MIGRATION_004_UPLOAD_QUEUE: Migration = {
   ],
 };
 
+/**
+ * v5 — local search index projection (Phase 8A/8B, design §3.1).
+ *
+ * A DERIVED, droppable projection of the searchable `messages` corpus — NOT a
+ * source of truth (§18). `messages.id` is a TEXT PK, but FTS5 external content
+ * needs an INTEGER content_rowid, so search is indexed against this dedicated
+ * projection (an integer `rowid`), leaving `MessageRepository`'s table — and
+ * its ownership — completely untouched (not one column added to `messages`).
+ *
+ * This migration only CREATEs the plain relational table + its indexes. The
+ * FTS5 virtual table and its sync triggers are created OUTSIDE the migration
+ * chain, best-effort, by `ensureSearchFtsSchema` (below): a platform build
+ * without FTS5 must degrade to a local LIKE scan, never fail the migration and
+ * disable the ENTIRE cache. The first fill is the idempotent boot
+ * coverage-repair pass (§16.2), so a large existing cache never backfills
+ * inside this transaction. Same droppable-cache lifecycle (wiped on logout).
+ */
+const MIGRATION_005_SEARCH_INDEX: Migration = {
+  toVersion: 5,
+  name: "search_index",
+  statements: [
+    `CREATE TABLE IF NOT EXISTS search_index (
+      rowid       INTEGER PRIMARY KEY,
+      message_id  TEXT NOT NULL UNIQUE,
+      room_id     TEXT NOT NULL,
+      sender_id   TEXT,
+      type        TEXT NOT NULL,
+      has_link    INTEGER NOT NULL DEFAULT 0,
+      created_ms  INTEGER NOT NULL,
+      created_at  TEXT NOT NULL,
+      text        TEXT,
+      media_text  TEXT,
+      indexed_at  TEXT NOT NULL
+    );`,
+    // Room-scoped search + media-lane browse (ORDER BY created_ms DESC)
+    `CREATE INDEX IF NOT EXISTS idx_search_room
+       ON search_index (room_id, created_ms DESC);`,
+    // Lane predicate + browse ordering by message type
+    `CREATE INDEX IF NOT EXISTS idx_search_type
+       ON search_index (type, created_ms DESC);`,
+  ],
+};
+
 // Append-only, ordered by toVersion
 const MIGRATIONS: Migration[] = [
   MIGRATION_001_INITIAL_SCHEMA,
   MIGRATION_002_SYNC_STATE,
   MIGRATION_003_OUTBOX,
   MIGRATION_004_UPLOAD_QUEUE,
+  MIGRATION_005_SEARCH_INDEX,
 ];
 
 export const LATEST_SCHEMA_VERSION =
@@ -252,5 +297,89 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
       await txn.execAsync(`PRAGMA user_version = ${migration.toVersion}`);
     });
     current = migration.toVersion;
+  }
+}
+
+// FTS5 external-content vtable + the three sync triggers that keep it aligned
+// with the search_index projection (design §3.2/§3.3). Kept as a SEPARATE
+// best-effort step (not a hard migration) so a build lacking FTS5 degrades to
+// a local LIKE scan instead of failing runMigrations and disabling the cache.
+const FTS_SCHEMA_STATEMENTS = [
+  `CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
+    text,
+    media_text,
+    content = 'search_index',
+    content_rowid = 'rowid',
+    tokenize = "unicode61 remove_diacritics 2",
+    prefix = '2 3'
+  );`,
+  `CREATE TRIGGER IF NOT EXISTS search_index_ai AFTER INSERT ON search_index BEGIN
+    INSERT INTO message_fts(rowid, text, media_text)
+    VALUES (new.rowid, new.text, new.media_text);
+  END;`,
+  `CREATE TRIGGER IF NOT EXISTS search_index_ad AFTER DELETE ON search_index BEGIN
+    INSERT INTO message_fts(message_fts, rowid, text, media_text)
+    VALUES ('delete', old.rowid, old.text, old.media_text);
+  END;`,
+  `CREATE TRIGGER IF NOT EXISTS search_index_au AFTER UPDATE ON search_index BEGIN
+    INSERT INTO message_fts(message_fts, rowid, text, media_text)
+    VALUES ('delete', old.rowid, old.text, old.media_text);
+    INSERT INTO message_fts(rowid, text, media_text)
+    VALUES (new.rowid, new.text, new.media_text);
+  END;`,
+];
+
+/**
+ * Best-effort creation of the FTS5 layer over the (already-migrated)
+ * `search_index` table. Runs on every init AFTER runMigrations, guarded so it
+ * can never disable the cache (Phase 8B, design §16.5):
+ *  - Returns `true` when `message_fts` exists and is usable (FTS path enabled).
+ *  - Returns `false` on any failure (no FTS5 in this build, corrupt vtable) —
+ *    the caller keeps the plain `search_index` table and search degrades to a
+ *    local LIKE scan (still offline), never a crash.
+ *
+ * A stored tokenizer/column fingerprint (`meta['search_schema_hash']`) guards
+ * against a future SEARCH_SCHEMA_VERSION bump silently serving a stale index:
+ * on mismatch the FTS vtable is dropped and recreated (the projection refills
+ * via the boot coverage-repair pass). Idempotent; safe to call every launch.
+ */
+export async function ensureSearchFtsSchema(
+  db: SQLiteDatabase
+): Promise<boolean> {
+  try {
+    const stored = await db.getFirstAsync<{ value: string | null }>(
+      "SELECT value FROM meta WHERE key = 'search_schema_hash'"
+    );
+    let repopulate = false;
+    if (stored?.value != null && stored.value !== SEARCH_SCHEMA_VERSION) {
+      // Tokenizer/column definition changed — drop the derived FTS layer so it
+      // is rebuilt fresh. The projection rows survive, so FTS must be
+      // repopulated from them (triggers only fire on future writes).
+      await db.execAsync(
+        `DROP TRIGGER IF EXISTS search_index_ai;
+         DROP TRIGGER IF EXISTS search_index_ad;
+         DROP TRIGGER IF EXISTS search_index_au;
+         DROP TABLE IF EXISTS message_fts;`
+      );
+      repopulate = true;
+    }
+    for (const statement of FTS_SCHEMA_STATEMENTS) {
+      await db.execAsync(statement);
+    }
+    if (repopulate) {
+      // Rebuild the external-content index from the surviving projection rows.
+      await db.execAsync(
+        "INSERT INTO message_fts(message_fts) VALUES('rebuild');"
+      );
+    }
+    await db.runAsync(
+      `INSERT INTO meta (key, value) VALUES ('search_schema_hash', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [SEARCH_SCHEMA_VERSION]
+    );
+    return true;
+  } catch (err) {
+    console.error("[db] FTS5 unavailable — search degrades to LIKE scan", err);
+    return false;
   }
 }

@@ -1,4 +1,5 @@
 import { databaseService } from "@/src/services/databaseService";
+import { searchIndexer } from "@/src/services/searchIndexer";
 import { mergeMessageWindow } from "@/src/db/repositories/merge";
 import { diag } from "@/src/lib/diagnostics";
 import type {
@@ -118,6 +119,9 @@ export const cacheService = {
       .catch((err) => console.error("[cacheService] saveMessagePage", err));
     // Advance the room cursor to the newest updated_at just persisted (§17 C5)
     advanceMessageCursors(rows);
+    // Reconcile the search index for the same window (Phase 8B §6) — beside the
+    // cursor seam, fire-and-forget, flag-gated inside the indexer.
+    void searchIndexer.applyPage(roomId, rows);
   },
 
   /** Upsert individual messages (older pages, realtime events, confirmed sends). */
@@ -132,6 +136,9 @@ export const cacheService = {
     // Every ingest point funnels through here, so this single call makes all
     // user-visible mutations advance the cursor (Invariant #5, §17 C5)
     advanceMessageCursors(rows);
+    // …and index the same batch for local search (Phase 8B §6) — the indexer
+    // rides this exact seam, fire-and-forget, flag-gated internally.
+    void searchIndexer.apply(rows);
   },
 
   /** Remove one message from the cache (hard delete / undo send). */
@@ -141,6 +148,9 @@ export const cacheService = {
     void repos.messages
       .deleteById(messageId)
       .catch((err) => console.error("[cacheService] deleteMessage", err));
+    // Evict from the search index too (Phase 8B §6) — matches the RPC's
+    // deleted_at filter so a recalled message never surfaces.
+    void searchIndexer.remove(messageId);
   },
 
   /** Cap a room's persisted history (disk trim after a delta apply). */
@@ -150,6 +160,9 @@ export const cacheService = {
     void repos.messages
       .pruneRoom(roomId, keep)
       .catch((err) => console.error("[cacheService] pruneRoom", err));
+    // Prune the index in lockstep so it never indexes more than the cache holds
+    // (Phase 8B §2.2 r4 — the index is bounded by the cache by construction).
+    void searchIndexer.pruneRoom(roomId, keep);
   },
 
   // -------------------------------------------------------------------------

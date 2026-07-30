@@ -160,6 +160,37 @@ export const MEDIA_DOWNLOAD_CACHE_MAX_BYTES = 256 * 1024 * 1024;
 export const IMAGE_PREFETCH_COUNT = 10;
 
 // ============================================
+// Local search & indexing (Phase 8A/8B)
+// ============================================
+
+// Master flag. false ⇒ searchService.searchMessages delegates to today's
+// server search_messages RPC byte-for-byte (online-only, no index reads); the
+// v5 index tables may exist on disk but are never queried. true ⇒ search runs
+// local-first over the SQLite FTS5 index (offline, ranked, highlighted),
+// falling back to the RPC only when the cache/FTS is unavailable. INDEPENDENT
+// of every other feature flag — toggling search can never change delivery,
+// sync, or media behavior. Rollback = flip false.
+export const FEATURE_LOCAL_SEARCH = false;
+// Below this trimmed-query length FTS prefix terms are skipped and the service
+// falls back to a bounded local LIKE scan over search_index.text (§5.3).
+export const SEARCH_MIN_TOKEN_LEN = 2;
+// FTS5 snippet() window width (tokens) for the result preview line (§10).
+export const SEARCH_SNIPPET_TOKENS = 10;
+// Ranking blend weights (§8): score = w_bm25*bm25 − w_recency*recency_boost −
+// w_room*(in scoped room). bm25 is negative (lower = better), so lower score
+// ranks first. w_bm25=1,w_recency=0 ⇒ relevance-only; w_bm25=0 ⇒ recency-only.
+export const SEARCH_RANK_W_BM25 = 1;
+export const SEARCH_RANK_W_RECENCY = 0.3;
+export const SEARCH_RANK_W_ROOM = 2;
+// Boot coverage-repair chunk size (§16.2): re-index at most this many
+// missing/stale rows per pass so a large cache never blocks first paint.
+export const SEARCH_REPAIR_BATCH = 500;
+// Tokenizer/column fingerprint stored in meta['search_schema_hash']; a mismatch
+// on boot triggers a rebuild so a future tokenizer change can't serve a stale
+// index (§16.4).
+export const SEARCH_SCHEMA_VERSION = "fts5:unicode61-rd2:cols=text,media_text:v1";
+
+// ============================================
 // 1:1 Calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 
