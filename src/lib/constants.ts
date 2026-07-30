@@ -1,5 +1,12 @@
 export const MESSAGES_PER_PAGE = 20;
 export const MEDIA_PER_PAGE = 30;
+// Bounded in-memory message cache (RAM tier only — no persistence).
+// Active room holds up to MESSAGE_WINDOW_SIZE messages; leaving a room trims
+// it to ROOM_CACHE_TRIM_SIZE (still an instant re-open paint); at most
+// MAX_CACHED_ROOMS rooms stay resident — least-recently-used are evicted.
+export const MESSAGE_WINDOW_SIZE = 200;
+export const ROOM_CACHE_TRIM_SIZE = 50;
+export const MAX_CACHED_ROOMS = 8;
 export const PINNED_MESSAGES_LIMIT = 50;
 export const TYPING_DEBOUNCE_MS = 2000;
 export const TYPING_TIMEOUT_MS = 5000;

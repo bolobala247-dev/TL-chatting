@@ -16,7 +16,7 @@ export function useMessages(roomId: string) {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const messages = useChatStore((s) => s.messages[roomId] ?? EMPTY_MESSAGES);
-  const loading = useChatStore((s) => s.loading);
+  const loading = useChatStore((s) => s.loadingByRoom[roomId] ?? false);
   const hasMore = useChatStore((s) => s.hasMore[roomId] !== undefined ? s.hasMore[roomId] : true);
   const fetchMessages = useChatStore((s) => s.fetchMessages);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
@@ -298,7 +298,7 @@ export function useMessages(roomId: string) {
   // FlashList's onStartReached keeps its identity across message updates
   const loadMore = useCallback(() => {
     const state = useChatStore.getState();
-    if (state.loading || state.hasMore[roomId] === false) return;
+    if (state.loadingByRoom[roomId] || state.hasMore[roomId] === false) return;
     const roomMessages = state.messages[roomId] ?? EMPTY_MESSAGES;
     if (roomMessages.length === 0) return;
     const oldest = roomMessages[roomMessages.length - 1];
