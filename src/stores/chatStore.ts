@@ -33,6 +33,14 @@ interface ChatState {
   removeMessage: (messageId: string, roomId: string) => void;
   addOptimisticMessage: (message: MessageWithMeta) => void;
   replaceOptimisticMessage: (tempId: string, message: Message) => void;
+  // Outbox (Phase 5A, §11.1) — additive; flag-off never touches these.
+  // enqueueOptimistic generalizes addOptimisticMessage (RAM prepend + durable
+  // persist); markMessageSent generalizes replaceOptimisticMessage (adopt the
+  // server row, clear the send-state annotation); markMessageFailed parks the
+  // RAM row as failed (durable state is written by the worker via the repo).
+  enqueueOptimistic: (message: MessageWithMeta) => void;
+  markMessageSent: (serverRow: Message) => void;
+  markMessageFailed: (id: string) => void;
   // Dumb setter for the incremental-sync path (Phase 4): syncService merges
   // the server delta (repository-owned merge) then hands back the finished
   // window. The store just swaps the array — no merge logic lives here.
@@ -316,6 +324,73 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // The send is confirmed server-side — safe to persist (upsert dedups
     // against the realtime echo)
     cacheService.saveMessages([message]);
+  },
+
+  // Outbox enqueue (Phase 5A, §11.1 / §13.1): prepend the optimistic send AND
+  // persist it durably (message row status=pending + outbox row, one txn), so
+  // it survives a restart and renders "đang gửi". The id is the final client
+  // UUID (no temp-), so echo/ACK/merge all reconcile to this same row.
+  enqueueOptimistic: (message) => {
+    const pending: MessageWithMeta = { ...message, outbox_status: "pending" };
+    set((state) => {
+      const rows = state.messages[pending.room_id] ?? [];
+      // Retry re-enters PENDING for a row already on screen (§13.4): patch it
+      // in place (same id) so we never duplicate the bubble. A first send has
+      // no such row → prepend the fresh optimistic one.
+      const exists = rows.some((m) => m.id === pending.id);
+      return withRoomMessages(
+        state,
+        pending.room_id,
+        exists
+          ? rows.map((m) => (m.id === pending.id ? { ...m, ...pending } : m))
+          : [pending, ...rows]
+      );
+    });
+    // created_at is the authoring instant (the ordering key); the repository
+    // applies the monotonic per-room guard (§6.3) and INSERT-OR-REPLACEs the
+    // outbox row so a retry resets attempts=0/state=pending. Never-throw (F9/F10).
+    void cacheService.enqueueOutbox(
+      pending,
+      pending.created_at ?? new Date().toISOString()
+    );
+  },
+
+  // ACK (§4.2): adopt the server row and drop the send-state annotation. Keyed
+  // by id; a no-op when the row is gone (discarded) — and idempotent if the
+  // realtime echo already promoted it (same id). RAM only: the durable
+  // status=sent + outbox-row deletion is done by cacheService.markOutboxSent.
+  markMessageSent: (serverRow) => {
+    set((state) =>
+      withPatchedMessage(state, serverRow.room_id, serverRow.id, (m) => ({
+        ...serverRow,
+        // Server INSERT row carries no embeds; keep any local meta
+        message_reactions: m.message_reactions,
+        poll_votes: m.poll_votes,
+        // outbox_status intentionally absent → renders as a normal sent bubble
+      }))
+    );
+  },
+
+  // Park a send as FAILED in RAM (§11.1). Durable state (messages.status +
+  // outbox.state) is written by the worker via cacheService.markOutboxFailed;
+  // this only flips the render annotation. Scans rooms since only the id is
+  // known (the failed path is rare and user-visible).
+  markMessageFailed: (id) => {
+    set((state) => {
+      for (const roomId of Object.keys(state.messages)) {
+        const rows = state.messages[roomId];
+        if (rows.some((m) => m.id === id)) {
+          return withRoomMessages(
+            state,
+            roomId,
+            rows.map((m) =>
+              m.id === id ? { ...m, outbox_status: "failed" } : m
+            )
+          );
+        }
+      }
+      return state;
+    });
   },
 
   // Swap in the already-merged window from the incremental-sync path. The

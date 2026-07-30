@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as Crypto from "expo-crypto";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -7,7 +8,9 @@ import { reactionService } from "@/src/services/reactionService";
 import { pollService } from "@/src/services/pollService";
 import { roomService } from "@/src/services/roomService";
 import { syncService } from "@/src/services/syncService";
-import { UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
+import { outboxService } from "@/src/services/outboxService";
+import { cacheService } from "@/src/services/cacheService";
+import { FEATURE_OFFLINE_OUTBOX, UNDO_SEND_WINDOW_MS } from "@/src/lib/constants";
 import { useRealtimeMessages } from "./useRealtime";
 import type { Message, MessageMention, MessageWithMeta } from "@/src/types";
 
@@ -21,6 +24,7 @@ export function useMessages(roomId: string) {
   const hasMore = useChatStore((s) => s.hasMore[roomId] !== undefined ? s.hasMore[roomId] : true);
   const setActiveRoom = useChatStore((s) => s.setActiveRoom);
   const addOptimisticMessage = useChatStore((s) => s.addOptimisticMessage);
+  const enqueueOptimistic = useChatStore((s) => s.enqueueOptimistic);
   const replaceOptimisticMessage = useChatStore(
     (s) => s.replaceOptimisticMessage
   );
@@ -72,6 +76,38 @@ export function useMessages(roomId: string) {
 
       // Tagged users ride along in metadata (no schema change)
       const metadata = mentions?.length ? { mentions } : null;
+
+      // Flag on (§2, §11.1): durable, idempotent outbox path. The client mints
+      // the FINAL id (a v4 UUID = the idempotency key — no temp- swap); the
+      // message persists PENDING (survives restart, renders "đang gửi") and the
+      // worker delivers it. No remove-on-error: a failed send parks as FAILED
+      // with a retry/delete affordance (§11), the outbox worker owns delivery.
+      if (FEATURE_OFFLINE_OUTBOX) {
+        const now = new Date().toISOString();
+        const optimistic: MessageWithMeta = {
+          id: Crypto.randomUUID(),
+          room_id: roomId,
+          sender_id: user.id,
+          content: content.trim(),
+          type: "text",
+          media_url: null,
+          reply_to: null,
+          thread_id: null,
+          is_edited: false,
+          pinned_at: null,
+          pinned_by: null,
+          deleted_at: null,
+          deleted_by: null,
+          has_link: null,
+          attachments: null,
+          metadata: metadata as any,
+          created_at: now,
+          updated_at: now,
+        };
+        enqueueOptimistic(optimistic);
+        outboxService.poke();
+        return;
+      }
 
       const tempId = `temp-${Date.now()}`;
       const optimistic: Message = {
@@ -187,6 +223,37 @@ export function useMessages(roomId: string) {
   const sendPoll = useCallback(
     async (question: string, options: string[]) => {
       if (!user || !question.trim() || options.length < 2) return;
+
+      // Flag on: poll sends are durable too (§0 — text + poll are in scope). A
+      // poll is just a message row (type='poll', metadata carries the question
+      // + options), so the same idempotent outbox path applies.
+      if (FEATURE_OFFLINE_OUTBOX) {
+        const now = new Date().toISOString();
+        const optimistic: MessageWithMeta = {
+          id: Crypto.randomUUID(),
+          room_id: roomId,
+          sender_id: user.id,
+          content: question.trim(),
+          type: "poll",
+          media_url: null,
+          reply_to: null,
+          thread_id: null,
+          is_edited: false,
+          pinned_at: null,
+          pinned_by: null,
+          deleted_at: null,
+          deleted_by: null,
+          has_link: null,
+          attachments: null,
+          metadata: { question: question.trim(), options } as any,
+          created_at: now,
+          updated_at: now,
+          poll_votes: [],
+        };
+        enqueueOptimistic(optimistic);
+        outboxService.poke();
+        return;
+      }
 
       const tempId = `temp-${Date.now()}`;
       const optimistic: MessageWithMeta = {
@@ -308,6 +375,28 @@ export function useMessages(roomId: string) {
     state.fetchMessages(roomId, oldest.created_at ?? undefined);
   }, [roomId]);
 
+  // Retry a FAILED send (§13.4): re-enter PENDING with the SAME id (the
+  // idempotency key never changes) so the server returns the existing row if it
+  // slipped through earlier — never a duplicate. enqueueOptimistic patches the
+  // bubble back to pending and INSERT-OR-REPLACEs the outbox row (attempts=0,
+  // state=pending); the poke drives delivery.
+  const retryMessage = useCallback((message: MessageWithMeta) => {
+    if (!FEATURE_OFFLINE_OUTBOX) return;
+    enqueueOptimistic(message);
+    outboxService.poke();
+  }, []);
+
+  // Discard a PENDING/FAILED send (§7.4, §11.1): remove it locally (RAM +
+  // message row + outbox row). It was never accepted by the server, so there is
+  // nothing to recall — no network op.
+  const discardMessage = useCallback(
+    (message: MessageWithMeta) => {
+      removeMessage(message.id, roomId);
+      void cacheService.removeOutbox(message.id);
+    },
+    [roomId]
+  );
+
   return {
     messages,
     loading,
@@ -320,5 +409,7 @@ export function useMessages(roomId: string) {
     loadMore,
     undoableMessage,
     undoSend,
+    retryMessage,
+    discardMessage,
   };
 }

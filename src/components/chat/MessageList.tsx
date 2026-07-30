@@ -25,6 +25,10 @@ interface MessageListProps {
   onOpenAlbum?: (message: MessageWithMeta, index: number) => void;
   onVote?: (message: MessageWithMeta, optionIndex: number) => void;
   onViewVoters?: (message: MessageWithMeta) => void;
+  /** Re-attempt a failed send (Phase 5A outbox). */
+  onRetryMessage?: (message: MessageWithMeta) => void;
+  /** Discard a pending/failed send (Phase 5A outbox). */
+  onDiscardMessage?: (message: MessageWithMeta) => void;
 }
 
 // Memoized: the chat screen re-renders on every composer keystroke; stable
@@ -43,6 +47,8 @@ export const MessageList = memo(function MessageList({
   onOpenAlbum,
   onVote,
   onViewVoters,
+  onRetryMessage,
+  onDiscardMessage,
 }: MessageListProps) {
   const { t } = useTranslation("chat");
   const colors = useThemeColors();
@@ -75,6 +81,8 @@ export const MessageList = memo(function MessageList({
         onOpenAlbum={onOpenAlbum}
         onVote={onVote}
         onViewVoters={onViewVoters}
+        onRetry={onRetryMessage}
+        onDiscard={onDiscardMessage}
       />
     ),
     [
@@ -87,6 +95,8 @@ export const MessageList = memo(function MessageList({
       onOpenAlbum,
       onVote,
       onViewVoters,
+      onRetryMessage,
+      onDiscardMessage,
     ]
   );
 

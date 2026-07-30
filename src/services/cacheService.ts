@@ -1,6 +1,11 @@
 import { databaseService } from "@/src/services/databaseService";
 import { mergeMessageWindow } from "@/src/db/repositories/merge";
-import type { MessageWithMeta, RoomWithLastMessage, SyncState } from "@/src/types";
+import type {
+  MessageWithMeta,
+  OutboxItem,
+  RoomWithLastMessage,
+  SyncState,
+} from "@/src/types";
 
 /**
  * Domain-facing facade over the local cache (Phase 3 — hydration).
@@ -185,6 +190,98 @@ export const cacheService = {
     cap: number
   ): MessageWithMeta[] {
     return mergeMessageWindow(existing, incoming, cap);
+  },
+
+  // -------------------------------------------------------------------------
+  // Outbox (Phase 5A) — durable send queue, never-throw wrappers
+  // -------------------------------------------------------------------------
+  //
+  // 1:1 facade over OutboxRepository so the service/store layers never import
+  // src/db/* directly. Writes never throw: if the cache is unavailable (web,
+  // init failure) or a write fails, the send degrades to today's in-RAM
+  // optimistic behavior (F9/F10) — the message still shows, just without
+  // durability. Reads return [] when unavailable.
+
+  /** Persist a pending send (message row status=pending + outbox row, one txn). */
+  async enqueueOutbox(message: MessageWithMeta, createdAt: string): Promise<void> {
+    const repos = databaseService.repositories;
+    if (!repos) return;
+    try {
+      await repos.outbox.enqueue(message, createdAt);
+    } catch (err) {
+      console.error("[cacheService] enqueueOutbox", err);
+    }
+  },
+
+  /** Every outbox item (pending + failed), FIFO by created_at; [] when
+   * unavailable. The one enumeration the worker drains head-first (§3.2) and
+   * resume() rebuilds timers from (§8.1). */
+  async listOutboxAll(): Promise<OutboxItem[]> {
+    const repos = databaseService.repositories;
+    if (!repos) return [];
+    try {
+      return await repos.outbox.listAll();
+    } catch (err) {
+      console.error("[cacheService] listOutboxAll", err);
+      return [];
+    }
+  },
+
+  /** ACK: adopt the server row (status=sent) + delete the outbox row, one txn. */
+  async markOutboxSent(id: string, serverRow: MessageWithMeta): Promise<void> {
+    const repos = databaseService.repositories;
+    if (!repos) return;
+    try {
+      await repos.outbox.markSent(id, serverRow);
+      // Adopting the server row is the one outbox transition that advances the
+      // messages sync cursor (§9.2): un-ACKed rows never do, so a pending local
+      // row can't poison the server-authored delta cursor (Invariant #4).
+      advanceMessageCursors([serverRow]);
+    } catch (err) {
+      console.error("[cacheService] markOutboxSent", err);
+    }
+  },
+
+  /** Park a send as FAILED (message.status=failed + outbox.state=failed). */
+  async markOutboxFailed(
+    id: string,
+    error: string,
+    permanent: boolean
+  ): Promise<void> {
+    const repos = databaseService.repositories;
+    if (!repos) return;
+    try {
+      await repos.outbox.markFailed(id, error, permanent);
+    } catch (err) {
+      console.error("[cacheService] markOutboxFailed", err);
+    }
+  },
+
+  /** Transient retry: bump attempts + persist next_attempt_at (stays pending). */
+  async rescheduleOutbox(
+    id: string,
+    attempts: number,
+    nextAttemptAt: string,
+    error: string
+  ): Promise<void> {
+    const repos = databaseService.repositories;
+    if (!repos) return;
+    try {
+      await repos.outbox.reschedule(id, attempts, nextAttemptAt, error);
+    } catch (err) {
+      console.error("[cacheService] rescheduleOutbox", err);
+    }
+  },
+
+  /** Discard a pending/failed send: delete the message row + outbox row, one txn. */
+  async removeOutbox(id: string): Promise<void> {
+    const repos = databaseService.repositories;
+    if (!repos) return;
+    try {
+      await repos.outbox.remove(id);
+    } catch (err) {
+      console.error("[cacheService] removeOutbox", err);
+    }
   },
 
   // -------------------------------------------------------------------------

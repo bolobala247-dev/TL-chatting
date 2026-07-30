@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { initI18n } from "@/src/i18n";
 import { databaseService } from "@/src/services/databaseService";
+import { outboxService } from "@/src/services/outboxService";
 import { ThemeProvider, useTheme, useThemeBootstrap, useThemeColors } from "@/src/theme";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useNotifications } from "@/src/hooks/useNotifications";
@@ -53,6 +54,14 @@ function AuthGate() {
       router.replace("/(tabs)");
     }
   }, [session, initialized, segments]);
+
+  // Restart recovery (§8.1): once the DB is migrated and a session is restored,
+  // rebuild the outbox schedule and drive any due sends. No-op when the flag is
+  // off or the outbox is empty; safe to re-run on session changes.
+  useEffect(() => {
+    if (!session || !initialized) return;
+    void outboxService.resume();
+  }, [session, initialized]);
 
   if (!initialized) {
     return <Spinner fullScreen />;

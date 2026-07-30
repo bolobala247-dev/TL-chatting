@@ -10,6 +10,8 @@ import { supabase } from "@/src/lib/supabase";
 import { profileService } from "@/src/services/profileService";
 import { pushTokenService } from "@/src/services/pushTokenService";
 import { cacheService } from "@/src/services/cacheService";
+import { outboxService } from "@/src/services/outboxService";
+import { OUTBOX_LOGOUT_DRAIN_MS } from "@/src/lib/constants";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
@@ -169,7 +171,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useRoomStore.getState().reset();
     usePrivacyStore.getState().reset();
     // Cached plaintext must not survive an account switch: close + delete
-    // the SQLite file, then reopen an empty one (cacheService never throws)
+    // the SQLite file, then reopen an empty one (cacheService never throws).
+    // First, best-effort drain the outbox (§8.3) so a logout doesn't silently
+    // discard unsent messages; bounded so a flaky network can't block sign-out.
+    await Promise.race([
+      outboxService.resume(),
+      new Promise<void>((resolve) => setTimeout(resolve, OUTBOX_LOGOUT_DRAIN_MS)),
+    ]);
     await cacheService.wipe();
     set({ session: null, user: null, profile: null });
   },
