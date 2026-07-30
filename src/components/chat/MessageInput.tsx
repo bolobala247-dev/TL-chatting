@@ -1,5 +1,12 @@
 import { useRef } from "react";
-import { View, TextInput, Pressable, Platform } from "react-native";
+import {
+  View,
+  TextInput,
+  Pressable,
+  Platform,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/src/components/ui/Icon";
 import { useThemeColors } from "@/src/theme";
@@ -57,6 +64,16 @@ export function MessageInput({
     endTyping();
   };
 
+  // Web: Enter gửi tin, Shift+Enter mới xuống dòng.
+  const handleKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    if (Platform.OS !== "web") return;
+    const native = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean };
+    if (native.key === "Enter" && !native.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const handleLongPressSend = () => {
     if (!value.trim() || !onLongPressSend) return;
     onLongPressSend(value.trim());
@@ -86,6 +103,7 @@ export function MessageInput({
       <View className="min-h-[36px] flex-1 justify-center rounded-2xl bg-surface-secondary px-4 py-2">
         <TextInput
           className="max-h-24 font-sans text-body leading-5 text-fg"
+          style={Platform.OS === "web" ? ({ outlineStyle: "none" } as never) : undefined}
           placeholder={t("input.placeholder")}
           placeholderTextColor={colors.placeholder}
           value={value}
@@ -94,7 +112,7 @@ export function MessageInput({
           textAlignVertical="center"
           returnKeyType="default"
           submitBehavior="newline"
-          onSubmitEditing={Platform.OS === "web" ? handleSend : undefined}
+          onKeyPress={handleKeyPress}
         />
       </View>
 

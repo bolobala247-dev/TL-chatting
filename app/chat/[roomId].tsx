@@ -49,7 +49,6 @@ import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
 import { PinnedMessagesSheet } from "@/src/components/chat/PinnedMessagesSheet";
 import { ScheduleSheet } from "@/src/components/chat/ScheduleSheet";
 import { ScheduledMessagesSheet } from "@/src/components/chat/ScheduledMessagesSheet";
-import { UndoSendBar } from "@/src/components/chat/UndoSendBar";
 import { ContactInfoSheet } from "@/src/components/chat/ContactInfoSheet";
 import { ReportUserSheet } from "@/src/components/chat/ReportUserSheet";
 import { Icon } from "@/src/components/ui/Icon";
@@ -77,8 +76,6 @@ export default function ChatScreen() {
     toggleReaction,
     votePoll,
     loadMore,
-    undoableMessage,
-    undoSend,
   } = useMessages(roomId!);
   const { typingUsers, startTyping, stopTyping } = useTypingIndicator(roomId!);
 
@@ -387,15 +384,6 @@ export default function ChatScreen() {
     [user, t]
   );
 
-  const handleUndo = useCallback(async () => {
-    try {
-      const recalled = await undoSend();
-      if (recalled) updateInputText(recalled);
-    } catch {
-      setChatError(t("undo.failed"));
-    }
-  }, [undoSend, updateInputText, t]);
-
   const handleLongPressSend = useCallback(
     (content: string) => {
       setScheduleDraft(content);
@@ -610,7 +598,6 @@ export default function ChatScreen() {
       </View>
 
       <Animated.View style={composerInsetStyle}>
-        <UndoSendBar visible={!!undoableMessage} onUndo={handleUndo} />
         <TypingIndicator typingUsers={typingUsers} />
         {chatError ? (
           <View className="border-t border-divider bg-danger-bg px-4 py-2">
