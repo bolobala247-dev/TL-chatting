@@ -56,7 +56,8 @@
           "cameraPermission": "Talo cần quyền truy cập camera cho cuộc gọi video.",
           "microphonePermission": "Talo cần quyền truy cập micro cho cuộc gọi thoại."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
