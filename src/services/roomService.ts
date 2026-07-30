@@ -148,35 +148,24 @@ export const roomService = {
     userId1: string,
     userId2: string
   ): Promise<Room | null> {
+    // Both memberships filtered server-side via aliased !inner embeds:
+    // one round trip instead of fetching every direct room (with all
+    // participants) and scanning client-side
     const { data } = await supabase
-      .from("room_participants")
-      .select("room_id")
-      .eq("user_id", userId1);
-
-    if (!data?.length) return null;
-
-    const roomIds = data.map((p) => p.room_id);
-
-    const { data: rooms } = await supabase
       .from("rooms")
-      .select("*, room_participants!inner(*)")
-      .in("id", roomIds)
-      .eq("type", "direct");
+      .select(
+        "*, mine:room_participants!inner(user_id), theirs:room_participants!inner(user_id)"
+      )
+      .eq("type", "direct")
+      .eq("mine.user_id", userId1)
+      .eq("theirs.user_id", userId2)
+      .limit(1);
 
-    if (!rooms) return null;
+    const room = data?.[0];
+    if (!room) return null;
 
-    for (const room of rooms) {
-      const participants = (room as any).room_participants as Array<{
-        user_id: string;
-      }>;
-      const hasOtherUser = participants.some((p) => p.user_id === userId2);
-      if (hasOtherUser) {
-        const { room_participants: _, ...roomWithout } = room as any;
-        return roomWithout;
-      }
-    }
-
-    return null;
+    const { mine: _m, theirs: _t, ...roomWithout } = room as any;
+    return roomWithout as Room;
   },
 
   async getRoomParticipants(
