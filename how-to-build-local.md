@@ -1,14 +1,35 @@
 # Hướng dẫn build APK local (không dùng lượt EAS cloud)
 
 > Áp dụng khi hết lượt build trên EAS cloud. Build ngay trên máy Mac, ra file APK y hệt bản build cloud.
+> ✅ **Đã setup xong và build thành công lần đầu ngày 30/07/2026** (versionCode 15, APK 79MB, ~19 phút Gradle).
 
-## Trạng thái máy đã kiểm tra (07/2026)
+## Build lần sau — chỉ cần 1 lệnh
+
+Môi trường đã cài đặt đầy đủ, chỉ cần chạy:
+
+```bash
+eas build --platform android --profile production --local
+```
+
+- APK xuất ra tại thư mục gốc project, dạng `build-xxxxxxxxxx.apk` (đã có `*.apk` trong `.gitignore`).
+- Các lần build sau nhanh hơn lần đầu nhiều nhờ Gradle cache.
+- Muốn build bản preview: đổi `--profile production` thành `--profile preview`.
+
+**Cài APK lên máy Android:**
+- Copy file APK qua điện thoại rồi mở để cài, hoặc
+- Cắm cáp USB (bật USB debugging): `adb install build-xxxxxxxxxx.apk`
+
+---
+
+## Trạng thái máy (cập nhật 30/07/2026)
 
 | Thành phần | Trạng thái |
 |---|---|
 | JDK 17 (Homebrew) | ✅ Đã có |
 | EAS CLI 20.5.1 | ✅ Đã có |
-| Android SDK | ❌ Chưa có — cần cài (Bước 1–3) |
+| Android SDK (`~/Library/Android/sdk`) | ✅ Đã cài (30/07/2026) |
+| platform-tools, android-36, build-tools 36.0.0, NDK 27.1.12297006 | ✅ Đã cài, license đã chấp nhận |
+| `ANDROID_HOME` trong `~/.zshrc` | ✅ Đã cấu hình |
 | Thư mục `android/` (đã prebuild) | ✅ Đã có |
 
 ---
@@ -20,12 +41,11 @@ Chạy đúng pipeline EAS ngay trên máy:
 - ✅ **Không tốn lượt build** trên EAS cloud
 - ✅ Tự tải **keystore production từ server EAS** về để ký → APK có **cùng chữ ký** với các bản đã phát hành, người dùng cài đè được
 - ✅ Tự dùng env vars trong `eas.json` (Supabase URL/key production)
+- ✅ Tự tăng versionCode (appVersionSource: remote)
 
 ```bash
 eas build --platform android --profile production --local
 ```
-
-APK xuất ra ngay tại thư mục gốc project, dạng `build-xxxxxxxxxx.apk`.
 
 ## Cách 2: Gradle trực tiếp
 
@@ -40,7 +60,7 @@ Muốn dùng cách này đúng chuẩn, chạy `eas credentials` trước để 
 
 ---
 
-## Các bước cài đặt (bắt buộc trước lần build đầu tiên)
+## Các bước cài đặt lần đầu (✅ ĐÃ HOÀN THÀNH — chỉ cần làm lại nếu đổi máy)
 
 ### Bước 1: Cài Android SDK qua Homebrew (không cần Android Studio)
 
@@ -70,6 +90,8 @@ sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-36" "bui
 sdkmanager --sdk_root=$ANDROID_HOME --licenses
 ```
 
+(CMake 3.22.1 sẽ được Gradle tự cài thêm trong lần build đầu.)
+
 ### Bước 4: Đăng nhập EAS (nếu chưa)
 
 ```bash
@@ -87,8 +109,9 @@ eas build --platform android --profile production --local
 
 ## Lưu ý
 
-- **Lần build đầu rất lâu** (30–60 phút): Gradle phải tải toàn bộ dependency. Các lần sau nhanh hơn nhiều nhờ cache.
+- **Lần build đầu rất lâu** (thực tế ~19 phút Gradle + thời gian tải dependency): các lần sau nhanh hơn nhiều nhờ cache.
 - **Cần ổ trống ~15–20GB** (SDK + NDK + Gradle cache).
 - Cần mạng ổn định để tải keystore từ EAS và dependency từ Maven.
-- Muốn build bản preview thay vì production: đổi `--profile production` thành `--profile preview`.
-- Không commit file APK và keystore vào git.
+- Các warning trong log build (Kotlin/Java deprecated, npm deprecated, Gradle 10 incompatible...) đều **vô hại**, không cần xử lý.
+- File `.apk`/`.aab` đã nằm trong `.gitignore` — không commit vào git.
+- Nếu gặp lỗi `SDK location not found`: shell chưa có `ANDROID_HOME` → chạy `source ~/.zshrc` hoặc mở terminal mới.
