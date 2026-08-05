@@ -11,7 +11,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { FlashList, type FlashListRef, type ViewToken } from "@shopify/flash-list";
 import { MessageBubble } from "./MessageBubble";
+import { DateSeparator } from "./DateSeparator";
 import { useAuthStore } from "@/src/stores/authStore";
+import { isSameCalendarDay } from "@/src/lib/formatDate";
 import { getSeenWatermark } from "@/src/lib/receipts";
 import { useThemeColors } from "@/src/theme";
 import type { MessageWithMeta, RoomParticipantWithProfile } from "@/src/types";
@@ -95,23 +97,35 @@ export const MessageList = memo(function MessageList({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: MessageWithMeta }) => (
-      <MessageBubble
-        message={item}
-        seenWatermark={seenWatermark}
-        showPollVoters={showPollVoters}
-        onLongPress={onMessageLongPress}
-        onSwipeReply={onSwipeReply}
-        onToggleReaction={onToggleReaction}
-        onShowReactions={onShowReactions}
-        onOpenAlbum={onOpenAlbum}
-        onVote={onVote}
-        onViewVoters={onViewVoters}
-        onRetry={onRetryMessage}
-        onDiscard={onDiscardMessage}
-      />
-    ),
+    ({ item, index }: { item: MessageWithMeta; index: number }) => {
+      const prev = index > 0 ? orderedMessages[index - 1] : null;
+      const showDate =
+        !!item.created_at &&
+        (!prev?.created_at ||
+          !isSameCalendarDay(prev.created_at, item.created_at));
+
+      return (
+        <>
+          {showDate ? <DateSeparator dateStr={item.created_at!} /> : null}
+          <MessageBubble
+            message={item}
+            seenWatermark={seenWatermark}
+            showPollVoters={showPollVoters}
+            onLongPress={onMessageLongPress}
+            onSwipeReply={onSwipeReply}
+            onToggleReaction={onToggleReaction}
+            onShowReactions={onShowReactions}
+            onOpenAlbum={onOpenAlbum}
+            onVote={onVote}
+            onViewVoters={onViewVoters}
+            onRetry={onRetryMessage}
+            onDiscard={onDiscardMessage}
+          />
+        </>
+      );
+    },
     [
+      orderedMessages,
       seenWatermark,
       showPollVoters,
       onMessageLongPress,

@@ -93,6 +93,8 @@
     "deleted": "Tin nhắn đã bị thu hồi",
     "emptyTitle": "Chưa có tin nhắn nào",
     "emptyCta": "Hãy bắt đầu cuộc trò chuyện!",
+    "dateToday": "Hôm nay",
+    "dateYesterday": "Hôm qua",
     "editTitle": "Chỉnh sửa tin nhắn",
     "editEmpty": "Nội dung tin nhắn không được để trống",
     "editFailed": "Không thể chỉnh sửa tin nhắn",

@@ -98,6 +98,8 @@
     "deleted": "This message was deleted",
     "emptyTitle": "No messages yet",
     "emptyCta": "Start the conversation!",
+    "dateToday": "Today",
+    "dateYesterday": "Yesterday",
     "editTitle": "Edit message",
     "editEmpty": "Message cannot be empty",
     "editFailed": "Couldn't edit the message",
