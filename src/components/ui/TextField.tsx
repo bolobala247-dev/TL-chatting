@@ -10,7 +10,13 @@ interface TextFieldProps extends TextInputProps {
   /** Trailing element inside the field (e.g. password visibility toggle). */
   rightSlot?: ReactNode;
   containerClassName?: string;
+  size?: "md" | "lg";
 }
+
+const sizeStyles = {
+  md: { input: "h-11", slot: "h-11 w-11" },
+  lg: { input: "h-12", slot: "h-12 w-12" },
+};
 
 /**
  * Canonical text input (DESIGN_SYSTEM.md §16) — consolidates the input
@@ -23,6 +29,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
       error,
       rightSlot,
       containerClassName,
+      size = "lg",
       onFocus,
       onBlur,
       ...props
@@ -31,6 +38,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
   ) {
     const colors = useThemeColors();
     const [focused, setFocused] = useState(false);
+    const sizes = sizeStyles[size];
 
     const borderClass = error
       ? "border-danger"
@@ -48,7 +56,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
         <View className="relative">
           <TextInput
             ref={ref}
-            className={`h-12 rounded-xl border bg-surface-secondary px-4 font-sans text-body text-fg ${borderClass} ${rightSlot ? "pr-12" : ""}`}
+            className={`${sizes.input} rounded-xl border bg-surface-secondary px-4 font-sans text-body text-fg ${borderClass} ${rightSlot ? "pr-12" : ""}`}
             placeholderTextColor={colors.placeholder}
             onFocus={(e) => {
               setFocused(true);
@@ -61,7 +69,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
             {...props}
           />
           {rightSlot ? (
-            <View className="absolute right-0 top-0 h-12 w-12 items-center justify-center">
+            <View className={`absolute right-0 top-0 items-center justify-center ${sizes.slot}`}>
               {rightSlot}
             </View>
           ) : null}
