@@ -1,10 +1,19 @@
-import { Modal, View, Text } from "react-native";
+import { Modal, Platform, View, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { useLockBodyScroll } from "@/src/hooks/useLockBodyScroll";
 import { useCallStore } from "@/src/stores/callStore";
 import type { CallPhase } from "@/src/stores/callStore";
 import type { CallStatus } from "@/src/types";
+import {
+  callColumnStyle,
+  callControlsDockStyle,
+  callIdentityStyle,
+  callMainStyle,
+  callRootStyle,
+  callVideoHeaderStyle,
+} from "./callLayout";
 import { VideoStream } from "./VideoStream";
 import { RemoteVideo } from "./RemoteVideo";
 import { CallControls } from "./CallControls";
@@ -49,27 +58,41 @@ export function CallScreen() {
   const isFrontCamera = useCallStore((s) => s.isFrontCamera);
   const connectedAt = useCallStore((s) => s.connectedAt);
 
+  useLockBodyScroll(true);
+
   const isVideo = callType === "video";
   const showRemoteVideo =
     isVideo && phase === "connected" && !!remoteStream;
   const showLocalVideo = isVideo && cameraEnabled && !!localStream;
   const connected = phase === "connected" && connectedAt != null;
+  const showCenteredIdentity = !showRemoteVideo;
+  const controlsBottomInset = insets.bottom + 24;
 
   return (
     <Modal
       visible
-      animationType="fade"
+      animationType={Platform.OS === "web" ? "none" : "fade"}
+      transparent={Platform.OS === "web"}
       statusBarTranslucent
       onRequestClose={() => {}}
     >
-      <View className="flex-1 bg-black">
+      <View style={callRootStyle()}>
         {/* Remote video fills the screen once media is flowing */}
         {showRemoteVideo && (
-          <View className="absolute inset-0">
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              overflow: "hidden",
+            }}
+          >
             <RemoteVideo
               stream={remoteStream}
               objectFit="cover"
-              style={{ flex: 1 }}
+              style={{ flex: 1, width: "100%", height: "100%" }}
             />
           </View>
         )}
@@ -86,39 +109,57 @@ export function CallScreen() {
           </View>
         )}
 
-        <View
-          className="flex-1"
-          style={{
-            paddingTop: insets.top + 16,
-            paddingBottom: insets.bottom + 24,
-          }}
-        >
-          {/* Peer identity + call status */}
-          <View className="items-center px-6">
-            {!showRemoteVideo && (
-              <View className="mb-6 mt-8">
+        <View style={callColumnStyle()}>
+          <View
+            style={[
+              callMainStyle(),
+              { paddingTop: insets.top + 16 },
+            ]}
+          >
+            {showCenteredIdentity ? (
+              <View style={callIdentityStyle()}>
                 <Avatar uri={peer?.avatar} name={peer?.name} size={112} />
+                <Text
+                  className="mt-6 font-sans-semibold text-headline text-white"
+                  numberOfLines={1}
+                >
+                  {peer?.name}
+                </Text>
+                {connected ? (
+                  <CallTimer
+                    connectedAt={connectedAt!}
+                    className="mt-1 font-sans text-body text-white/70"
+                  />
+                ) : (
+                  <Text className="mt-1 font-sans text-body text-white/70">
+                    {statusLabel(t, phase, direction, endReason)}
+                  </Text>
+                )}
               </View>
-            )}
-            <Text
-              className="font-sans-semibold text-headline text-white"
-              numberOfLines={1}
-            >
-              {peer?.name}
-            </Text>
-            {connected ? (
-              <CallTimer
-                connectedAt={connectedAt!}
-                className="mt-1 font-sans text-body text-white/70"
-              />
             ) : (
-              <Text className="mt-1 font-sans text-body text-white/70">
-                {statusLabel(t, phase, direction, endReason)}
-              </Text>
+              <>
+                <View style={callVideoHeaderStyle()}>
+                  <Text
+                    className="font-sans-semibold text-headline text-white"
+                    numberOfLines={1}
+                  >
+                    {peer?.name}
+                  </Text>
+                  {connected ? (
+                    <CallTimer
+                      connectedAt={connectedAt!}
+                      className="mt-1 font-sans text-body text-white/70"
+                    />
+                  ) : (
+                    <Text className="mt-1 font-sans text-body text-white/70">
+                      {statusLabel(t, phase, direction, endReason)}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1 }} />
+              </>
             )}
           </View>
-
-          <View className="flex-1" />
 
           {/* Self-view — pinned top-right, mirrored for the front camera */}
           {showLocalVideo && (
@@ -135,7 +176,11 @@ export function CallScreen() {
             </View>
           )}
 
-          {phase !== "ended" && <CallControls />}
+          {phase !== "ended" && (
+            <View style={callControlsDockStyle(controlsBottomInset)}>
+              <CallControls />
+            </View>
+          )}
         </View>
       </View>
     </Modal>

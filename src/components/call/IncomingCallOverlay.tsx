@@ -1,9 +1,18 @@
-import { Modal, View, Text, Pressable } from "react-native";
+import { Modal, Platform, View, Text, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
+import { useLockBodyScroll } from "@/src/hooks/useLockBodyScroll";
 import { useCallStore } from "@/src/stores/callStore";
+import {
+  callAnswerRowStyle,
+  callColumnStyle,
+  callControlsDockStyle,
+  callIdentityStyle,
+  callMainStyle,
+  callRootStyle,
+} from "./callLayout";
 
 // Immersive dark surface → fixed white icon tint (not a theme tone).
 const ICON_LIGHT = "#FFFFFF";
@@ -44,53 +53,63 @@ export function IncomingCallOverlay() {
   const acceptCall = useCallStore((s) => s.acceptCall);
   const declineCall = useCallStore((s) => s.declineCall);
 
+  useLockBodyScroll(true);
+
   const isVideo = callType === "video";
+  const controlsBottomInset = Math.max(insets.bottom, 16) + 8;
 
   return (
     <Modal
       visible
-      animationType="slide"
+      animationType={Platform.OS === "web" ? "none" : "slide"}
+      transparent={Platform.OS === "web"}
       statusBarTranslucent
       onRequestClose={declineCall}
     >
-      <View
-        className="flex-1 bg-black"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-      >
-        <View className="flex-1 items-center justify-center px-8">
-          <Avatar uri={peer?.avatar} name={peer?.name} size={128} />
-          <Text
-            className="mt-6 font-sans-semibold text-headline text-white"
-            numberOfLines={1}
-          >
-            {peer?.name}
-          </Text>
-          <Text className="mt-2 font-sans text-body text-white/70">
-            {t(
-              isVideo
-                ? "call.status.incomingVideo"
-                : "call.status.incomingAudio"
-            )}
-          </Text>
-        </View>
+      <View style={callRootStyle()}>
+        <View
+          style={[
+            callColumnStyle(),
+            { paddingTop: insets.top },
+          ]}
+        >
+          <View style={[callMainStyle(), callIdentityStyle()]}>
+            <Avatar uri={peer?.avatar} name={peer?.name} size={128} />
+            <Text
+              className="mt-6 font-sans-semibold text-headline text-white"
+              numberOfLines={1}
+            >
+              {peer?.name}
+            </Text>
+            <Text className="mt-2 font-sans text-body text-white/70">
+              {t(
+                isVideo
+                  ? "call.status.incomingVideo"
+                  : "call.status.incomingAudio"
+              )}
+            </Text>
+          </View>
 
-        <View className="flex-row items-center justify-around px-10 pb-6">
-          <AnswerButton
-            icon={{ ios: "phone.down.fill", android: "call_end", web: "call_end" }}
-            label={t("call.actions.decline")}
-            variant="decline"
-            onPress={declineCall}
-          />
-          <AnswerButton
-            icon={
-              isVideo
-                ? { ios: "video.fill", android: "videocam", web: "videocam" }
-                : { ios: "phone.fill", android: "call", web: "call" }
-            }
-            label={t("call.actions.accept")}
-            variant="accept"
-            onPress={acceptCall}
-          />
+          <View style={callControlsDockStyle(controlsBottomInset)}>
+            <View style={callAnswerRowStyle()}>
+              <AnswerButton
+                icon={{ ios: "phone.down.fill", android: "call_end", web: "call_end" }}
+                label={t("call.actions.decline")}
+                variant="decline"
+                onPress={declineCall}
+              />
+              <AnswerButton
+                icon={
+                  isVideo
+                    ? { ios: "video.fill", android: "videocam", web: "videocam" }
+                    : { ios: "phone.fill", android: "call", web: "call" }
+                }
+                label={t("call.actions.accept")}
+                variant="accept"
+                onPress={acceptCall}
+              />
+            </View>
+          </View>
         </View>
       </View>
     </Modal>

@@ -1,10 +1,10 @@
-import { Platform } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Pressable } from "react-native";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { useTranslation } from "react-i18next";
 import { useCallStore } from "@/src/stores/callStore";
 import { PIP_SUPPORTED } from "@/src/lib/webrtc";
+import { callControlsRowStyle } from "./callLayout";
 
 // The call surface is an immersive, always-dark scene, so its icons use
 // fixed black/white rather than theme tones (which would flip in light mode).
@@ -66,12 +66,10 @@ export function CallControls() {
 
   const isVideo = callType === "video";
   const canSwitchCamera = isVideo && Platform.OS !== "web";
+  const rowStyle = callControlsRowStyle();
 
-  return (
-    <Animated.View
-      entering={FadeIn}
-      className="flex-row flex-wrap items-center justify-center gap-4 px-6"
-    >
+  const buttons = (
+    <>
       <ControlButton
         icon={
           micEnabled
@@ -144,6 +142,17 @@ export function CallControls() {
         variant="danger"
         onPress={endCall}
       />
+    </>
+  );
+
+  // Reanimated Animated.View has no NativeWind cssInterop — layout must be inline.
+  if (Platform.OS === "web") {
+    return <View style={rowStyle}>{buttons}</View>;
+  }
+
+  return (
+    <Animated.View entering={FadeIn} style={rowStyle}>
+      {buttons}
     </Animated.View>
   );
 }

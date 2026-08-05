@@ -16,6 +16,14 @@
   textarea:focus {
     outline: none;
   }
+
+  /* RN Web Modal inner container only sets flex:1 — stretch it to the viewport
+     so full-screen call surfaces layout correctly (no scrollbars / no shrink). */
+  [role="dialog"] > div {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 /*
