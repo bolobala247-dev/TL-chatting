@@ -24,8 +24,8 @@ import { scheduledMessageService } from "@/src/services/scheduledMessageService"
 import { useAuthStore } from "@/src/stores/authStore";
 import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
-import { useCallStore } from "@/src/stores/callStore";
-import { WEBRTC_SUPPORTED } from "@/src/lib/webrtc";
+import { useVoiceCallStore } from "@/src/stores/voiceCallStore";
+import { VOICE_CALL_SUPPORTED } from "@/src/lib/voiceCall";
 import { useDraftStore } from "@/src/stores/draftStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { usePresenceStore } from "@/src/stores/presenceStore";
@@ -56,7 +56,7 @@ import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Dialog } from "@/src/components/ui/Dialog";
 import { Button } from "@/src/components/ui/Button";
 import { FormMessage } from "@/src/components/ui/FormMessage";
-import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage, CallType, Room } from "@/src/types";
+import type { Message, MessageWithMeta, MessageAttachment, MessageMention, ScheduledMessage, Room } from "@/src/types";
 
 // Lazy: sheets/modals below are chat-screen-only and closed at mount — on web
 // they split out of the route chunk, on native their evaluation is deferred
@@ -660,24 +660,23 @@ export default function ChatScreen() {
     [sendPoll, t]
   );
 
-  // 1:1 calling — DM only. Media negotiation lives in the call store.
-  const startCall = useCallStore((s) => s.startCall);
-  const handleStartCall = useCallback(
-    (type: CallType) => {
+  // 1:1 voice calling — DM only.
+  const startVoiceCall = useVoiceCallStore((s) => s.startCall);
+  const handleStartVoiceCall = useCallback(
+    () => {
       if (!roomId || !otherProfile) return;
-      void startCall(
+      void startVoiceCall(
         roomId,
         {
           id: otherProfile.id,
           name: otherProfile.display_name || otherProfile.username,
           avatar: otherProfile.avatar_url ?? null,
         },
-        type
       );
     },
-    [roomId, otherProfile, startCall]
+    [roomId, otherProfile, startVoiceCall]
   );
-  const canCall = !isGroup && !!otherProfile && WEBRTC_SUPPORTED && !isDmBlocked;
+  const canCall = !isGroup && !!otherProfile && VOICE_CALL_SUPPORTED && !isDmBlocked;
 
   if (!roomId) {
     return <Spinner fullScreen />;
@@ -702,8 +701,7 @@ export default function ChatScreen() {
                 ? () => setShowContactInfo(true)
                 : undefined
           }
-          onStartAudioCall={canCall ? () => handleStartCall("audio") : undefined}
-          onStartVideoCall={canCall ? () => handleStartCall("video") : undefined}
+          onStartAudioCall={canCall ? handleStartVoiceCall : undefined}
           onPressMedia={() =>
             router.push({ pathname: "/chat/media", params: { roomId } })
           }

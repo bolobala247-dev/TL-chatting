@@ -256,48 +256,24 @@
   },
   "call": {
     "audio": "Cuộc gọi thoại",
-    "video": "Cuộc gọi video",
     "startAudio": "Gọi thoại",
-    "startVideo": "Gọi video",
     "status": {
       "calling": "Đang gọi…",
-      "ringing": "Đang đổ chuông…",
       "connecting": "Đang kết nối…",
-      "incomingAudio": "Cuộc gọi thoại đến",
-      "incomingVideo": "Cuộc gọi video đến",
-      "ended": "Đã kết thúc cuộc gọi",
-      "declined": "Cuộc gọi bị từ chối",
-      "missed": "Cuộc gọi nhỡ",
-      "failed": "Kết nối thất bại",
-      "reconnecting": "Đang kết nối lại…"
+      "connected": "Đã kết nối",
+      "incomingAudio": "Cuộc gọi thoại đến"
     },
     "actions": {
       "accept": "Trả lời",
-      "decline": "Từ chối",
-      "cancel": "Hủy"
+      "decline": "Từ chối"
     },
     "controls": {
       "mic": "Micro",
-      "camera": "Camera",
-      "switchCamera": "Đổi camera",
       "speaker": "Loa ngoài",
-      "pip": "Thu nhỏ màn hình",
       "end": "Kết thúc"
     },
-    "log": {
-      "outgoingAudio": "Cuộc gọi thoại đi",
-      "outgoingVideo": "Cuộc gọi video đi",
-      "incomingAudio": "Cuộc gọi thoại đến",
-      "incomingVideo": "Cuộc gọi video đến",
-      "missed": "Cuộc gọi nhỡ",
-      "declined": "Cuộc gọi bị từ chối",
-      "cancelled": "Cuộc gọi đã hủy",
-      "duration": "Thời lượng {{duration}}"
-    },
     "error": {
-      "permission": "Cần quyền truy cập camera và micro để thực hiện cuộc gọi.",
-      "start": "Không thể bắt đầu cuộc gọi, vui lòng thử lại.",
-      "busy": "Người này đang trong cuộc gọi khác."
+      "connection": "Không thể kết nối cuộc gọi. Vui lòng thử lại."
     }
   },
   "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"
