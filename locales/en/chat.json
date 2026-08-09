@@ -9,7 +9,12 @@
     "pin": "Pin",
     "unpin": "Unpin",
     "pinConversation": "Pin conversation",
-    "unpinConversation": "Unpin conversation"
+    "unpinConversation": "Unpin conversation",
+    "deleteConversation": "Delete conversation",
+    "deleteConversationTitle": "Delete conversation?",
+    "deleteConversationConfirm": "The conversation will be removed from your list. Other people's messages will not be deleted.",
+    "deleteConversationAction": "Delete conversation",
+    "deleteConversationFailed": "Couldn't delete the conversation"
   },
   "create": {
     "title": "New conversation",
@@ -55,6 +60,7 @@
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
     "back": "Back",
+    "media": "Media & links",
     "media": "Media & links"
   },
   "input": {

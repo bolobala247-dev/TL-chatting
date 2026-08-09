@@ -8,7 +8,12 @@
     "pin": "Ghim",
     "unpin": "Bỏ ghim",
     "pinConversation": "Ghim hội thoại",
-    "unpinConversation": "Bỏ ghim hội thoại"
+    "unpinConversation": "Bỏ ghim hội thoại",
+    "deleteConversation": "Xoá cuộc trò chuyện",
+    "deleteConversationTitle": "Xoá cuộc trò chuyện?",
+    "deleteConversationConfirm": "Cuộc trò chuyện sẽ bị xoá khỏi danh sách của bạn. Tin nhắn của những người khác không bị xoá.",
+    "deleteConversationAction": "Xoá cuộc trò chuyện",
+    "deleteConversationFailed": "Không thể xoá cuộc trò chuyện"
   },
   "create": {
     "title": "Cuộc trò chuyện mới",
@@ -50,6 +55,7 @@
     "lastSeenDays_other": "Hoạt động {{count}} ngày trước",
     "members_other": "{{count}} thành viên",
     "back": "Quay lại",
+    "media": "Phương tiện & liên kết",
     "media": "Phương tiện & liên kết"
   },
   "input": {

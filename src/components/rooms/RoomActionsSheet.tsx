@@ -10,6 +10,7 @@ interface RoomActionsSheetProps {
   onClose: () => void;
   /** Toggle the conversation bookmark (pin). */
   onTogglePin: (room: RoomWithLastMessage) => void;
+  onDelete: (room: RoomWithLastMessage) => void;
 }
 
 /**
@@ -21,6 +22,7 @@ export function RoomActionsSheet({
   visible,
   onClose,
   onTogglePin,
+  onDelete,
 }: RoomActionsSheetProps) {
   const { t } = useTranslation("chat");
   if (!room) return null;
@@ -59,6 +61,24 @@ export function RoomActionsSheet({
           {isBookmarked
             ? t("rooms.unpinConversation")
             : t("rooms.pinConversation")}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        className="flex-row items-center gap-3 border-t border-divider px-4 py-3.5 active:bg-pressed"
+        onPress={() => {
+          onDelete(room);
+          onClose();
+        }}
+        accessibilityRole="button"
+      >
+        <Icon
+          name={{ ios: "trash", android: "delete", web: "delete" }}
+          tone="danger"
+          size="md"
+        />
+        <Text className="font-sans text-body text-danger">
+          {t("rooms.deleteConversation")}
         </Text>
       </Pressable>
     </Sheet>
