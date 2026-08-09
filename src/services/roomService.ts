@@ -229,4 +229,15 @@ export const roomService = {
     if (error) throw error;
     return bookmarkedAt;
   },
+
+  // Removes only the current user's membership, so other participants keep
+  // their conversation and messages. A future direct message can create a
+  // new room for this user again.
+  async deleteConversation(roomId: string): Promise<void> {
+    const { error } = await (supabase.rpc as any)("remove_room_for_user", {
+      p_room_id: roomId,
+    });
+
+    if (error) throw error;
+  },
 };

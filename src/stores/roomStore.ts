@@ -22,6 +22,7 @@ interface RoomState {
   incrementUnread: (roomId: string) => void;
   clearUnread: (roomId: string) => void;
   toggleBookmark: (roomId: string, userId: string) => Promise<void>;
+  deleteConversation: (roomId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -139,6 +140,19 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     } catch (error) {
       console.error("[roomStore] toggleBookmark", error);
       set({ rooms: previous });
+    }
+  },
+
+  deleteConversation: async (roomId) => {
+    const previous = get().rooms;
+    set({ rooms: previous.filter((room) => room.room_id !== roomId) });
+    try {
+      await roomService.deleteConversation(roomId);
+      cacheService.saveRooms(get().rooms);
+    } catch (error) {
+      console.error("[roomStore] deleteConversation", error);
+      set({ rooms: previous });
+      throw error;
     }
   },
 

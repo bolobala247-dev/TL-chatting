@@ -7,10 +7,16 @@ import { Icon } from "./Icon";
 interface PasswordInputProps extends TextInputProps {
   label?: string;
   error?: string | boolean;
+  size?: "md" | "lg";
 }
 
+const toggleSizeStyles = {
+  md: "h-11 w-11",
+  lg: "h-12 w-12",
+};
+
 export const PasswordInput = forwardRef<TextInput, PasswordInputProps>(
-  function PasswordInput({ label, error = false, ...props }, ref) {
+  function PasswordInput({ label, error = false, size = "lg", ...props }, ref) {
     const { t } = useTranslation();
     const [visible, setVisible] = useState(false);
 
@@ -19,10 +25,11 @@ export const PasswordInput = forwardRef<TextInput, PasswordInputProps>(
         ref={ref}
         label={label}
         error={error}
+        size={size}
         secureTextEntry={!visible}
         rightSlot={
           <Pressable
-            className="h-12 w-12 items-center justify-center"
+            className={`${toggleSizeStyles[size]} items-center justify-center`}
             onPress={() => setVisible((v) => !v)}
             hitSlop={8}
             accessibilityRole="button"

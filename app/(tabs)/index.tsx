@@ -18,22 +18,26 @@ import { RoomListItem } from "@/src/components/rooms/RoomListItem";
 import { RoomActionsSheet } from "@/src/components/rooms/RoomActionsSheet";
 import { CreateRoomModal } from "@/src/components/rooms/CreateRoomModal";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { ConfirmDialog } from "@/src/components/ui/ConfirmDialog";
 import { Icon } from "@/src/components/ui/Icon";
 import { useTabBarSpace } from "@/src/components/ui/TabBar";
 import { useThemeColors, elevationFloat } from "@/src/theme";
 import type { RoomWithLastMessage } from "@/src/types";
 
 export default function ChatsScreen() {
-  const { t } = useTranslation("chat");
+  const { t } = useTranslation(["chat", "common"]);
   const router = useRouter();
   const colors = useThemeColors();
   const tabBarSpace = useTabBarSpace();
   const user = useAuthStore((s) => s.user);
   const toggleBookmark = useRoomStore((s) => s.toggleBookmark);
+  const deleteConversation = useRoomStore((s) => s.deleteConversation);
   const { rooms, loading, refresh } = useRooms();
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [actionRoom, setActionRoom] = useState<RoomWithLastMessage | null>(null);
   const [showRoomActions, setShowRoomActions] = useState(false);
+  const [deleteRoom, setDeleteRoom] = useState<RoomWithLastMessage | null>(null);
+  const [roomError, setRoomError] = useState("");
 
   const handleRoomPress = useCallback(
     (roomId: string) => {
@@ -63,6 +67,23 @@ export default function ChatsScreen() {
     [user, toggleBookmark]
   );
 
+  const handleDeleteConversation = useCallback((room: RoomWithLastMessage) => {
+    setDeleteRoom(room);
+    setRoomError("");
+  }, []);
+
+  const confirmDeleteConversation = useCallback(async () => {
+    if (!deleteRoom) return;
+    const target = deleteRoom;
+    setDeleteRoom(null);
+    try {
+      await deleteConversation(target.room_id);
+    } catch (error: unknown) {
+      console.error("[ChatsScreen] delete conversation", error);
+      setRoomError(error instanceof Error ? error.message : t("rooms.deleteConversationFailed"));
+    }
+  }, [deleteConversation, deleteRoom, t]);
+
   const renderItem = useCallback(
     ({ item }: { item: RoomWithLastMessage }) => (
       <RoomListItem
@@ -72,7 +93,7 @@ export default function ChatsScreen() {
         onTogglePin={handleTogglePin}
       />
     ),
-    [handleRoomPress, handleRoomLongPress, handleTogglePin]
+    [handleRoomPress, handleRoomLongPress, handleTogglePin, handleDeleteConversation]
   );
 
   const renderEmpty = useCallback(() => {
@@ -164,7 +185,25 @@ export default function ChatsScreen() {
         visible={showRoomActions}
         onClose={() => setShowRoomActions(false)}
         onTogglePin={handleTogglePin}
+        onDelete={handleDeleteConversation}
       />
+
+      <ConfirmDialog
+        visible={!!deleteRoom}
+        title={t("rooms.deleteConversationTitle")}
+        message={t("rooms.deleteConversationConfirm")}
+        confirmText={t("rooms.deleteConversationAction")}
+        cancelText={t("common:actions.cancel")}
+        destructive
+        onConfirm={confirmDeleteConversation}
+        onCancel={() => setDeleteRoom(null)}
+      />
+
+      {roomError ? (
+        <Text className="absolute bottom-24 left-4 right-4 rounded-xl bg-danger-bg px-4 py-3 text-center font-sans text-caption text-danger">
+          {roomError}
+        </Text>
+      ) : null}
 
       <CreateRoomModal
         visible={showCreateRoom}

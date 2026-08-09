@@ -8,7 +8,12 @@
     "pin": "Ghim",
     "unpin": "Bỏ ghim",
     "pinConversation": "Ghim hội thoại",
-    "unpinConversation": "Bỏ ghim hội thoại"
+    "unpinConversation": "Bỏ ghim hội thoại",
+    "deleteConversation": "Xoá cuộc trò chuyện",
+    "deleteConversationTitle": "Xoá cuộc trò chuyện?",
+    "deleteConversationConfirm": "Cuộc trò chuyện sẽ bị xoá khỏi danh sách của bạn. Tin nhắn của những người khác không bị xoá.",
+    "deleteConversationAction": "Xoá cuộc trò chuyện",
+    "deleteConversationFailed": "Không thể xoá cuộc trò chuyện"
   },
   "create": {
     "title": "Cuộc trò chuyện mới",
@@ -50,6 +55,7 @@
     "lastSeenDays_other": "Hoạt động {{count}} ngày trước",
     "members_other": "{{count}} thành viên",
     "back": "Quay lại",
+    "media": "Phương tiện & liên kết",
     "media": "Phương tiện & liên kết"
   },
   "input": {
@@ -93,6 +99,8 @@
     "deleted": "Tin nhắn đã bị thu hồi",
     "emptyTitle": "Chưa có tin nhắn nào",
     "emptyCta": "Hãy bắt đầu cuộc trò chuyện!",
+    "dateToday": "Hôm nay",
+    "dateYesterday": "Hôm qua",
     "editTitle": "Chỉnh sửa tin nhắn",
     "editEmpty": "Nội dung tin nhắn không được để trống",
     "editFailed": "Không thể chỉnh sửa tin nhắn",
@@ -248,48 +256,24 @@
   },
   "call": {
     "audio": "Cuộc gọi thoại",
-    "video": "Cuộc gọi video",
     "startAudio": "Gọi thoại",
-    "startVideo": "Gọi video",
     "status": {
       "calling": "Đang gọi…",
-      "ringing": "Đang đổ chuông…",
       "connecting": "Đang kết nối…",
-      "incomingAudio": "Cuộc gọi thoại đến",
-      "incomingVideo": "Cuộc gọi video đến",
-      "ended": "Đã kết thúc cuộc gọi",
-      "declined": "Cuộc gọi bị từ chối",
-      "missed": "Cuộc gọi nhỡ",
-      "failed": "Kết nối thất bại",
-      "reconnecting": "Đang kết nối lại…"
+      "connected": "Đã kết nối",
+      "incomingAudio": "Cuộc gọi thoại đến"
     },
     "actions": {
       "accept": "Trả lời",
-      "decline": "Từ chối",
-      "cancel": "Hủy"
+      "decline": "Từ chối"
     },
     "controls": {
       "mic": "Micro",
-      "camera": "Camera",
-      "switchCamera": "Đổi camera",
       "speaker": "Loa ngoài",
-      "pip": "Thu nhỏ màn hình",
       "end": "Kết thúc"
     },
-    "log": {
-      "outgoingAudio": "Cuộc gọi thoại đi",
-      "outgoingVideo": "Cuộc gọi video đi",
-      "incomingAudio": "Cuộc gọi thoại đến",
-      "incomingVideo": "Cuộc gọi video đến",
-      "missed": "Cuộc gọi nhỡ",
-      "declined": "Cuộc gọi bị từ chối",
-      "cancelled": "Cuộc gọi đã hủy",
-      "duration": "Thời lượng {{duration}}"
-    },
     "error": {
-      "permission": "Cần quyền truy cập camera và micro để thực hiện cuộc gọi.",
-      "start": "Không thể bắt đầu cuộc gọi, vui lòng thử lại.",
-      "busy": "Người này đang trong cuộc gọi khác."
+      "connection": "Không thể kết nối cuộc gọi. Vui lòng thử lại."
     }
   },
   "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"

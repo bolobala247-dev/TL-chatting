@@ -23,7 +23,7 @@ import { useNotifications } from "@/src/hooks/useNotifications";
 import { usePresenceHeartbeat } from "@/src/hooks/usePresence";
 import { useRealtimeRooms } from "@/src/hooks/useRealtime";
 import { AppLockGate } from "@/src/components/AppLockGate";
-import { CallHost } from "@/src/components/call/CallHost";
+import { VoiceCallHost } from "@/src/components/call/VoiceCallHost";
 import { Spinner } from "@/src/components/ui/LoadingSpinner";
 import { VercelInsights } from "@/src/components/VercelInsights";
 import "../global.css";
@@ -94,9 +94,7 @@ function AuthGate() {
           fullScreenGestureEnabled: true,
         }}
       />
-      {/* Global calling overlay — renders above every screen while a call is
-          active, and runs the incoming-call listener when signed in */}
-      {session && <CallHost />}
+      {session && <VoiceCallHost />}
     </>
   );
 }

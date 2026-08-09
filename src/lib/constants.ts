@@ -284,13 +284,11 @@ export const ROOM_OPEN_STATS_SCHEMA_VERSION = 1;
 export const PRESENCE_AWAY_MS = 60000;
 
 // ============================================
-// 1:1 Calling (WebRTC over Supabase Realtime signaling)
+// 1:1 voice calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 
-// Ring for this long before the outgoing call is marked missed
-export const CALL_RING_TIMEOUT_MS = 35000;
-// Connection-establishment guard: fail the call if media never connects
-export const CALL_CONNECT_TIMEOUT_MS = 30000;
+export const VOICE_CALL_RING_TIMEOUT_MS = 35000;
+export const VOICE_CALL_CONNECT_TIMEOUT_MS = 30000;
 
 // Google public STUN + optional TURN (env-driven, TURN-ready by design).
 // Provide EXPO_PUBLIC_TURN_URL/USERNAME/CREDENTIAL to add a relay for

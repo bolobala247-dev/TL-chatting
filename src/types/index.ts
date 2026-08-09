@@ -24,18 +24,7 @@ export type RoomRead = Tables<"room_reads">;
 export type UserBlock = Tables<"user_blocks">;
 export type UserReport = Tables<"user_reports">;
 export type Call = Tables<"calls">;
-
-// Call lifecycle (calls.type / calls.status CHECK constraints)
-export type CallType = "audio" | "video";
-export type CallStatus = "ringing" | "answered" | "declined" | "missed" | "ended";
-
-// Call-log payload stored on messages.metadata.call (type = "call")
-export interface CallLogMetadata {
-  call_id: string;
-  call_type: CallType;
-  status: Extract<CallStatus, "declined" | "missed" | "ended">;
-  duration_seconds: number | null;
-}
+export type VoiceCallStatus = "ringing" | "answered" | "declined" | "missed" | "ended";
 
 // Privacy visibility levels (privacy_settings CHECK constraints)
 export type VisibilityLevel = "everyone" | "contacts" | "nobody";

@@ -20,7 +20,6 @@ export type Database = {
           callee_id: string
           caller_id: string
           created_at: string | null
-          duration_seconds: number | null
           ended_at: string | null
           id: string
           room_id: string
@@ -32,19 +31,17 @@ export type Database = {
           callee_id: string
           caller_id: string
           created_at?: string | null
-          duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           room_id: string
           status?: string
-          type: string
+          type?: string
         }
         Update: {
           answered_at?: string | null
           callee_id?: string
           caller_id?: string
           created_at?: string | null
-          duration_seconds?: number | null
           ended_at?: string | null
           id?: string
           room_id?: string
@@ -798,6 +795,7 @@ export type Database = {
       is_username_available: { Args: { p_username: string }; Returns: boolean }
       mark_room_read: { Args: { p_room_id: string }; Returns: undefined }
       process_scheduled_messages: { Args: never; Returns: undefined }
+      remove_room_for_user: { Args: { p_room_id: string }; Returns: undefined }
       search_messages: {
         Args: {
           p_before?: string

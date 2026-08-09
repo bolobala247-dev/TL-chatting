@@ -120,9 +120,9 @@ export default function LoginScreen() {
 
       <KeyboardAwareScrollView
         className="flex-1"
-        contentContainerClassName="flex-grow justify-center px-6"
+        contentContainerClassName="flex-grow items-center justify-center px-4"
         contentContainerStyle={{
-          paddingTop: insets.top + 56,
+          paddingTop: insets.top + 40,
           paddingBottom: insets.bottom + 24,
         }}
         bottomOffset={24}
@@ -130,81 +130,88 @@ export default function LoginScreen() {
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
-        <View className="mb-10 items-center">
-          <Image
-            source={LOGO_BY_SCHEME[scheme]}
-            style={{ width: 72, height: 72 }}
-            contentFit="contain"
-            accessibilityLabel={t("common:appName")}
-          />
-          <Text className="mt-4 font-sans-bold text-display text-ink">
-            {t("common:appName")}
-          </Text>
-          <Text className="mt-2 font-sans text-body text-fg-tertiary">
-            {t("tagline")}
-          </Text>
-        </View>
-
-        <View className="gap-4">
-          <TextField
-            label={t("fields.identifier.label")}
-            error={!!error}
-            placeholder={t("fields.identifier.placeholder")}
-            value={identifier}
-            onChangeText={(text) => {
-              setIdentifier(text);
-              if (error) setError("");
-            }}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            textContentType="username"
-            autoComplete="username"
-            returnKeyType="next"
-            submitBehavior="submit"
-            onSubmitEditing={() => passwordRef.current?.focus()}
-          />
-
-          <PasswordInput
-            ref={passwordRef}
-            label={t("fields.password.label")}
-            error={!!error}
-            placeholder={t("fields.password.placeholder")}
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) setError("");
-            }}
-            textContentType="password"
-            autoComplete="password"
-            returnKeyType="go"
-            onSubmitEditing={handleLogin}
-          />
-
-          <View className="items-end">
-            <Link href="/(auth)/forgot-password" asChild>
-              <Text className="py-1 font-sans-medium text-caption text-ink">
-                {t("login.forgotPassword")}
-              </Text>
-            </Link>
+        <View className="w-full max-w-[460px] gap-8">
+          <View className="items-center gap-2">
+            <Image
+              source={LOGO_BY_SCHEME[scheme]}
+              style={{ width: 64, height: 64 }}
+              contentFit="contain"
+              accessibilityLabel={t("common:appName")}
+            />
+            <Text className="font-sans-bold text-headline text-ink">
+              {t("common:appName")}
+            </Text>
+            <Text className="font-sans text-caption text-fg-tertiary">
+              {t("tagline")}
+            </Text>
           </View>
 
-          {error ? <FormMessage>{error}</FormMessage> : null}
+          <View className="gap-3">
+            <TextField
+              size="md"
+              label={t("fields.identifier.label")}
+              error={!!error}
+              placeholder={t("fields.identifier.placeholder")}
+              value={identifier}
+              onChangeText={(text) => {
+                setIdentifier(text);
+                if (error) setError("");
+              }}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="username"
+              autoComplete="username"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+            />
 
-          <Button
-            title={t("login.submit")}
-            onPress={handleLogin}
-            loading={loading}
-          />
+            <View className="gap-1">
+              <PasswordInput
+                ref={passwordRef}
+                size="md"
+                label={t("fields.password.label")}
+                error={!!error}
+                placeholder={t("fields.password.placeholder")}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (error) setError("");
+                }}
+                textContentType="password"
+                autoComplete="password"
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+              />
 
-          <View className="mt-4 flex-row items-center justify-center gap-1">
-            <Text className="font-sans text-caption text-fg-tertiary">
-              {t("login.noAccount")}
-            </Text>
-            <Link href="/(auth)/register" asChild>
-              <Text className="font-sans-semibold text-caption text-ink">
-                {t("login.signUpNow")}
+              <View className="items-end">
+                <Link href="/(auth)/forgot-password" asChild>
+                  <Text className="font-sans-medium text-caption text-ink">
+                    {t("login.forgotPassword")}
+                  </Text>
+                </Link>
+              </View>
+            </View>
+
+            {error ? <FormMessage>{error}</FormMessage> : null}
+
+            <Button
+              title={t("login.submit")}
+              onPress={handleLogin}
+              loading={loading}
+              size="md"
+            />
+
+            <View className="flex-row items-center justify-center gap-1">
+              <Text className="font-sans text-caption text-fg-tertiary">
+                {t("login.noAccount")}
               </Text>
-            </Link>
+              <Link href="/(auth)/register" asChild>
+                <Text className="font-sans-semibold text-caption text-ink">
+                  {t("login.signUpNow")}
+                </Text>
+              </Link>
+            </View>
           </View>
         </View>
       </KeyboardAwareScrollView>

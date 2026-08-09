@@ -30,7 +30,7 @@ import {
   JUMP_HIGHLIGHT_FADE_OUT_MS,
 } from "@/src/lib/constants";
 import { useThemeColors } from "@/src/theme";
-import { getAttachments, getCallMetadata, formatCallDuration } from "@/src/lib/messageMeta";
+import { getAttachments } from "@/src/lib/messageMeta";
 import { seenByAllAt } from "@/src/lib/receipts";
 import { getMentions, splitByMentions } from "@/src/lib/mentions";
 import { hapticImpact, hapticSelection } from "@/src/lib/haptics";
@@ -227,49 +227,6 @@ export const MessageBubble = memo(function MessageBubble({
     return (
       <View className="my-1 items-center px-4">
         <Text className="font-sans text-label text-fg-tertiary">{message.content}</Text>
-      </View>
-    );
-  }
-
-  // Call-log: a centered chip summarizing a finished call. sender_id is the
-  // caller, so isMine distinguishes an outgoing call from an incoming one.
-  if (message.type === "call") {
-    const call = getCallMetadata(message);
-    const isVideo = call?.call_type === "video";
-    const isMissed = call?.status === "missed" || call?.status === "declined";
-
-    let label: string;
-    if (call?.status === "missed") label = t("call.log.missed");
-    else if (call?.status === "declined") label = t("call.log.declined");
-    else if (isMine)
-      label = isVideo ? t("call.log.outgoingVideo") : t("call.log.outgoingAudio");
-    else label = isVideo ? t("call.log.incomingVideo") : t("call.log.incomingAudio");
-
-    const duration =
-      call?.duration_seconds != null && call.duration_seconds > 0
-        ? formatCallDuration(call.duration_seconds)
-        : null;
-
-    return (
-      <View className="my-1 items-center px-4">
-        <View className="flex-row items-center gap-1.5 rounded-full border border-border bg-surface-secondary px-3 py-1.5">
-          <Icon
-            name={
-              isMissed
-                ? { ios: "phone.down.fill", android: "call_missed", web: "call_missed" }
-                : isVideo
-                  ? { ios: "video.fill", android: "videocam", web: "videocam" }
-                  : { ios: "phone.fill", android: "call", web: "call" }
-            }
-            tone={isMissed ? "danger" : "secondary"}
-            size={13}
-          />
-          <Text
-            className={`font-sans text-label ${isMissed ? "text-danger" : "text-fg-secondary"}`}
-          >
-            {duration ? `${label} · ${duration}` : label}
-          </Text>
-        </View>
       </View>
     );
   }

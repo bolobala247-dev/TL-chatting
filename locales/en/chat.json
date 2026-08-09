@@ -9,7 +9,12 @@
     "pin": "Pin",
     "unpin": "Unpin",
     "pinConversation": "Pin conversation",
-    "unpinConversation": "Unpin conversation"
+    "unpinConversation": "Unpin conversation",
+    "deleteConversation": "Delete conversation",
+    "deleteConversationTitle": "Delete conversation?",
+    "deleteConversationConfirm": "The conversation will be removed from your list. Other people's messages will not be deleted.",
+    "deleteConversationAction": "Delete conversation",
+    "deleteConversationFailed": "Couldn't delete the conversation"
   },
   "create": {
     "title": "New conversation",
@@ -55,6 +60,7 @@
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
     "back": "Back",
+    "media": "Media & links",
     "media": "Media & links"
   },
   "input": {
@@ -98,6 +104,8 @@
     "deleted": "This message was deleted",
     "emptyTitle": "No messages yet",
     "emptyCta": "Start the conversation!",
+    "dateToday": "Today",
+    "dateYesterday": "Yesterday",
     "editTitle": "Edit message",
     "editEmpty": "Message cannot be empty",
     "editFailed": "Couldn't edit the message",
@@ -257,48 +265,24 @@
   },
   "call": {
     "audio": "Voice call",
-    "video": "Video call",
     "startAudio": "Start voice call",
-    "startVideo": "Start video call",
     "status": {
       "calling": "Calling…",
-      "ringing": "Ringing…",
       "connecting": "Connecting…",
-      "incomingAudio": "Incoming voice call",
-      "incomingVideo": "Incoming video call",
-      "ended": "Call ended",
-      "declined": "Call declined",
-      "missed": "Missed call",
-      "failed": "Connection failed",
-      "reconnecting": "Reconnecting…"
+      "connected": "Connected",
+      "incomingAudio": "Incoming voice call"
     },
     "actions": {
       "accept": "Accept",
-      "decline": "Decline",
-      "cancel": "Cancel"
+      "decline": "Decline"
     },
     "controls": {
       "mic": "Microphone",
-      "camera": "Camera",
-      "switchCamera": "Switch camera",
       "speaker": "Speaker",
-      "pip": "Picture in picture",
       "end": "End call"
     },
-    "log": {
-      "outgoingAudio": "Outgoing voice call",
-      "outgoingVideo": "Outgoing video call",
-      "incomingAudio": "Incoming voice call",
-      "incomingVideo": "Incoming video call",
-      "missed": "Missed call",
-      "declined": "Call declined",
-      "cancelled": "Cancelled call",
-      "duration": "Duration {{duration}}"
-    },
     "error": {
-      "permission": "Camera and microphone access is required for calls.",
-      "start": "Couldn't start the call, please try again.",
-      "busy": "This person is on another call."
+      "connection": "Couldn't connect the call. Please try again."
     }
   },
   "startChatFailed": "Couldn't start the conversation, please try again"
