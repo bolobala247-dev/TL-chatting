@@ -29,7 +29,8 @@
     "placeholder": "Search users...",
     "searching": "Searching...",
     "noResults": "No users found",
-    "prompt": "Enter a name or username to search"
+    "prompt": "Enter a name or username to search",
+    "you": "This is you"
   },
   "globalSearch": {
     "placeholder": "Search...",

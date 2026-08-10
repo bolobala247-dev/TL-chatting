@@ -42,7 +42,7 @@ export default function ContactsScreen() {
       }
       setSearching(true);
       try {
-        const data = await profileService.searchUsers(text.trim(), user.id);
+        const data = await profileService.searchUsers(text.trim(), user.id, true);
         setResults(data);
       } catch {
         setResults([]);
@@ -58,7 +58,7 @@ export default function ContactsScreen() {
     if (!query.trim() || !user) return;
     setRefreshing(true);
     try {
-      const data = await profileService.searchUsers(query.trim(), user.id);
+      const data = await profileService.searchUsers(query.trim(), user.id, true);
       setResults(data);
     } catch {
       // keep the previous results on a failed refresh
@@ -89,9 +89,15 @@ export default function ContactsScreen() {
   const renderItem = useCallback(
     ({ item }: { item: ProfileSearchResult }) => (
       <Pressable
-        className="mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 active:bg-pressed"
+        className={`mx-3 flex-row items-center gap-3 rounded-2xl px-3 py-3 ${item.id === user?.id ? "bg-surface-secondary" : "active:bg-pressed"}`}
         onPress={() => handleStartChat(item)}
         accessibilityRole="button"
+        disabled={item.id === user?.id}
+        accessibilityLabel={
+          item.id === user?.id
+            ? `${item.display_name || item.username}, ${t("search.you")}`
+            : item.display_name || item.username
+        }
       >
         <Avatar
           uri={item.avatar_url}
@@ -103,6 +109,11 @@ export default function ContactsScreen() {
             {item.display_name || item.username}
           </Text>
           <Text className="mt-0.5 font-sans text-caption text-fg-tertiary">@{item.username}</Text>
+          {item.id === user?.id ? (
+            <Text className="mt-0.5 font-sans-medium text-caption text-fg-secondary">
+              {t("search.you")}
+            </Text>
+          ) : null}
         </View>
         <Icon
           name={{
@@ -115,7 +126,7 @@ export default function ContactsScreen() {
         />
       </Pressable>
     ),
-    [handleStartChat]
+    [handleStartChat, t, user?.id]
   );
 
   return (
