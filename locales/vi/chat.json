@@ -28,7 +28,8 @@
     "placeholder": "Tìm kiếm người dùng...",
     "searching": "Đang tìm kiếm...",
     "noResults": "Không tìm thấy người dùng",
-    "prompt": "Nhập tên hoặc username để tìm kiếm"
+    "prompt": "Nhập tên hoặc username để tìm kiếm",
+    "you": "Đây là bạn"
   },
   "globalSearch": {
     "placeholder": "Tìm kiếm...",

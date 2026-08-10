@@ -49,7 +49,8 @@ export const profileService = {
 
   async searchUsers(
     query: string,
-    _currentUserId: string
+    currentUserId: string,
+    includeCurrentUser = false
   ): Promise<ProfileSearchResult[]> {
     // SECURITY DEFINER RPC: excludes blocked users, masks avatar per privacy settings
     const { data, error } = await supabase.rpc("search_profiles", {
@@ -57,7 +58,10 @@ export const profileService = {
     });
 
     if (error) throw error;
-    return (data ?? []) as ProfileSearchResult[];
+    const results = (data ?? []) as ProfileSearchResult[];
+    return includeCurrentUser
+      ? results
+      : results.filter((profile) => profile.id !== currentUserId);
   },
 
   async uploadAvatar(userId: string, uri: string): Promise<string> {
