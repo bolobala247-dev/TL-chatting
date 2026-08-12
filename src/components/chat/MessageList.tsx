@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { FlashList, type FlashListRef, type ViewToken } from "@shopify/flash-list";
-import { MessageBubble } from "./MessageBubble";
+import { MessageBubble, type MessageLayout } from "./MessageBubble";
 import { DateSeparator } from "./DateSeparator";
 import { useAuthStore } from "@/src/stores/authStore";
 import { isSameCalendarDay } from "@/src/lib/formatDate";
@@ -27,7 +27,7 @@ interface MessageListProps {
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
   onLoadMore: () => void;
-  onMessageLongPress?: (message: MessageWithMeta) => void;
+  onMessageLongPress?: (message: MessageWithMeta, layout?: MessageLayout) => void;
   /** Swipe-to-reply on a bubble (native only). */
   onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
