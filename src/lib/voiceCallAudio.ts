@@ -24,5 +24,10 @@ export const voiceCallAudio = {
   stopRingback() {
     InCallManager.stopRingback();
   },
-  attachRemoteAudio(_stream: unknown) {},
+  async attachRemoteAudio(_stream: unknown): Promise<boolean> {
+    return true;
+  },
+  async resumeRemoteAudio(): Promise<boolean> {
+    return true;
+  },
 };

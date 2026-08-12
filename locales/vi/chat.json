@@ -266,7 +266,9 @@
     },
     "actions": {
       "accept": "Trả lời",
-      "decline": "Từ chối"
+      "decline": "Từ chối",
+      "enableAudio": "Bật âm thanh",
+      "retry": "Thử lại"
     },
     "controls": {
       "mic": "Micro",
@@ -274,7 +276,14 @@
       "end": "Kết thúc"
     },
     "error": {
-      "connection": "Không thể kết nối cuộc gọi. Vui lòng thử lại."
+      "connection": "Không thể kết nối cuộc gọi. Vui lòng thử lại.",
+      "permission-denied": "Bạn cần cho phép truy cập micro để gọi.",
+      "microphone-unavailable": "Không tìm thấy micro hoặc micro đang được sử dụng.",
+      "signaling-unavailable": "Kết nối báo hiệu bị gián đoạn. Vui lòng thử lại.",
+      "relay-unavailable": "Không thể tìm đường truyền âm thanh. Vui lòng đổi mạng và thử lại.",
+      "connection-timeout": "Cuộc gọi kết nối quá lâu. Vui lòng thử lại.",
+      "audio-playback-blocked": "Trình duyệt đang chặn âm thanh.",
+      "call-connect-failed": "Không thể kết nối cuộc gọi. Vui lòng thử lại."
     }
   },
   "startChatFailed": "Không thể bắt đầu trò chuyện, vui lòng thử lại"

@@ -1,9 +1,23 @@
 const audioState: { element?: HTMLAudioElement } = {};
 
+async function playRemoteAudio(): Promise<boolean> {
+  if (!audioState.element) return false;
+  try {
+    await audioState.element.play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const voiceCallAudio = {
   start() {},
   stop() {
-    audioState.element?.remove();
+    if (audioState.element) {
+      audioState.element.pause();
+      audioState.element.srcObject = null;
+      audioState.element.remove();
+    }
     audioState.element = undefined;
   },
   setSpeaker(_enabled: boolean) {},
@@ -11,15 +25,19 @@ export const voiceCallAudio = {
   stopRingtone() {},
   startRingback() {},
   stopRingback() {},
-  attachRemoteAudio(stream: any) {
-    if (typeof document === "undefined" || !stream) return;
-    const audio = document.createElement("audio");
-    audio.autoplay = true;
-    audio.srcObject = stream;
-    audio.setAttribute("aria-hidden", "true");
-    audio.style.display = "none";
-    document.body.appendChild(audio);
-    void audio.play().catch(() => {});
-    audioState.element = audio;
+  async attachRemoteAudio(stream: MediaStream): Promise<boolean> {
+    if (typeof document === "undefined" || !stream) return false;
+    if (!audioState.element) {
+      const audio = document.createElement("audio");
+      audio.autoplay = true;
+      audio.setAttribute("playsinline", "true");
+      audio.setAttribute("aria-hidden", "true");
+      audio.style.display = "none";
+      document.body.appendChild(audio);
+      audioState.element = audio;
+    }
+    audioState.element.srcObject = stream;
+    return playRemoteAudio();
   },
+  resumeRemoteAudio: playRemoteAudio,
 };

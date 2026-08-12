@@ -295,23 +295,11 @@ export const PRESENCE_AWAY_MS = 60000;
 export const VOICE_CALL_RING_TIMEOUT_MS = 35000;
 export const VOICE_CALL_CONNECT_TIMEOUT_MS = 30000;
 
-// Google public STUN + optional TURN (env-driven, TURN-ready by design).
-// Provide EXPO_PUBLIC_TURN_URL/USERNAME/CREDENTIAL to add a relay for
-// peers behind symmetric NATs; STUN-only still works for most networks.
+// Public STUN fallback. TURN credentials are fetched from the authenticated
+// get-turn-credentials Edge Function and are never shipped in EXPO_PUBLIC_*.
 export function getIceServers(): { urls: string | string[]; username?: string; credential?: string }[] {
-  const servers: { urls: string | string[]; username?: string; credential?: string }[] = [
+  return [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ];
-
-  const turnUrl = process.env.EXPO_PUBLIC_TURN_URL;
-  if (turnUrl) {
-    servers.push({
-      urls: turnUrl,
-      username: process.env.EXPO_PUBLIC_TURN_USERNAME,
-      credential: process.env.EXPO_PUBLIC_TURN_CREDENTIAL,
-    });
-  }
-
-  return servers;
 }

@@ -275,7 +275,9 @@
     },
     "actions": {
       "accept": "Accept",
-      "decline": "Decline"
+      "decline": "Decline",
+      "enableAudio": "Enable audio",
+      "retry": "Retry"
     },
     "controls": {
       "mic": "Microphone",
@@ -283,7 +285,14 @@
       "end": "End call"
     },
     "error": {
-      "connection": "Couldn't connect the call. Please try again."
+      "connection": "Couldn't connect the call. Please try again.",
+      "permission-denied": "Microphone permission is required for calls.",
+      "microphone-unavailable": "The microphone is unavailable or already in use.",
+      "signaling-unavailable": "The call signaling connection was interrupted.",
+      "relay-unavailable": "The audio route could not be established. Try another network.",
+      "connection-timeout": "The call took too long to connect.",
+      "audio-playback-blocked": "The browser is blocking call audio.",
+      "call-connect-failed": "Couldn't connect the call. Please try again."
     }
   },
   "startChatFailed": "Couldn't start the conversation, please try again"
