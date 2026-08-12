@@ -47,6 +47,7 @@ import { MessageInput } from "@/src/components/chat/MessageInput";
 import { MentionAutocomplete } from "@/src/components/chat/MentionAutocomplete";
 import { TypingIndicator } from "@/src/components/chat/TypingIndicator";
 import { MessageActions } from "@/src/components/chat/MessageActions";
+import type { MessageLayout } from "@/src/components/chat/MessageBubble";
 import { ReactionsSheet } from "@/src/components/chat/ReactionBar";
 import { ReplyPreview } from "@/src/components/chat/ReplyPreview";
 import { PinnedBanner } from "@/src/components/chat/PinnedBanner";
@@ -231,6 +232,8 @@ export default function ChatScreen() {
   }, []);
 
   const [selectedMessage, setSelectedMessage] = useState<MessageWithMeta | null>(null);
+  const [selectedMessageLayout, setSelectedMessageLayout] =
+    useState<MessageLayout | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [reactionsTarget, setReactionsTarget] = useState<MessageWithMeta | null>(null);
   const [receiptsTarget, setReceiptsTarget] = useState<MessageWithMeta | null>(null);
@@ -357,10 +360,14 @@ export default function ChatScreen() {
     });
   }, [messages]);
 
-  const handleLongPress = useCallback((message: MessageWithMeta) => {
-    setSelectedMessage(message);
-    setShowActions(true);
-  }, []);
+  const handleLongPress = useCallback(
+    (message: MessageWithMeta, layout?: MessageLayout) => {
+      setSelectedMessage(message);
+      setSelectedMessageLayout(layout ?? null);
+      setShowActions(true);
+    },
+    []
+  );
 
   const handleShowReactions = useCallback((message: MessageWithMeta) => {
     setReactionsTarget(message);
@@ -826,8 +833,12 @@ export default function ChatScreen() {
       <MessageActions
         message={selectedMessage}
         visible={showActions}
+        messageLayout={selectedMessageLayout}
         isSaved={selectedMessage ? savedIds.has(selectedMessage.id) : false}
-        onClose={() => setShowActions(false)}
+        onClose={() => {
+          setShowActions(false);
+          setSelectedMessageLayout(null);
+        }}
         onReply={handleReply}
         onPin={handlePin}
         onSave={handleSave}

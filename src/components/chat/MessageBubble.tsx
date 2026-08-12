@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -45,7 +45,7 @@ interface MessageBubbleProps {
   seenWatermark?: string | null;
   /** Group rooms expose the poll voters list. */
   showPollVoters?: boolean;
-  onLongPress?: (message: MessageWithMeta) => void;
+  onLongPress?: (message: MessageWithMeta, layout?: MessageLayout) => void;
   /** Swipe the bubble toward the center to quote-reply (native only). */
   onSwipeReply?: (message: MessageWithMeta) => void;
   onToggleReaction?: (message: MessageWithMeta, emoji: string) => void;
@@ -57,6 +57,13 @@ interface MessageBubbleProps {
   onRetry?: (message: MessageWithMeta) => void;
   /** Discard a pending/failed send without sending (Phase 5A outbox). */
   onDiscard?: (message: MessageWithMeta) => void;
+}
+
+export interface MessageLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /** Drag distance that arms the swipe-to-reply on release. */
@@ -132,6 +139,7 @@ export const MessageBubble = memo(function MessageBubble({
   const isMine = message.sender_id === userId;
   const isDeleted = !!message.deleted_at;
   const isPoll = message.type === "poll";
+  const bubbleRef = useRef<View>(null);
   // Phase 5A send state (own messages only; undefined = normal sent message)
   const isPending = message.outbox_status === "pending";
   const isFailed = message.outbox_status === "failed";
@@ -237,6 +245,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <Pressable
+      ref={bubbleRef}
       className={`my-0.5 max-w-[80%] px-3 ${isMine ? "self-end" : "self-start"}`}
       style={bubbleMaxWidth != null ? { maxWidth: bubbleMaxWidth } : undefined}
       onLongPress={
@@ -244,7 +253,14 @@ export const MessageBubble = memo(function MessageBubble({
           ? undefined
           : () => {
               hapticImpact();
-              onLongPress?.(message);
+              const bubble = bubbleRef.current;
+              if (bubble?.measureInWindow) {
+                bubble.measureInWindow((x, y, width, height) => {
+                  onLongPress?.(message, { x, y, width, height });
+                });
+              } else {
+                onLongPress?.(message);
+              }
             }
       }
       delayLongPress={300}

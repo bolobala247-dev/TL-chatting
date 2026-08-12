@@ -34,7 +34,7 @@ export const APP_LOCK_COOLDOWN_SECONDS = 30;
 export const APP_LOCK_PIN_LENGTH = { min: 4, max: 6 } as const;
 
 // Quick-reaction palette (minimal, no full emoji keyboard)
-export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"] as const;
+export const QUICK_REACTIONS = ["❤️", "😂", "😮", "😢", "😡", "👍"] as const;
 
 export const MESSAGE_TYPES = {
   TEXT: "text",
