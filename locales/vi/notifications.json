@@ -7,6 +7,10 @@
   },
   "errors": {
     "androidOnly": "Push hiện chỉ hỗ trợ Android",
+    "webUnsupported": "Trình duyệt này không hỗ trợ Web Push hoặc chưa chạy trên HTTPS",
+    "webPushNotConfigured": "Web Push chưa được cấu hình trên máy chủ",
+    "webPermissionDenied": "Quyền thông báo của trình duyệt chưa được cấp. Hãy bật quyền trong cài đặt trình duyệt",
+    "webSubscriptionFailed": "Không thể đăng ký thông báo trình duyệt, vui lòng thử lại",
     "physicalDeviceRequired": "Cần cài trên điện thoại thật, không phải emulator",
     "sessionNotReady": "Phiên đăng nhập chưa sẵn sàng, thử lại sau vài giây",
     "permissionDenied": "Chưa cấp quyền thông báo. Vào Cài đặt → Talo → Thông báo → Bật",

@@ -37,6 +37,10 @@ yarn-error.*
 !.env.example
 .env*.local
 
+# Web Push VAPID material (private JWK + generated public-key output)
+vapid-keys.json
+vapid-public-key.txt
+
 # IDEs/Editors
 .cursor/*
 !.cursor/rules/

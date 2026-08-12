@@ -5,7 +5,7 @@
   },
   "notifications": {
     "sectionTitle": "Thông báo",
-    "statusUnsupported": "Thiết bị này không hỗ trợ push Android",
+    "statusUnsupported": "Thiết bị hoặc trình duyệt này không hỗ trợ thông báo hệ thống",
     "statusGranted": "Đã bật quyền thông báo",
     "statusNotGranted": "Chưa bật quyền thông báo",
     "registered": "Đã đăng ký thông báo thành công",

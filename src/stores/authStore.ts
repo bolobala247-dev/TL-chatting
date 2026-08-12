@@ -8,7 +8,7 @@ import i18n, {
 } from "@/src/i18n";
 import { supabase } from "@/src/lib/supabase";
 import { profileService } from "@/src/services/profileService";
-import { pushTokenService } from "@/src/services/pushTokenService";
+import { removeCurrentPushRegistration } from "@/src/services/notificationService";
 import { cacheService } from "@/src/services/cacheService";
 import { outboxService } from "@/src/services/outboxService";
 import { mediaService } from "@/src/services/mediaService";
@@ -160,9 +160,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     try {
-      await pushTokenService.removeCurrentToken();
+      await removeCurrentPushRegistration();
     } catch (error) {
-      console.error("[AuthStore.signOut] remove push token", error);
+      console.error("[AuthStore.signOut] remove push registration", error);
     }
 
     const { error } = await supabase.auth.signOut();
@@ -209,6 +209,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       if (error) throw error;
 
+      try {
+        await removeCurrentPushRegistration();
+      } catch (cleanupError) {
+        console.error("[AuthStore.updatePassword] remove push registration", cleanupError);
+      }
       await supabase.auth.signOut();
       set({ session: null, user: null, profile: null });
     } finally {

@@ -1,0 +1,12 @@
+# Edge Function auth modes:
+# - send-push-on-message is called by pg_net with x-push-secret and performs
+#   its own shared-secret validation.
+# - manage-web-push-subscription is called by the browser with a user JWT;
+#   the function validates that JWT before using the service role. Built-in JWT
+#   verification is disabled so browser CORS preflight reaches the handler.
+
+[functions.send-push-on-message]
+verify_jwt = false
+
+[functions.manage-web-push-subscription]
+verify_jwt = false

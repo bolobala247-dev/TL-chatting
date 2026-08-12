@@ -88,17 +88,23 @@ export default function SettingsScreen() {
 
     setRegisteringNotifications(true);
     setNotificationError("");
+    try {
+      const result = await registerPushNotificationsForUser(user.id);
+      await refreshNotificationStatus();
 
-    const result = await registerPushNotificationsForUser(user.id);
-    await refreshNotificationStatus();
-
-    if (result.ok) {
-      setNotificationStatus("registered");
-    } else {
-      setNotificationError(result.reason);
+      if (result.ok) {
+        setNotificationStatus("registered");
+      } else {
+        setNotificationError(result.reason);
+      }
+    } catch (error) {
+      console.error("[Settings] enable notifications", error);
+      setNotificationError(
+        error instanceof Error ? error.message : t("errors:generic")
+      );
+    } finally {
+      setRegisteringNotifications(false);
     }
-
-    setRegisteringNotifications(false);
   };
 
   const handleSaveProfile = async () => {
