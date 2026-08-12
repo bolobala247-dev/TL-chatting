@@ -7,6 +7,7 @@ import i18n from "@/src/i18n";
 import { EAS_PROJECT_ID } from "@/src/lib/constants";
 import { supabase } from "@/src/lib/supabase";
 import { pushTokenService } from "@/src/services/pushTokenService";
+import { webPushService } from "@/src/services/webPushService";
 
 const ANDROID_CHANNEL_ID = "messages";
 // Per-install identifier — Device.modelName collides between identical
@@ -49,6 +50,14 @@ function resolveProjectId(): string {
 export async function getNotificationPermissionStatus(): Promise<
   Notifications.PermissionStatus | "unsupported"
 > {
+  if (Platform.OS === "web") {
+    const status = webPushService.getPermissionStatus();
+    if (status === "unsupported") return "unsupported";
+    if (status === "granted") return Notifications.PermissionStatus.GRANTED;
+    if (status === "denied") return Notifications.PermissionStatus.DENIED;
+    return Notifications.PermissionStatus.UNDETERMINED;
+  }
+
   if (Platform.OS !== "android" || !Device.isDevice) {
     return "unsupported";
   }
@@ -60,6 +69,11 @@ export async function getNotificationPermissionStatus(): Promise<
 export async function registerPushNotificationsForUser(
   userId: string
 ): Promise<PushRegistrationResult> {
+  if (Platform.OS === "web") {
+    const result = await webPushService.registerForUser(userId);
+    return result.ok ? { ok: true, token: "web" } : result;
+  }
+
   if (Platform.OS !== "android") {
     return { ok: false, reason: i18n.t("notifications:errors.androidOnly") };
   }
@@ -143,6 +157,10 @@ export async function registerPushNotificationsForUser(
 }
 
 export function startPushTokenSync(userId: string): () => void {
+  if (Platform.OS === "web") {
+    return webPushService.startSync(userId);
+  }
+
   let cancelled = false;
 
   async function sync() {
@@ -162,4 +180,13 @@ export function startPushTokenSync(userId: string): () => void {
     cancelled = true;
     subscription.remove();
   };
+}
+
+export async function removeCurrentPushRegistration(): Promise<void> {
+  if (Platform.OS === "web") {
+    await webPushService.removeCurrentSubscription();
+    return;
+  }
+
+  await pushTokenService.removeCurrentToken();
 }

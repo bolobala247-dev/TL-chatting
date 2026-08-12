@@ -7,6 +7,10 @@
   },
   "errors": {
     "androidOnly": "Push notifications are currently Android-only",
+    "webUnsupported": "This browser doesn't support Web Push or the app isn't running over HTTPS",
+    "webPushNotConfigured": "Web Push hasn't been configured on the server",
+    "webPermissionDenied": "Browser notification permission wasn't granted. Enable it in your browser settings",
+    "webSubscriptionFailed": "Couldn't subscribe to browser notifications, please try again",
     "physicalDeviceRequired": "Requires a physical phone, not an emulator",
     "sessionNotReady": "Your session isn't ready yet, try again in a few seconds",
     "permissionDenied": "Notification permission not granted. Go to Settings → Talo → Notifications → Enable",

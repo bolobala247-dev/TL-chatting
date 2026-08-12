@@ -5,7 +5,7 @@
   },
   "notifications": {
     "sectionTitle": "Notifications",
-    "statusUnsupported": "This device doesn't support Android push notifications",
+    "statusUnsupported": "This device or browser doesn't support system notifications",
     "statusGranted": "Notification permission enabled",
     "statusNotGranted": "Notification permission not enabled",
     "registered": "Notifications enabled successfully",

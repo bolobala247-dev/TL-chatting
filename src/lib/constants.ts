@@ -58,6 +58,11 @@ export const USER_STATUS = {
 
 export const EAS_PROJECT_ID = "5ff3ce97-1320-44a7-b7f5-167bbfd02b6f";
 
+// Public half of the Web Push VAPID key. The private key stays in Supabase
+// Edge Function secrets and is never bundled into the web client.
+export const WEB_PUSH_VAPID_PUBLIC_KEY =
+  process.env.EXPO_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY ?? "";
+
 // ============================================
 // Incremental synchronization (Phase 4)
 // ============================================
