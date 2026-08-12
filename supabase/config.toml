@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.manage-web-push-subscription]
 verify_jwt = false
+
+[functions.get-turn-credentials]
+verify_jwt = true

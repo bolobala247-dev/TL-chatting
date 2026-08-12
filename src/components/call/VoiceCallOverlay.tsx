@@ -16,11 +16,14 @@ export function VoiceCallOverlay() {
   const micEnabled = useVoiceCallStore((state) => state.micEnabled);
   const speakerEnabled = useVoiceCallStore((state) => state.speakerEnabled);
   const error = useVoiceCallStore((state) => state.error);
+  const audioPlaybackBlocked = useVoiceCallStore((state) => state.audioPlaybackBlocked);
   const accept = useVoiceCallStore((state) => state.accept);
   const decline = useVoiceCallStore((state) => state.decline);
   const end = useVoiceCallStore((state) => state.end);
   const toggleMic = useVoiceCallStore((state) => state.toggleMic);
   const toggleSpeaker = useVoiceCallStore((state) => state.toggleSpeaker);
+  const resumeRemoteAudio = useVoiceCallStore((state) => state.resumeRemoteAudio);
+  const retryCall = useVoiceCallStore((state) => state.retryCall);
 
   const incoming = direction === "incoming" && phase === "ringing";
   const status = incoming
@@ -46,7 +49,12 @@ export function VoiceCallOverlay() {
             {peer?.name}
           </Text>
           <Text className="mt-2 font-sans text-body text-white/70">{status}</Text>
-          {error && <Text className="mt-3 text-center font-sans text-label text-red-300">{t("call.error.connection")}</Text>}
+          {error && <Text className="mt-3 text-center font-sans text-label text-red-300">{t(`call.error.${error}`, { defaultValue: t("call.error.connection") })}</Text>}
+          {audioPlaybackBlocked && (
+            <Pressable onPress={resumeRemoteAudio} className="mt-4 rounded-full bg-white/20 px-4 py-2">
+              <Text className="font-sans-semibold text-label text-white">{t("call.actions.enableAudio")}</Text>
+            </Pressable>
+          )}
         </View>
 
         {incoming ? (
@@ -57,9 +65,14 @@ export function VoiceCallOverlay() {
         ) : (
           <View className="w-full flex-row items-center justify-around">
             {phase !== "ringing" && <Action icon={micEnabled ? "mic.fill" : "mic.slash.fill"} androidIcon={micEnabled ? "mic" : "mic_off"} label={t("call.controls.mic")} onPress={toggleMic} />}
-            {phase !== "ringing" && <Action icon="speaker.wave.2.fill" androidIcon="volume_up" label={t("call.controls.speaker")} active={speakerEnabled} onPress={toggleSpeaker} />}
+            {phase !== "ringing" && Platform.OS !== "web" && <Action icon="speaker.wave.2.fill" androidIcon="volume_up" label={t("call.controls.speaker")} active={speakerEnabled} onPress={toggleSpeaker} />}
             <Action icon="phone.down.fill" androidIcon="call_end" label={t("call.controls.end")} color="bg-red-500" onPress={end} />
           </View>
+        )}
+        {error && direction === "outgoing" && phase === "ended" && (
+          <Pressable onPress={retryCall} className="mb-4 rounded-full bg-white/20 px-5 py-3">
+            <Text className="font-sans-semibold text-label text-white">{t("call.actions.retry")}</Text>
+          </Pressable>
         )}
       </View>
     </Modal>

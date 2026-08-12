@@ -906,6 +906,26 @@ export type Database = {
         }
         Returns: string
       }
+      transition_voice_call: {
+        Args: { p_call_id: string; p_status: string }
+        Returns: {
+          answered_at: string | null
+          callee_id: string
+          caller_id: string
+          created_at: string | null
+          ended_at: string | null
+          id: string
+          room_id: string
+          status: string
+          type: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "calls"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never
