@@ -26,6 +26,7 @@ import { useChatStore } from "@/src/stores/chatStore";
 import { useRoomStore } from "@/src/stores/roomStore";
 import { useVoiceCallStore } from "@/src/stores/voiceCallStore";
 import { VOICE_CALL_SUPPORTED } from "@/src/lib/voiceCall";
+import { FEATURE_VIDEO_CALLS } from "@/src/lib/constants";
 import { useDraftStore } from "@/src/stores/draftStore";
 import { usePrivacyStore } from "@/src/stores/privacyStore";
 import { usePresenceStore } from "@/src/stores/presenceStore";
@@ -676,6 +677,17 @@ export default function ChatScreen() {
     },
     [roomId, otherProfile, startVoiceCall]
   );
+  const handleStartVideoCall = useCallback(
+    () => {
+      if (!roomId || !otherProfile) return;
+      void startVoiceCall(roomId, {
+        id: otherProfile.id,
+        name: otherProfile.display_name || otherProfile.username,
+        avatar: otherProfile.avatar_url ?? null,
+      }, "video");
+    },
+    [roomId, otherProfile, startVoiceCall]
+  );
   const canCall = !isGroup && !!otherProfile && VOICE_CALL_SUPPORTED && !isDmBlocked;
 
   if (!roomId) {
@@ -702,6 +714,7 @@ export default function ChatScreen() {
                 : undefined
           }
           onStartAudioCall={canCall ? handleStartVoiceCall : undefined}
+          onStartVideoCall={canCall && FEATURE_VIDEO_CALLS ? handleStartVideoCall : undefined}
           onPressMedia={() =>
             router.push({ pathname: "/chat/media", params: { roomId } })
           }

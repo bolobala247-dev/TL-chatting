@@ -53,7 +53,8 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "microphonePermission": "Talo cần quyền truy cập micro cho cuộc gọi thoại."
+          "microphonePermission": "Talo cần quyền truy cập micro cho cuộc gọi.",
+          "cameraPermission": "Talo cần quyền truy cập camera cho cuộc gọi video."
         }
       ],
       "expo-sqlite"

@@ -18,6 +18,8 @@ interface ChatHeaderProps {
   onPressInfo?: () => void;
   /** Starts a 1:1 voice call (DM only). */
   onStartAudioCall?: () => void;
+  /** Starts a 1:1 video call (DM only). */
+  onStartVideoCall?: () => void;
 }
 
 // Relative "last seen" copy; anything beyond a week falls back to offline
@@ -47,6 +49,7 @@ export function ChatHeader({
   onPressMedia,
   onPressInfo,
   onStartAudioCall,
+  onStartVideoCall,
 }: ChatHeaderProps) {
   const { t } = useTranslation("chat");
   const router = useRouter();
@@ -102,6 +105,22 @@ export function ChatHeader({
         >
           <Icon
             name={{ ios: "phone", android: "call", web: "call" }}
+            tone="primary"
+            size={20}
+          />
+        </Pressable>
+      )}
+
+      {onStartVideoCall && (
+        <Pressable
+          onPress={onStartVideoCall}
+          className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={t("call.startVideo")}
+        >
+          <Icon
+            name={{ ios: "video", android: "videocam", web: "videocam" }}
             tone="primary"
             size={20}
           />

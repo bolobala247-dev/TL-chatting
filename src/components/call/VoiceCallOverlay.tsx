@@ -4,6 +4,7 @@ import { SymbolView } from "expo-symbols";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { useVoiceCallStore } from "@/src/stores/voiceCallStore";
+import { CallVideoView } from "./CallVideoView";
 
 const WHITE = "#FFFFFF";
 
@@ -12,6 +13,12 @@ export function VoiceCallOverlay() {
   const insets = useSafeAreaInsets();
   const peer = useVoiceCallStore((state) => state.peer);
   const phase = useVoiceCallStore((state) => state.phase);
+  const callType = useVoiceCallStore((state) => state.callType);
+  const localStream = useVoiceCallStore((state) => state.localStream);
+  const remoteStream = useVoiceCallStore((state) => state.remoteStream);
+  const cameraEnabled = useVoiceCallStore((state) => state.cameraEnabled);
+  const cameraFacing = useVoiceCallStore((state) => state.cameraFacing);
+  const remoteMediaState = useVoiceCallStore((state) => state.remoteMediaState);
   const direction = useVoiceCallStore((state) => state.direction);
   const micEnabled = useVoiceCallStore((state) => state.micEnabled);
   const speakerEnabled = useVoiceCallStore((state) => state.speakerEnabled);
@@ -21,18 +28,21 @@ export function VoiceCallOverlay() {
   const decline = useVoiceCallStore((state) => state.decline);
   const end = useVoiceCallStore((state) => state.end);
   const toggleMic = useVoiceCallStore((state) => state.toggleMic);
+  const toggleCamera = useVoiceCallStore((state) => state.toggleCamera);
+  const switchCamera = useVoiceCallStore((state) => state.switchCamera);
   const toggleSpeaker = useVoiceCallStore((state) => state.toggleSpeaker);
   const resumeRemoteAudio = useVoiceCallStore((state) => state.resumeRemoteAudio);
   const retryCall = useVoiceCallStore((state) => state.retryCall);
 
   const incoming = direction === "incoming" && phase === "ringing";
+  const isVideo = callType === "video";
   const status = incoming
-    ? t("call.status.incomingAudio")
+    ? t(isVideo ? "call.status.incomingVideo" : "call.status.incomingAudio")
     : phase === "ringing"
       ? t("call.status.calling")
       : phase === "connecting"
         ? t("call.status.connecting")
-        : t("call.status.connected");
+        : t(isVideo ? "call.status.connectedVideo" : "call.status.connected");
 
   return (
     <Modal
@@ -43,8 +53,11 @@ export function VoiceCallOverlay() {
       onRequestClose={incoming ? decline : end}
     >
       <View className="flex-1 items-center justify-between bg-black px-6" style={{ paddingTop: insets.top + 48, paddingBottom: insets.bottom + 32 }}>
+        {isVideo && !incoming && remoteStream && remoteMediaState.videoEnabled && (
+          <View className="absolute inset-0"><CallVideoView stream={remoteStream} muted /></View>
+        )}
         <View className="items-center">
-          <Avatar uri={peer?.avatar} name={peer?.name} size={112} />
+          {(!isVideo || incoming || !remoteStream || !remoteMediaState.videoEnabled) && <Avatar uri={peer?.avatar} name={peer?.name} size={112} />}
           <Text className="mt-6 font-sans-semibold text-headline text-white" numberOfLines={1}>
             {peer?.name}
           </Text>
@@ -64,7 +77,10 @@ export function VoiceCallOverlay() {
           </View>
         ) : (
           <View className="w-full flex-row items-center justify-around">
+            {isVideo && localStream && cameraEnabled && <View className="absolute bottom-24 right-0 h-36 w-24 overflow-hidden rounded-xl border border-white/30"><CallVideoView stream={localStream} mirror={cameraFacing === "user"} muted local /></View>}
             {phase !== "ringing" && <Action icon={micEnabled ? "mic.fill" : "mic.slash.fill"} androidIcon={micEnabled ? "mic" : "mic_off"} label={t("call.controls.mic")} onPress={toggleMic} />}
+            {isVideo && phase !== "ringing" && <Action icon={cameraEnabled ? "video.fill" : "video.slash.fill"} androidIcon={cameraEnabled ? "videocam" : "videocam_off"} label={t("call.controls.camera")} onPress={toggleCamera} />}
+            {isVideo && phase !== "ringing" && cameraEnabled && <Action icon="arrow.triangle.2.circlepath.camera.fill" androidIcon="flip_camera_android" label={t("call.controls.switchCamera")} onPress={() => void switchCamera()} />}
             {phase !== "ringing" && Platform.OS !== "web" && <Action icon="speaker.wave.2.fill" androidIcon="volume_up" label={t("call.controls.speaker")} active={speakerEnabled} onPress={toggleSpeaker} />}
             <Action icon="phone.down.fill" androidIcon="call_end" label={t("call.controls.end")} color="bg-red-500" onPress={end} />
           </View>

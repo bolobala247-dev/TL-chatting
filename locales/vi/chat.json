@@ -258,11 +258,14 @@
   "call": {
     "audio": "Cuộc gọi thoại",
     "startAudio": "Gọi thoại",
+    "startVideo": "Gọi video",
     "status": {
       "calling": "Đang gọi…",
       "connecting": "Đang kết nối…",
       "connected": "Đã kết nối",
+      "connectedVideo": "Đã kết nối video",
       "incomingAudio": "Cuộc gọi thoại đến"
+      ,"incomingVideo": "Cuộc gọi video đến"
     },
     "actions": {
       "accept": "Trả lời",
@@ -273,6 +276,8 @@
     "controls": {
       "mic": "Micro",
       "speaker": "Loa ngoài",
+      "camera": "Camera",
+      "switchCamera": "Đổi camera",
       "end": "Kết thúc"
     },
     "error": {
@@ -283,6 +288,11 @@
       "relay-unavailable": "Không thể tìm đường truyền âm thanh. Vui lòng đổi mạng và thử lại.",
       "connection-timeout": "Cuộc gọi kết nối quá lâu. Vui lòng thử lại.",
       "audio-playback-blocked": "Trình duyệt đang chặn âm thanh.",
+      "camera-permission-denied": "Bạn cần cho phép truy cập camera. Cuộc gọi vẫn tiếp tục bằng âm thanh.",
+      "camera-unavailable": "Camera không khả dụng. Cuộc gọi vẫn tiếp tục bằng âm thanh.",
+      "camera-switch-failed": "Không thể đổi camera.",
+      "peer-video-unsupported": "Người nhận cần cập nhật ứng dụng để gọi video.",
+      "quota-exceeded": "Hệ thống đang tạm hết hạn mức đường truyền video.",
       "call-connect-failed": "Không thể kết nối cuộc gọi. Vui lòng thử lại."
     }
   },

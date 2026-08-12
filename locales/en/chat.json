@@ -267,11 +267,14 @@
   "call": {
     "audio": "Voice call",
     "startAudio": "Start voice call",
+    "startVideo": "Start video call",
     "status": {
       "calling": "Calling…",
       "connecting": "Connecting…",
       "connected": "Connected",
+      "connectedVideo": "Video connected",
       "incomingAudio": "Incoming voice call"
+      ,"incomingVideo": "Incoming video call"
     },
     "actions": {
       "accept": "Accept",
@@ -282,6 +285,8 @@
     "controls": {
       "mic": "Microphone",
       "speaker": "Speaker",
+      "camera": "Camera",
+      "switchCamera": "Switch camera",
       "end": "End call"
     },
     "error": {
@@ -292,6 +297,11 @@
       "relay-unavailable": "The audio route could not be established. Try another network.",
       "connection-timeout": "The call took too long to connect.",
       "audio-playback-blocked": "The browser is blocking call audio.",
+      "camera-permission-denied": "Camera permission is unavailable. The call will continue with audio.",
+      "camera-unavailable": "The camera is unavailable. The call will continue with audio.",
+      "camera-switch-failed": "Couldn't switch camera.",
+      "peer-video-unsupported": "The recipient needs to update the app for video calls.",
+      "quota-exceeded": "The video relay quota is temporarily unavailable.",
       "call-connect-failed": "Couldn't connect the call. Please try again."
     }
   },
