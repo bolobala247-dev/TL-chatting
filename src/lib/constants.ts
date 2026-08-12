@@ -292,6 +292,8 @@ export const PRESENCE_AWAY_MS = 60000;
 // 1:1 voice calling (WebRTC over Supabase Realtime signaling)
 // ============================================
 
+export const FEATURE_VIDEO_CALLS = process.env.EXPO_PUBLIC_FEATURE_VIDEO_CALLS === "true";
+
 export const VOICE_CALL_RING_TIMEOUT_MS = 35000;
 export const VOICE_CALL_CONNECT_TIMEOUT_MS = 30000;
 

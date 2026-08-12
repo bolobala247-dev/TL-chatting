@@ -25,6 +25,8 @@ export type UserBlock = Tables<"user_blocks">;
 export type UserReport = Tables<"user_reports">;
 export type Call = Tables<"calls">;
 export type VoiceCallStatus = "ringing" | "answered" | "declined" | "missed" | "ended";
+export type CallStatus = VoiceCallStatus;
+export type CallType = "audio" | "video";
 
 // Privacy visibility levels (privacy_settings CHECK constraints)
 export type VisibilityLevel = "everyone" | "contacts" | "nobody";

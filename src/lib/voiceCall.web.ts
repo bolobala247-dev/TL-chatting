@@ -6,8 +6,10 @@ export const RTCSessionDescription = browser.RTCSessionDescription;
 export const mediaDevices = browser.navigator?.mediaDevices;
 export const MediaStream = browser.MediaStream;
 export const MediaStreamTrack = browser.MediaStreamTrack;
+export const RTCView = undefined;
 
 export type VoiceMediaStream = MediaStream;
+export type CallMediaStream = MediaStream;
 
 export const VOICE_CALL_SUPPORTED =
   typeof browser.RTCPeerConnection !== "undefined" &&

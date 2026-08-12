@@ -5,6 +5,7 @@ const TURN_TTL_SECONDS = 60 * 60;
 const DEFAULT_TURN_QUOTA_GB = 950;
 const BYTES_PER_GB = 1024 ** 3;
 const QUOTA_CACHE_MS = 60_000;
+const REFRESH_GRACE_MS = 10 * 60_000;
 const CLOUDFLARE_TURN_BASE = "https://rtc.live.cloudflare.com/v1/turn/keys";
 const CLOUDFLARE_GRAPHQL_URL = "https://api.cloudflare.com/client/v4/graphql";
 
@@ -32,6 +33,15 @@ function json(req: Request, body: Record<string, unknown>, status = 200): Respon
     status,
     headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
+}
+
+async function readBody(req: Request): Promise<{ callId?: string }> {
+  try {
+    const body = await req.json() as { callId?: unknown };
+    return typeof body.callId === "string" ? { callId: body.callId } : {};
+  } catch {
+    return {};
+  }
 }
 
 function browserSafeIceServers(iceServers: RTCIceServer[]): RTCIceServer[] {
@@ -153,9 +163,50 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await authClient.auth.getUser(accessToken);
   if (userError || !userData.user) return json(req, { error: "Invalid session" }, 401);
 
+  const { callId } = await readBody(req);
+  const userId = userData.user.id;
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const adminClient = serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+  let selectedCallId = callId;
+  if (!selectedCallId) {
+    const { data: currentCall, error: currentCallError } = await userClient
+      .from("calls")
+      .select("id")
+      .eq("status", "answered")
+      .or(`caller_id.eq.${userId},callee_id.eq.${userId}`)
+      .order("answered_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (currentCallError) return json(req, { error: "Call lookup failed", code: "call-not-active" }, 400);
+    selectedCallId = currentCall?.id;
+  }
+  if (!selectedCallId) return json(req, { error: "Call is not active", code: "call-not-active" }, 400);
+
+  const { data: selectedCall, error: selectedCallError } = await userClient
+    .from("calls")
+    .select("id, status, caller_id, callee_id")
+    .eq("id", selectedCallId)
+    .maybeSingle();
+  if (selectedCallError || !selectedCall || selectedCall.status !== "answered" ||
+      ![selectedCall.caller_id, selectedCall.callee_id].includes(userId)) {
+    return json(req, { error: "Call is not active", code: "call-not-active" }, 400);
+  }
+
   const quotaMonitorConfigured = Boolean(cloudflareAccountId && analyticsToken);
   let quota: TurnQuotaSnapshot | null = null;
-  if (quotaMonitorConfigured) {
+  const { data: existingAdmission } = adminClient
+    ? await adminClient
+      .from("call_turn_admissions")
+      .select("call_id, admitted_at, last_refreshed_at")
+      .eq("call_id", selectedCallId)
+      .maybeSingle()
+    : { data: null };
+  const hasAdmission = Boolean(existingAdmission);
+
+  if (quotaMonitorConfigured && !hasAdmission) {
     try {
       quota = await getTurnQuota(cloudflareAccountId!, analyticsToken!, new Date());
     } catch {
@@ -175,6 +226,22 @@ Deno.serve(async (req) => {
         checkedAt: quota.checkedAt,
       }, 429);
     }
+  }
+
+  // The service role is used only for this internal admission write. It is
+  // never returned to the client and the table has no public policies.
+  if (!hasAdmission && adminClient) {
+    const { error: admissionError } = await adminClient
+      .from("call_turn_admissions")
+      .upsert({ call_id: selectedCallId }, { onConflict: "call_id" });
+    if (admissionError) return json(req, { error: "TURN admission unavailable", code: "quota-unavailable" }, 503);
+  } else if (hasAdmission && adminClient) {
+    await adminClient
+      .from("call_turn_admissions")
+      .update({ last_refreshed_at: new Date().toISOString() })
+      .eq("call_id", selectedCallId);
+  } else if (!hasAdmission && !serviceRoleKey) {
+    return json(req, { error: "TURN admission unavailable", code: "quota-unavailable" }, 503);
   }
 
   const response = await fetch(
@@ -208,7 +275,11 @@ Deno.serve(async (req) => {
         }
       : {
           status: "not-configured",
-          limitGb: DEFAULT_TURN_QUOTA_GB,
-        },
+        limitGb: DEFAULT_TURN_QUOTA_GB,
+      },
+    admission: {
+      callId: selectedCallId,
+      refreshBefore: new Date(Date.now() + TURN_TTL_SECONDS * 1000 - REFRESH_GRACE_MS).toISOString(),
+    },
   });
 });

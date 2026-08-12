@@ -1,9 +1,9 @@
 import InCallManager from "react-native-incall-manager";
 
 export const voiceCallAudio = {
-  start() {
-    InCallManager.start({ media: "audio", auto: true });
-    InCallManager.setForceSpeakerphoneOn(false);
+  start(type: "audio" | "video" = "audio") {
+    InCallManager.start({ media: type, auto: true });
+    InCallManager.setForceSpeakerphoneOn(type === "video");
   },
   stop() {
     InCallManager.stop();

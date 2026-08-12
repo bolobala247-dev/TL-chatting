@@ -11,7 +11,7 @@ async function playRemoteAudio(): Promise<boolean> {
 }
 
 export const voiceCallAudio = {
-  start() {},
+  start(_type: "audio" | "video" = "audio") {},
   stop() {
     if (audioState.element) {
       audioState.element.pause();

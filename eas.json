@@ -9,6 +9,7 @@
       "distribution": "internal",
       "env": {
         "EAS_USE_CACHE": "1",
+        "EXPO_PUBLIC_FEATURE_VIDEO_CALLS": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "https://elevsuvbbittizjxrfll.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsZXZzdXZiYml0dGl6anhyZmxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjE3NDEsImV4cCI6MjA5ODEzNzc0MX0.AN61yGiBcQOOPKnwHMCAasMqkcLREARNdPQFiQAiqMY"
       }
@@ -20,6 +21,7 @@
       },
       "env": {
         "EAS_USE_CACHE": "1",
+        "EXPO_PUBLIC_FEATURE_VIDEO_CALLS": "true",
         "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a",
         "EXPO_PUBLIC_SUPABASE_URL": "https://elevsuvbbittizjxrfll.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsZXZzdXZiYml0dGl6anhyZmxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjE3NDEsImV4cCI6MjA5ODEzNzc0MX0.AN61yGiBcQOOPKnwHMCAasMqkcLREARNdPQFiQAiqMY"
@@ -33,6 +35,7 @@
       },
       "env": {
         "EAS_USE_CACHE": "1",
+        "EXPO_PUBLIC_FEATURE_VIDEO_CALLS": "true",
         "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a",
         "EXPO_PUBLIC_SUPABASE_URL": "https://elevsuvbbittizjxrfll.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsZXZzdXZiYml0dGl6anhyZmxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NjE3NDEsImV4cCI6MjA5ODEzNzc0MX0.AN61yGiBcQOOPKnwHMCAasMqkcLREARNdPQFiQAiqMY"

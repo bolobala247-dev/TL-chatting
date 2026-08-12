@@ -1,6 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import { getIceServers } from "@/src/lib/constants";
-import type { Call, InsertTables, VoiceCallStatus } from "@/src/types";
+import type { Call, CallType, InsertTables, VoiceCallStatus } from "@/src/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type VoiceSignalKind =
@@ -9,7 +9,9 @@ export type VoiceSignalKind =
   | "answer"
   | "ice"
   | "hangup"
-  | "ack";
+  | "ack"
+  | "media-state"
+  | "ice-restart";
 
 export type VoiceSignalEnvelope = {
   version: 1;
@@ -21,17 +23,24 @@ export type VoiceSignalEnvelope = {
   ackFor?: string;
 };
 
+export type CallSignalKind = VoiceSignalKind;
+export type CallSignalEnvelope = VoiceSignalEnvelope;
+
 export type VoiceSignal =
-  | { kind: "ready" }
+  | { kind: "ready"; protocolVersion?: number; supportedCallTypes?: CallType[] }
   | { kind: "offer"; description: unknown }
   | { kind: "answer"; description: unknown }
   | { kind: "ice"; candidate: unknown }
   | { kind: "hangup" }
+  | { kind: "media-state"; audioEnabled: boolean; videoEnabled: boolean; revision: number }
+  | { kind: "ice-restart"; phase: "request" | "ready" }
   | { kind: "ack"; ackFor: string };
+
+export type CallSignal = VoiceSignal;
 
 export type VoiceCallAction = "answered" | "declined" | "missed" | "ended";
 
-let turnCache: { iceServers: RTCIceServer[]; expiresAt: number } | null = null;
+let turnCache: { callId: string | null; iceServers: RTCIceServer[]; expiresAt: number } | null = null;
 
 function createMessageId(): string {
   const cryptoApi = globalThis.crypto as Crypto | undefined;
@@ -40,12 +49,12 @@ function createMessageId(): string {
 }
 
 export const voiceCallService = {
-  async createCall(roomId: string, callerId: string, calleeId: string): Promise<Call> {
+  async createCall(roomId: string, callerId: string, calleeId: string, type: CallType = "audio"): Promise<Call> {
     const insert: InsertTables<"calls"> = {
       room_id: roomId,
       caller_id: callerId,
       callee_id: calleeId,
-      type: "audio",
+      type,
     };
     const { data, error } = await supabase.from("calls").insert(insert).select().single();
     if (error) throw error;
@@ -119,8 +128,8 @@ export const voiceCallService = {
     };
   },
 
-  async getIceServers(): Promise<RTCIceServer[]> {
-    if (turnCache && turnCache.expiresAt > Date.now() + 30_000) {
+  async getIceServers(callId?: string, options?: { forceRefresh?: boolean }): Promise<RTCIceServer[]> {
+    if (!options?.forceRefresh && turnCache && turnCache.callId === (callId ?? null) && turnCache.expiresAt > Date.now() + 30_000) {
       return turnCache.iceServers;
     }
 
@@ -128,11 +137,11 @@ export const voiceCallService = {
       iceServers?: RTCIceServer[];
       expiresAt?: string;
       code?: string;
-    }>("get-turn-credentials", { body: {} });
+    }>("get-turn-credentials", { body: callId ? { callId } : {} });
 
     if (!error && data?.iceServers?.length) {
       const expiresAt = data.expiresAt ? Date.parse(data.expiresAt) : Date.now() + 300_000;
-      turnCache = { iceServers: data.iceServers, expiresAt };
+      turnCache = { callId: callId ?? null, iceServers: data.iceServers, expiresAt };
       return data.iceServers;
     }
 
