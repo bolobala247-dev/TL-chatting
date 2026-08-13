@@ -21,6 +21,7 @@ import {
 } from "@/src/services/voiceCallService";
 import { useAuthStore } from "@/src/stores/authStore";
 import type { Call, CallType } from "@/src/types";
+import { callDebug, callDebugWarn, shortCallId, summarizeCallError } from "@/src/lib/callDebug";
 
 export type VoiceCallPhase = "idle" | "ringing" | "connecting" | "connected" | "ended";
 export type CallFailureCode =
@@ -105,6 +106,7 @@ interface Session {
   lastAnswer: unknown | null;
   mediaRevision: number;
   peerSupportsVideo: boolean;
+  generation: number;
 }
 
 const session: Session = {
@@ -130,6 +132,7 @@ const session: Session = {
   lastAnswer: null,
   mediaRevision: 0,
   peerSupportsVideo: false,
+  generation: 0,
 };
 
 const IDLE: Pick<
@@ -198,6 +201,7 @@ function supportedCallTypes(): CallType[] {
 
 async function getLocalMedia(type: CallType): Promise<CallMediaStream> {
   if (!mediaDevices) throw new Error("microphone-unavailable");
+  callDebug("media:request", { type });
   try {
     const stream = (await mediaDevices.getUserMedia(type === "video" ? {
       audio: true,
@@ -213,14 +217,20 @@ async function getLocalMedia(type: CallType): Promise<CallMediaStream> {
       throw new Error("microphone-unavailable");
     }
     if (type === "video" && stream.getVideoTracks().length === 0) {
+      callDebugWarn("media:video-unavailable-audio-fallback", { audioTracks: stream.getAudioTracks().length });
       return stream;
     }
+    callDebug("media:ok", { type, audioTracks: stream.getAudioTracks().length, videoTracks: stream.getVideoTracks().length });
     return stream;
   } catch (error) {
+    callDebugWarn("media:error", { type, ...summarizeCallError(error) });
     if (type === "video") {
       try {
         const audioOnly = await mediaDevices.getUserMedia({ audio: true, video: false }) as CallMediaStream;
-        if (audioOnly.getAudioTracks().length > 0) return audioOnly;
+        if (audioOnly.getAudioTracks().length > 0) {
+          callDebugWarn("media:audio-only-fallback", { type });
+          return audioOnly;
+        }
         audioOnly.getTracks().forEach((track) => track.stop());
       } catch {
         // The microphone-specific error below remains authoritative.
@@ -253,8 +263,16 @@ function clearTimers() {
   session.turnRefreshTimer = undefined;
 }
 
-function stopSession() {
+function stopSession(reason = "cleanup") {
+  callDebug("session:stop", {
+    reason,
+    callId: shortCallId(session.callId),
+    phase: useVoiceCallStore?.getState?.().phase,
+    hasPeerConnection: Boolean(session.pc),
+  });
   session.stopping = true;
+  // Invalidate callbacks from timers created by an older peer connection.
+  session.generation += 1;
   clearTimers();
   session.channel?.unsubscribe();
   session.channel = null;
@@ -314,20 +332,24 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
   }
 
   async function sendReliable(signal: VoiceSignal, attempts = 5): Promise<void> {
-    const envelope = await sendSignal(signal);
-    if (signal.kind === "ice" || signal.kind === "hangup") return;
+    const callId = session.callId;
+    const userId = session.userId;
+    if (!callId || !userId) throw new Error("signaling-unavailable");
+    const envelope = voiceCallService.createEnvelope(callId, userId, signal);
 
     const task = (async () => {
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         if (session.acknowledgedMessageIds.has(envelope.messageId)) return;
-        if (attempt > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 700));
-        }
         if (!session.channel || session.stopping) return;
         try {
           await sendEnvelope(envelope);
         } catch {
+          callDebugWarn("signal:retry-error", { callId: shortCallId(session.callId), kind: signal.kind, attempt: attempt + 1 });
           // Reconnect handling will retry the same logical message.
+        }
+        if (signal.kind === "ice" || signal.kind === "hangup") return;
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 700));
         }
       }
     })();
@@ -343,6 +365,16 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     }
   }
 
+  async function sendReady(force = false): Promise<void> {
+    if (session.readySent && !force) return;
+    session.readySent = true;
+    await sendReliable({
+      kind: "ready",
+      protocolVersion: 1,
+      supportedCallTypes: supportedCallTypes(),
+    }, 3);
+  }
+
   async function ensureCallerOffer(force = false) {
     if (get().direction !== "outgoing" || !session.channel) return;
     if (!session.pc) {
@@ -356,6 +388,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       return;
     }
     const offer = await session.pc.createOffer();
+    callDebug("webrtc:offer-create", { callId: shortCallId(session.callId), force, type: get().callType });
     await session.pc.setLocalDescription(offer);
     session.lastOfferDescription = serializableDescription(offer);
     session.offerSent = true;
@@ -363,6 +396,9 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
   }
 
   async function createPeerConnection(localStream: CallMediaStream) {
+    const generation = session.generation;
+    const callId = session.callId;
+    callDebug("webrtc:create", { callId: shortCallId(session.callId), type: get().callType, localAudio: localStream.getAudioTracks().length, localVideo: localStream.getVideoTracks().length });
     const pc = new RTCPeerConnection({
       iceServers: await voiceCallService.getIceServers(session.callId ?? undefined),
     });
@@ -373,7 +409,11 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
 
     (pc as any).ontrack = (event: any) => {
       const stream = event.streams?.[0];
-      if (!stream) return;
+      if (!stream) {
+        callDebugWarn("webrtc:track-without-stream", { callId: shortCallId(session.callId) });
+        return;
+      }
+      callDebug("webrtc:remote-track", { callId: shortCallId(session.callId), audioTracks: stream.getAudioTracks?.().length, videoTracks: stream.getVideoTracks?.().length });
       session.remoteStream = stream;
       set({ remoteStream: stream });
       voiceCallAudio.start(get().callType);
@@ -382,10 +422,24 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       });
     };
     (pc as any).onicecandidate = (event: any) => {
-      if (event.candidate) void sendSignal({ kind: "ice", candidate: serializableCandidate(event.candidate) });
+      if (event.candidate) {
+        callDebug("webrtc:ice-candidate", { callId: shortCallId(session.callId) });
+        void sendSignal({ kind: "ice", candidate: serializableCandidate(event.candidate) });
+      } else {
+        callDebug("webrtc:ice-gathering-complete", { callId: shortCallId(session.callId) });
+      }
     };
+    (pc as any).oniceconnectionstatechange = () => callDebug("webrtc:ice-state", { callId: shortCallId(session.callId), state: pc.iceConnectionState });
+    (pc as any).onicegatheringstatechange = () => callDebug("webrtc:ice-gathering-state", { callId: shortCallId(session.callId), state: pc.iceGatheringState });
+    (pc as any).onsignalingstatechange = () => callDebug("webrtc:signaling-state", { callId: shortCallId(session.callId), state: pc.signalingState });
     (pc as any).onconnectionstatechange = () => {
+      callDebug("webrtc:connection-state", { callId: shortCallId(session.callId), state: pc.connectionState, iceState: pc.iceConnectionState });
       if (pc.connectionState === "connected") {
+        // Ringback is started by the caller while waiting for acceptance. It
+        // must be stopped at the exact connected transition or the DTMF tone
+        // continues over the remote media on Android.
+        voiceCallAudio.stopRingback();
+        voiceCallAudio.stopRingtone();
         clearTimeout(session.connectTimer);
         clearTimeout(session.ringTimer);
         session.ringTimer = undefined;
@@ -394,6 +448,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
           : null;
         set({ phase: "connected", connectedAt: Date.now(), error: cameraWarning });
       } else if (pc.connectionState === "failed") {
+        callDebugWarn("webrtc:connection-failed", { callId: shortCallId(session.callId), iceState: pc.iceConnectionState });
         set({ error: "relay-unavailable" });
         void get().end();
       } else if (pc.connectionState === "closed" && !session.stopping) {
@@ -407,7 +462,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       void (async () => {
         // The caller coordinates ICE restarts; the callee only answers the
         // resulting offer, preventing simultaneous-offer glare.
-        if (session.stopping || get().direction !== "outgoing" || !session.pc || !session.callId) return;
+        if (session.stopping || session.generation !== generation || session.callId !== callId || get().direction !== "outgoing" || !session.pc || !session.callId) return;
         try {
           const iceServers = await voiceCallService.getIceServers(session.callId, { forceRefresh: true });
           session.pc.setConfiguration({ iceServers });
@@ -423,17 +478,24 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     }, 50 * 60_000);
 
     session.connectTimer = setTimeout(() => {
+      if (session.stopping || session.generation !== generation || session.callId !== callId || !session.pc) return;
+      callDebugWarn("webrtc:connect-timeout", { callId: shortCallId(session.callId), iceState: session.pc?.iceConnectionState, connectionState: session.pc?.connectionState });
       set({ error: "connection-timeout" });
       void get().end();
     }, VOICE_CALL_CONNECT_TIMEOUT_MS);
   }
 
-  async function handleSignal(envelope: VoiceSignalEnvelope, onReady?: () => Promise<void>) {
+  async function handleSignal(envelope: VoiceSignalEnvelope) {
     if (
       envelope.version !== 1 ||
       envelope.callId !== session.callId ||
       envelope.senderId !== session.peerId
-    ) return;
+    ) {
+      callDebugWarn("signal:ignored", { kind: envelope.kind, callId: shortCallId(envelope.callId), reason: "envelope-mismatch" });
+      return;
+    }
+
+    callDebug("signal:received", { callId: shortCallId(envelope.callId), kind: envelope.kind, messageId: shortCallId(envelope.messageId) });
 
     if (envelope.kind === "ack") {
       const ackFor = envelope.ackFor ?? (envelope.payload as { ackFor?: string } | undefined)?.ackFor;
@@ -442,7 +504,10 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     }
 
     await sendAck(envelope.messageId);
-    if (session.receivedMessageIds.has(envelope.messageId)) return;
+    if (session.receivedMessageIds.has(envelope.messageId)) {
+      callDebug("signal:duplicate", { callId: shortCallId(envelope.callId), kind: envelope.kind });
+      return;
+    }
     session.receivedMessageIds.add(envelope.messageId);
 
     const payload = (envelope.payload ?? {}) as {
@@ -455,13 +520,16 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     };
 
     if (envelope.kind === "ready") {
+      callDebug("signal:ready", { callId: shortCallId(session.callId), peerSupportsVideo: payload.supportedCallTypes?.includes("video") ?? false, callType: get().callType });
       session.peerSupportsVideo = payload.supportedCallTypes?.includes("video") ?? false;
       if (get().callType === "video" && !session.peerSupportsVideo) {
         set({ error: "peer-video-unsupported" });
         await get().end();
         return;
       }
-      await onReady?.();
+      // `ready` is a capability announcement, not a ping-pong handshake.
+      // Only the caller starts the offer after the callee announces readiness.
+      if (get().direction === "outgoing") await ensureCallerOffer();
       return;
     }
 
@@ -471,6 +539,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
         return;
       }
       session.lastOfferMessageId = envelope.messageId;
+      callDebug("signal:offer-apply", { callId: shortCallId(session.callId) });
       await session.pc.setRemoteDescription(new RTCSessionDescription(payload.description as any));
       session.remoteDescriptionSet = true;
       await flushCandidates();
@@ -486,6 +555,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       // Initial answers and ICE-restart answers are only valid while the
       // connection has a local offer. This also ignores duplicate answers.
       if (session.pc.signalingState === "have-local-offer") {
+        callDebug("signal:answer-apply", { callId: shortCallId(session.callId) });
         await session.pc.setRemoteDescription(new RTCSessionDescription(payload.description as any));
         session.remoteDescriptionSet = true;
         await flushCandidates();
@@ -494,6 +564,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     }
 
     if (envelope.kind === "ice") {
+      callDebug("signal:ice-apply-or-queue", { callId: shortCallId(session.callId), queued: !session.remoteDescriptionSet });
       if (session.pc && session.remoteDescriptionSet) {
         await session.pc.addIceCandidate(new RTCIceCandidate(payload.candidate as any));
       } else {
@@ -515,17 +586,20 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     }
 
     if (envelope.kind === "hangup") {
-      stopSession();
+      callDebug("signal:hangup", { callId: shortCallId(session.callId) });
+      stopSession("remote-hangup");
       set(IDLE);
     }
   }
 
   async function attachChannel(callId: string, onReady?: () => Promise<void>) {
+    callDebug("realtime:attach-start", { callId: shortCallId(callId) });
     await voiceCallService.prepareRealtimeAuth();
     const channel = voiceCallService.createSignalChannel(callId);
     session.channel = channel;
     channel.on("broadcast", { event: "signal" }, ({ payload }) => {
-      void handleSignal(payload as VoiceSignalEnvelope, onReady).catch(() => {
+      void handleSignal(payload as VoiceSignalEnvelope).catch(() => {
+        callDebugWarn("signal:handler-error", { callId: shortCallId(callId) });
         if (!session.stopping) set({ error: "signaling-unavailable" });
       });
     });
@@ -535,7 +609,10 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       const scheduleReconnect = () => {
         if (session.stopping || session.reconnecting) return;
         session.reconnecting = true;
+        callDebugWarn("realtime:reconnect-scheduled", { callId: shortCallId(callId) });
+        const generation = session.generation;
         session.reconnectTimer = setTimeout(() => {
+          if (session.stopping || session.generation !== generation || session.callId !== callId) return;
           void attachChannel(callId, onReady).catch(() => {
             session.reconnecting = false;
             set({ error: "signaling-unavailable" });
@@ -544,6 +621,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       };
 
       channel.subscribe((status) => {
+        callDebug("realtime:status", { callId: shortCallId(callId), status });
         if (status === "SUBSCRIBED") {
           const wasReconnect = session.reconnecting;
           subscribed = true;
@@ -553,7 +631,10 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           if (subscribed) scheduleReconnect();
-          else reject(new Error("signaling-unavailable"));
+          else {
+            callDebugWarn("realtime:subscribe-error", { callId: shortCallId(callId), status });
+            reject(new Error("signaling-unavailable"));
+          }
         }
         if (status === "CLOSED") scheduleReconnect();
       });
@@ -568,7 +649,10 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       const userId = useAuthStore.getState().user?.id;
       if (!userId) return;
 
+      callDebug("call:start", { roomId: shortCallId(roomId), peerId: shortCallId(peer.id), requestedType });
+
       session.stopping = false;
+      session.generation += 1;
       session.callId = null;
       session.userId = userId;
       session.peerId = peer.id;
@@ -581,18 +665,19 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
         set({ callId: call.id });
         await attachChannel(call.id, async () => {
           if (get().phase === "ringing") set({ phase: "connecting" });
-          session.readySent = true;
-          await sendReliable({ kind: "ready", protocolVersion: 1, supportedCallTypes: supportedCallTypes() }, 3);
+          await sendReady(true);
           await ensureCallerOffer(true);
         });
-        session.readySent = true;
-        await sendReliable({ kind: "ready", protocolVersion: 1, supportedCallTypes: supportedCallTypes() }, 3);
+        await sendReady();
         voiceCallAudio.startRingback();
+        const generation = session.generation;
         session.ringTimer = setTimeout(() => {
+          if (session.stopping || session.generation !== generation || session.callId !== call.id) return;
           set({ error: "connection-timeout" });
           void get().end();
         }, VOICE_CALL_RING_TIMEOUT_MS);
       } catch (error) {
+        callDebugWarn("call:start-error", { callId: shortCallId(get().callId), ...summarizeCallError(error) });
         const callId = get().callId;
         if (callId) await voiceCallService.transitionCall(callId, "missed").catch(() => {});
         stopSession();
@@ -601,18 +686,24 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
     },
 
     handleIncoming: (call, peer) => {
+      callDebug("call:incoming", { callId: shortCallId(call.id), type: call.type, peerId: shortCallId(peer.id) });
       if (get().phase !== "idle") {
         void voiceCallService.transitionCall(call.id, "declined").catch(() => {});
         return;
       }
       session.stopping = false;
+      session.generation += 1;
       session.callId = call.id;
       session.userId = useAuthStore.getState().user?.id ?? null;
       session.peerId = peer.id;
       const callType: CallType = call.type === "video" ? "video" : "audio";
       set({ callId: call.id, roomId: call.room_id, peer, direction: "incoming", phase: "ringing", callType, speakerEnabled: callType === "video", error: null, audioPlaybackBlocked: false });
       voiceCallAudio.startRingtone();
-      session.ringTimer = setTimeout(() => void get().decline(), VOICE_CALL_RING_TIMEOUT_MS);
+      const generation = session.generation;
+      session.ringTimer = setTimeout(() => {
+        if (session.stopping || session.generation !== generation || session.callId !== call.id) return;
+        void get().decline();
+      }, VOICE_CALL_RING_TIMEOUT_MS);
     },
 
     handleCallUpdate: (call) => {
@@ -621,7 +712,8 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       if (["declined", "missed", "ended"].includes(call.status)) {
         // Remote lifecycle events only tear down local resources. They must not
         // write another terminal status back to the database.
-        stopSession();
+        callDebug("call:remote-terminal", { callId: shortCallId(call.id), status: call.status });
+        stopSession(`remote-${call.status}`);
         set(IDLE);
       }
     },
@@ -630,19 +722,22 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       const callId = get().callId;
       if (!callId || get().direction !== "incoming" || get().phase !== "ringing") return;
       try {
+        callDebug("call:accept-start", { callId: shortCallId(callId), type: get().callType });
+        voiceCallAudio.stopRingtone();
+        voiceCallAudio.stopRingback();
         clearTimeout(session.ringTimer);
         set({ phase: "connecting", speakerEnabled: get().callType === "video", error: null });
         const local = await getLocalMedia(get().callType);
         await attachChannel(callId, async () => {
-          if (session.pc) await sendReliable({ kind: "ready", protocolVersion: 1, supportedCallTypes: supportedCallTypes() }, 3);
+          if (session.pc) await sendReady(true);
         });
         await voiceCallService.transitionCall(callId, "answered");
         await createPeerConnection(local);
         voiceCallAudio.start(get().callType);
-        session.readySent = true;
-        await sendReliable({ kind: "ready", protocolVersion: 1, supportedCallTypes: supportedCallTypes() });
+        await sendReady();
         await sendReliable({ kind: "media-state", audioEnabled: true, videoEnabled: local.getVideoTracks().length > 0, revision: ++session.mediaRevision }, 2);
       } catch (error) {
+        callDebugWarn("call:accept-error", { callId: shortCallId(callId), ...summarizeCallError(error) });
         set({ error: errorCode(error) });
         await get().end();
       }
@@ -650,13 +745,15 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
 
     decline: async () => {
       const callId = get().callId;
+      callDebug("call:decline", { callId: shortCallId(callId) });
       if (callId) await voiceCallService.transitionCall(callId, "declined").catch(() => {});
-      stopSession();
+      stopSession("local-decline");
       set(IDLE);
     },
 
     end: async () => {
       const callId = get().callId;
+      callDebug("call:end", { callId: shortCallId(callId), phase: get().phase, error: get().error });
       if (callId) await voiceCallService.transitionCall(callId, "ended").catch(() => {});
       try {
         if (session.channel && session.callId && session.userId) {
@@ -665,7 +762,7 @@ export const useVoiceCallStore = create<VoiceCallState>((set, get) => {
       } catch {
         // The database lifecycle is authoritative when the channel is gone.
       }
-      stopSession();
+      stopSession("local-end");
       set(IDLE);
     },
 
