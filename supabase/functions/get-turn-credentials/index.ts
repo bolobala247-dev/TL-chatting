@@ -18,6 +18,18 @@ type TurnQuotaSnapshot = {
 
 let quotaCache: (TurnQuotaSnapshot & { expiresAt: number }) | null = null;
 
+function shortId(value: string | undefined): string | undefined {
+  return value ? value.slice(0, 8) : undefined;
+}
+
+function turnLog(event: string, details: Record<string, unknown> = {}): void {
+  console.info(`[get-turn-credentials] ${event}`, details);
+}
+
+function turnWarn(event: string, details: Record<string, unknown> = {}): void {
+  console.warn(`[get-turn-credentials] ${event}`, details);
+}
+
 function corsHeaders(req: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": req.headers.get("Origin") ?? "*",
@@ -138,6 +150,7 @@ async function getTurnQuota(
 }
 
 Deno.serve(async (req) => {
+  turnLog("request", { method: req.method });
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
 
@@ -152,9 +165,16 @@ Deno.serve(async (req) => {
   const authorization = req.headers.get("Authorization");
 
   if (!supabaseUrl || !anonKey || !turnKeyId || !turnApiToken) {
+    turnWarn("configuration-missing", {
+      supabaseUrl: Boolean(supabaseUrl),
+      anonKey: Boolean(anonKey),
+      turnKeyId: Boolean(turnKeyId),
+      turnApiToken: Boolean(turnApiToken),
+    });
     return json(req, { error: "TURN service is not configured" }, 503);
   }
   if (!authorization?.toLowerCase().startsWith("bearer ")) {
+    turnWarn("authentication-missing");
     return json(req, { error: "Authentication required" }, 401);
   }
 
@@ -165,6 +185,7 @@ Deno.serve(async (req) => {
 
   const { callId } = await readBody(req);
   const userId = userData.user.id;
+  turnLog("authenticated", { userId: shortId(userId) });
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
@@ -192,6 +213,7 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (selectedCallError || !selectedCall || selectedCall.status !== "answered" ||
       ![selectedCall.caller_id, selectedCall.callee_id].includes(userId)) {
+    turnWarn("call-not-active", { callId: shortId(selectedCallId), userId: shortId(userId), status: selectedCall?.status });
     return json(req, { error: "Call is not active", code: "call-not-active" }, 400);
   }
 
@@ -205,18 +227,21 @@ Deno.serve(async (req) => {
       .maybeSingle()
     : { data: null };
   const hasAdmission = Boolean(existingAdmission);
+  turnLog("admission-check", { callId: shortId(selectedCallId), hasAdmission, quotaMonitorConfigured });
 
   if (quotaMonitorConfigured && !hasAdmission) {
     try {
       quota = await getTurnQuota(cloudflareAccountId!, analyticsToken!, new Date());
     } catch {
       // Once Analytics is configured, fail closed if the usage check is unavailable.
+      turnWarn("quota-unavailable", { callId: shortId(selectedCallId) });
       return json(req, {
         error: "TURN quota cannot be verified",
         code: "quota-unavailable",
       }, 503);
     }
     if (quota.egressBytes >= quota.limitBytes) {
+      turnWarn("quota-exceeded", { callId: shortId(selectedCallId), limitGb: quota.limitBytes / BYTES_PER_GB, usedGb: quota.egressBytes / BYTES_PER_GB });
       return json(req, {
         error: "TURN monthly quota reached",
         code: "quota-exceeded",
@@ -234,13 +259,18 @@ Deno.serve(async (req) => {
     const { error: admissionError } = await adminClient
       .from("call_turn_admissions")
       .upsert({ call_id: selectedCallId }, { onConflict: "call_id" });
-    if (admissionError) return json(req, { error: "TURN admission unavailable", code: "quota-unavailable" }, 503);
+    if (admissionError) {
+      turnWarn("admission-write-failed", { callId: shortId(selectedCallId) });
+      return json(req, { error: "TURN admission unavailable", code: "quota-unavailable" }, 503);
+    }
+    turnLog("admission-created", { callId: shortId(selectedCallId) });
   } else if (hasAdmission && adminClient) {
     await adminClient
       .from("call_turn_admissions")
       .update({ last_refreshed_at: new Date().toISOString() })
       .eq("call_id", selectedCallId);
   } else if (!hasAdmission && !serviceRoleKey) {
+    turnWarn("service-role-missing-for-admission", { callId: shortId(selectedCallId) });
     return json(req, { error: "TURN admission unavailable", code: "quota-unavailable" }, 503);
   }
 
@@ -258,11 +288,17 @@ Deno.serve(async (req) => {
 
   if (!response.ok) {
     console.error("[get-turn-credentials] Cloudflare request failed", response.status);
+    turnWarn("cloudflare-credentials-failed", { callId: shortId(selectedCallId), status: response.status });
     return json(req, { error: "TURN credentials unavailable" }, 502);
   }
 
   const payload = await response.json() as { iceServers?: RTCIceServer[] };
-  if (!payload.iceServers?.length) return json(req, { error: "TURN returned no ICE servers" }, 502);
+  if (!payload.iceServers?.length) {
+    turnWarn("cloudflare-empty-ice-servers", { callId: shortId(selectedCallId) });
+    return json(req, { error: "TURN returned no ICE servers" }, 502);
+  }
+
+  turnLog("success", { callId: shortId(selectedCallId), serverCount: payload.iceServers.length });
 
   return json(req, {
     iceServers: browserSafeIceServers(payload.iceServers),

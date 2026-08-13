@@ -1,5 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import { getIceServers } from "@/src/lib/constants";
+import { callDebug, callDebugWarn, shortCallId, summarizeCallError } from "@/src/lib/callDebug";
 import type { Call, CallType, InsertTables, VoiceCallStatus } from "@/src/types";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -50,6 +51,7 @@ function createMessageId(): string {
 
 export const voiceCallService = {
   async createCall(roomId: string, callerId: string, calleeId: string, type: CallType = "audio"): Promise<Call> {
+    callDebug("create-call:start", { type, roomId: shortCallId(roomId) });
     const insert: InsertTables<"calls"> = {
       room_id: roomId,
       caller_id: callerId,
@@ -57,7 +59,11 @@ export const voiceCallService = {
       type,
     };
     const { data, error } = await supabase.from("calls").insert(insert).select().single();
-    if (error) throw error;
+    if (error) {
+      callDebugWarn("create-call:error", { type, ...summarizeCallError(error) });
+      throw error;
+    }
+    callDebug("create-call:ok", { callId: shortCallId(data?.id), type });
     return data;
   },
 
@@ -66,7 +72,11 @@ export const voiceCallService = {
       p_call_id: callId,
       p_status: status,
     });
-    if (error) throw error;
+    if (error) {
+      callDebugWarn("transition:error", { callId: shortCallId(callId), status, ...summarizeCallError(error) });
+      throw error;
+    }
+    callDebug("transition:ok", { callId: shortCallId(callId), status });
     return data;
   },
 
@@ -93,6 +103,7 @@ export const voiceCallService = {
 
   async prepareRealtimeAuth(): Promise<void> {
     const { data } = await supabase.auth.getSession();
+    callDebug("realtime-auth", { hasSession: Boolean(data.session?.access_token) });
     await supabase.realtime.setAuth(data.session?.access_token ?? null);
   },
 
@@ -107,12 +118,20 @@ export const voiceCallService = {
   },
 
   async sendSignal(channel: RealtimeChannel, envelope: VoiceSignalEnvelope): Promise<void> {
+    callDebug("signal:send", {
+      callId: shortCallId(envelope.callId),
+      kind: envelope.kind,
+      messageId: shortCallId(envelope.messageId),
+    });
     const status = await channel.send({
       type: "broadcast",
       event: "signal",
       payload: envelope,
     });
-    if (status !== "ok") throw new Error("signaling-unavailable");
+    if (status !== "ok") {
+      callDebugWarn("signal:send-error", { callId: shortCallId(envelope.callId), kind: envelope.kind, status });
+      throw new Error("signaling-unavailable");
+    }
   },
 
   createEnvelope(callId: string, senderId: string, signal: VoiceSignal): VoiceSignalEnvelope {
@@ -130,21 +149,30 @@ export const voiceCallService = {
 
   async getIceServers(callId?: string, options?: { forceRefresh?: boolean }): Promise<RTCIceServer[]> {
     if (!options?.forceRefresh && turnCache && turnCache.callId === (callId ?? null) && turnCache.expiresAt > Date.now() + 30_000) {
+      callDebug("turn:cache-hit", { callId: shortCallId(callId), count: turnCache.iceServers.length });
       return turnCache.iceServers;
     }
 
+    callDebug("turn:request", { callId: shortCallId(callId), forceRefresh: Boolean(options?.forceRefresh) });
     const { data, error } = await supabase.functions.invoke<{
       iceServers?: RTCIceServer[];
       expiresAt?: string;
       code?: string;
+      quota?: unknown;
     }>("get-turn-credentials", { body: callId ? { callId } : {} });
 
     if (!error && data?.iceServers?.length) {
       const expiresAt = data.expiresAt ? Date.parse(data.expiresAt) : Date.now() + 300_000;
       turnCache = { callId: callId ?? null, iceServers: data.iceServers, expiresAt };
+      callDebug("turn:ok", { callId: shortCallId(callId), count: data.iceServers.length, hasQuota: Boolean(data.quota) });
       return data.iceServers;
     }
 
+    callDebugWarn("turn:fallback-stun", {
+      callId: shortCallId(callId),
+      code: data?.code,
+      ...summarizeCallError(error),
+    });
     return getIceServers() as RTCIceServer[];
   },
 };
